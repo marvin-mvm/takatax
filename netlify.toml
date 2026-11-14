@@ -1,0 +1,12 @@
+# Netlify build settings.
+# The app is TanStack Start with Nitro; the "netlify" preset writes static files to dist/
+# and the server-side rendering function to .netlify/functions-internal/, which Netlify
+# picks up automatically.
+[build]
+  command = "bun run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  BUN_VERSION = "1.4.4"
+  NITRO_PRESET = "netlify"
