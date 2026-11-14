@@ -44,11 +44,17 @@ where they differ.
 
 ## Workflow
 1. All frontend and backend (Supabase) work happens on branch `v0.002`.
-2. The owner opens and merges the PR `v0.002` -> `main`.
+2. The AI developer opens the PR `v0.002` -> `main` with the title and description filled
+   in; the owner reviews and merges it.
 3. The owner deploys `main` to Netlify.
 4. The owner back-fills Lovable with a PR `main` -> `v0.001`.
 - Push to `v0.002` only when the owner asks for it. Never push to `main` or `v0.001`.
 - Lovable is a backup editor and is used rarely; the owner will say when it was used.
+- Every commit pushed to `v0.002` ends its message with `[skip netlify]` so Netlify does
+  not build each push; only merges to `main` deploy. Do not use `[skip ci]`: it also skips
+  the GitHub Actions checks.
+- Merge PRs with "Create a merge commit" (not squash): a squash commit copies the
+  `[skip netlify]` lines into `main` and the production deploy would be skipped.
 
 ## Supabase
 - Project ref: `thiznrxojzrxkjwqhtjt`. The AI developer reads and edits the database
