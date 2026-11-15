@@ -19,7 +19,6 @@ const PESOS_PER_USD = 63;
 const MONTHLY_CHURN = 0.02;
 const TRIAL_DOCS = 11; // the COR plus 10 documents
 const RUN_DOC_LIMIT = 250;
-const PREMIUM_DOC_LIMIT = 300;
 const STORAGE_ADDON_SHARE = 50 / 900; // of regular customers
 const PARTNER_DISCOUNT = 0.25;
 const PARTNERS_TARGET = 1_608; // 20% of BIR-accredited tax agents, plus CPAs at half that
@@ -67,6 +66,10 @@ export interface ModelInputs {
   docsPerRun: number;
   /** Share of customers on the Premium plan, in percent. */
   premiumSharePct: number;
+  /** Documents a Premium month includes (the plan limit). */
+  premiumDocLimit: number;
+  /** How much of that limit an average Premium customer uses each month, in percent. */
+  premiumUsagePct: number;
   /** Which models read the documents. */
   reader: ReaderMode;
   /** Share of documents that need a second read (three-step reader only), in percent. */
@@ -93,6 +96,8 @@ export const DEFAULT_INPUTS: ModelInputs = {
   runsPerYear: 6,
   docsPerRun: 100,
   premiumSharePct: 10,
+  premiumDocLimit: 1_000,
+  premiumUsagePct: 40,
   reader: "pipeline",
   recheckSharePct: 50,
   marketingPct: 15,
@@ -214,7 +219,10 @@ export function runModel(inputs: ModelInputs): ModelResult {
   const costPerDoc = aiCostPerDocument(inputs.reader, inputs.recheckSharePct);
   const runsPerMonth = Math.max(inputs.runsPerYear, 0) / 12;
   const docsPerRun = clamp(inputs.docsPerRun, 0, RUN_DOC_LIMIT);
-  const premiumDocs = PREMIUM_DOC_LIMIT * (docsPerRun / RUN_DOC_LIMIT);
+  // Documents an average Premium customer has read each month: the plan limit times how much
+  // of it they use. At 100% usage every Premium customer maxes out their limit (worst case).
+  const premiumDocs =
+    Math.max(inputs.premiumDocLimit, 0) * (clamp(inputs.premiumUsagePct, 0, 100) / 100);
   const premiumShare = clamp(inputs.premiumSharePct, 0, 100) / 100;
   const partnerRunPrice = Math.round(inputs.runPrice * (1 - PARTNER_DISCOUNT));
 

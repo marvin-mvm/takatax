@@ -81,7 +81,7 @@ const STEPS: { href: string; question: string; answer: string }[] = [
   {
     href: "#users",
     question: "Who is the target user?",
-    answer: "Sole proprietors first. Bookkeepers and CPAs as free partners.",
+    answer: "Sole proprietors first. Bookkeepers and CPAs as partners, at 25% off.",
   },
   {
     href: "#market",
@@ -212,7 +212,7 @@ export function UsersSlide() {
       eyebrow={PHASE_1}
       tag="Step 2 of 7"
       title="Who is the target user?"
-      lead="Sole proprietors first. Tax professionals join free and bring their clients."
+      lead="Sole proprietors first. Tax professionals get 25% off and bring their clients."
     >
       <div className="grid gap-8 md:grid-cols-2 md:gap-12">
         <Block title="Taxpayers · pay per run">
@@ -234,7 +234,7 @@ export function UsersSlide() {
             />
           </ul>
         </Block>
-        <Block title="Tax professionals · free">
+        <Block title="Tax professionals · 25% off">
           <ul className="flex flex-col gap-4">
             <Persona
               icon={NotebookPen}
@@ -400,7 +400,7 @@ export function CompetitorsSlide() {
       title="What competitors already exist?"
       lead="Taxumo and JuanTax. Both are BIR-certified filing software sold by subscription, and you still record every transaction yourself."
     >
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-left text-[15px]/[22px]">
           <thead>
             <tr className="text-[13px] uppercase tracking-[0.08em] text-tk-muted">
@@ -469,8 +469,8 @@ const EDGES: { icon: LucideIcon; title: string; text: string }[] = [
   },
   {
     icon: BadgeCheck,
-    title: "Free for bookkeepers and CPAs",
-    text: "They pay nothing and keep 100% of their fees.",
+    title: "25% off for bookkeepers and CPAs",
+    text: "No platform fee. They keep 100% of what they charge.",
   },
 ];
 
@@ -588,7 +588,7 @@ export function RisksSlide() {
       title="What are the biggest failure risks?"
       lead="A wrong figure on a tax return. Most errors will come from people, not from Takatax, so we catch them before filing."
     >
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-left text-[15px]/[22px]">
           <thead>
             <tr className="text-[13px] uppercase tracking-[0.08em] text-tk-muted">

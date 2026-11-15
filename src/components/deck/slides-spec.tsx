@@ -323,7 +323,7 @@ export function ReviewSlide() {
       title="Review fixed the tax logic before any code was written."
       lead="A review of the first draft caught these tax errors. Each one is now a rule in the tax engine."
     >
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-left text-[15px]/[22px]">
           <thead>
             <tr className="text-[13px] uppercase tracking-[0.08em] text-tk-muted">
@@ -491,8 +491,8 @@ export function BuildSlide() {
               },
               {
                 task: "Implement the core AI feature",
-                status: "Next",
-                note: "Port the tested prototype: the reader and the tax engine.",
+                status: "In progress",
+                note: "The three-step reader and its checks are built and tested; the OpenRouter key is next.",
               },
               {
                 task: "At least 5 meaningful commits",

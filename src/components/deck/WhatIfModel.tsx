@@ -316,7 +316,7 @@ export function WhatIfModel() {
             <ControlGroup
               value="usage"
               title="Usage"
-              summary={`${inputs.runsPerYear} runs a year, ${inputs.docsPerRun} documents each, ${inputs.premiumSharePct}% Premium`}
+              summary={`${inputs.runsPerYear} runs a year of ${inputs.docsPerRun} documents; ${inputs.premiumSharePct}% on Premium, using ${inputs.premiumUsagePct}% of ${formatNumber(inputs.premiumDocLimit)}`}
             >
               <SliderRow
                 label="Runs per customer, per year"
@@ -344,6 +344,24 @@ export function WhatIfModel() {
                 max={30}
                 step={1}
                 onChange={(value) => set("premiumSharePct", value)}
+              />
+              <SliderRow
+                label="Premium limit, documents a month"
+                display={formatNumber(inputs.premiumDocLimit)}
+                value={inputs.premiumDocLimit}
+                min={300}
+                max={2_000}
+                step={50}
+                onChange={(value) => set("premiumDocLimit", value)}
+              />
+              <SliderRow
+                label="Share of the Premium limit used"
+                display={`${inputs.premiumUsagePct}% · ${formatNumber((inputs.premiumDocLimit * inputs.premiumUsagePct) / 100)} docs`}
+                value={inputs.premiumUsagePct}
+                min={10}
+                max={100}
+                step={5}
+                onChange={(value) => set("premiumUsagePct", value)}
               />
             </ControlGroup>
             <ControlGroup
@@ -468,7 +486,7 @@ export function WhatIfModel() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-right text-sm/5">
           <caption className="sr-only">Projection by year</caption>
           <thead>

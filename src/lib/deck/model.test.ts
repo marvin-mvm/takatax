@@ -146,6 +146,25 @@ describe("runModel", () => {
     expect(runModel(withInputs({ includeAds: false })).totals.revenue.ads).toBe(0);
   });
 
+  it("costs more AI, and earns no more, when Premium includes more documents", () => {
+    const small = runModel(withInputs({ premiumDocLimit: 300 })).totals;
+    const large = runModel(withInputs({ premiumDocLimit: 1_000 })).totals;
+    expect(large.revenue.total).toBeCloseTo(small.revenue.total, 4);
+    expect(large.costs).toBeGreaterThan(small.costs);
+    expect(large.netProfit).toBeLessThan(small.netProfit);
+  });
+
+  it("reads a full Premium limit for every Premium customer at 100% usage", () => {
+    const oneYear = { years: 1, includeAds: false, includeSubscriptions: false };
+    const none = runModel(withInputs({ ...oneYear, premiumUsagePct: 0 })).years[0];
+    const full = runModel(withInputs({ ...oneYear, premiumUsagePct: 100 })).years[0];
+    let premiumMonths = 0;
+    for (let month = 1; month <= 12; month++) {
+      premiumMonths += Math.round((MICRO_ENTERPRISES * 0.001 * month) / 12) * 0.1;
+    }
+    expect((full?.documents ?? 0) - (none?.documents ?? 0)).toBeCloseTo(premiumMonths * 1_000, 4);
+  });
+
   it("stays profitable on the default plan from year 2", () => {
     const years = runModel(DEFAULT_INPUTS).years;
     expect(years[1]?.netProfit).toBeGreaterThan(0);
