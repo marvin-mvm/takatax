@@ -1,9 +1,12 @@
 -- =============================================================================================
 -- Takatax core schema: accounts, documents, ledger, partners, reviews and the community.
 --
--- STATUS: written, NOT APPLIED. Apply it to project thiznrxojzrxkjwqhtjt (Supabase SQL editor,
--- `supabase db push`, or the Management API), then regenerate the TypeScript types. Until then
--- the app shows sample data. See docs/MISSING_PIECES.md.
+-- Applied to project thiznrxojzrxkjwqhtjt together with 20261115140000_chat_access_payments.sql.
+-- Until a migration is applied, the app shows sample data.
+--
+-- Column privileges: Supabase grants every table to `anon` and `authenticated`. Revoking one
+-- column from a table-wide grant does nothing, so each table that clients may update first
+-- loses UPDATE entirely and then gets it back on the columns they may change.
 --
 -- Money is stored in centavos (bigint). Files live in Cloudflare R2; `documents.storage_key`
 -- is the R2 object key. Edge functions write documents and ledger rows with the service role;
@@ -141,8 +144,8 @@ create table public.ledger_records (
 );
 create index ledger_records_account_date_idx on public.ledger_records (account_id, record_date);
 
--- A paid (or trial) batch of documents to read. MISSING: payments (PayMongo or Xendit) mark
--- runs paid through a verified webhook.
+-- A paid (or free) batch of documents to read. create-checkout creates it; free runs (trial,
+-- Premium) start paid, and the paymongo-webhook function marks paid ones.
 create table public.runs (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references public.accounts (id) on delete cascade,
@@ -314,20 +317,30 @@ alter table public.community_answers enable row level security;
 create policy "own profile" on public.profiles
   for select using (user_id = auth.uid());
 create policy "update own profile" on public.profiles
-  for update using (user_id = auth.uid());
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+-- Only the name: the role is set at sign-up and cannot be changed by the user.
+revoke update on public.profiles from anon, authenticated;
+grant update (full_name) on public.profiles to authenticated;
 
 create policy "verified partners are public" on public.partner_profiles
   for select using (verified_at is not null or user_id = auth.uid());
 create policy "partners edit their own profile" on public.partner_profiles
-  for update using (user_id = auth.uid());
--- Partners cannot verify themselves or set their own rating.
-revoke update (verified_at, rating_avg, rating_count, kind) on public.partner_profiles from anon, authenticated;
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+-- Partners cannot verify themselves, change their kind or set their own rating.
+revoke update on public.partner_profiles from anon, authenticated;
+grant update (display_name, city, bio, specialties, years_in_practice, bir_accreditation_no, prc_license_no)
+  on public.partner_profiles to authenticated;
 
 create policy "owner or partner reads the account" on public.accounts
   for select using (public.has_account_access(id));
 create policy "owner updates the account" on public.accounts
-  for update using (owner_user_id = auth.uid());
-revoke update (trial_used, owner_user_id) on public.accounts from anon, authenticated;
+  for update using (owner_user_id = auth.uid()) with check (owner_user_id = auth.uid());
+-- The owner confirms the COR fields; the trial, owner and Premium dates are set by the server.
+revoke update on public.accounts from anon, authenticated;
+grant update (tin, registered_name, trade_name, rdo_code, registered_address, line_of_business,
+              registration_date, vat_registered, withholding_agent, income_tax_option,
+              business_type, mixed_income, updated_at)
+  on public.accounts to authenticated;
 
 create policy "owner or partner reads documents" on public.documents
   for select using (public.has_account_access(account_id));
@@ -335,23 +348,29 @@ create policy "owner or partner reads documents" on public.documents
 create policy "owner or partner reads the ledger" on public.ledger_records
   for select using (public.has_account_access(account_id));
 create policy "owner or partner corrects the ledger" on public.ledger_records
-  for update using (public.has_account_access(account_id));
+  for update using (public.has_account_access(account_id))
+  with check (public.has_account_access(account_id));
+revoke update on public.ledger_records from anon, authenticated;
+grant update (record_date, counterparty, counterparty_tin, description, category, amount_centavos,
+              vat_centavos, tax_withheld_centavos, user_corrected, updated_at)
+  on public.ledger_records to authenticated;
 
 create policy "owner reads runs" on public.runs
   for select using (public.has_account_access(account_id));
 
+-- Granting and removing access goes through grant_partner_access() and revoke_partner_access()
+-- (next migration), which check that the partner is verified.
 create policy "owner and partner see access" on public.partner_access
   for select using (
     partner_user_id = auth.uid()
     or account_id = public.my_account_id()
   );
-create policy "owner grants access" on public.partner_access
-  for insert with check (account_id = public.my_account_id());
-create policy "owner revokes access" on public.partner_access
-  for update using (account_id = public.my_account_id());
 
 create policy "reviews are public" on public.partner_reviews
   for select using (true);
+-- Reviews are public, but not who wrote them.
+revoke select on public.partner_reviews from anon, authenticated;
+grant select (id, partner_user_id, rating, body, created_at) on public.partner_reviews to anon, authenticated;
 create policy "clients review partners they worked with" on public.partner_reviews
   for insert with check (
     author_user_id = auth.uid()
@@ -368,6 +387,9 @@ create policy "members post questions" on public.community_posts
   for insert to authenticated with check (author_user_id = auth.uid());
 create policy "authors delete their posts" on public.community_posts
   for update to authenticated using (author_user_id = auth.uid());
+-- Authors can only set deleted_at; the guard trigger also blocks edits to the text.
+revoke update on public.community_posts from anon, authenticated;
+grant update (deleted_at) on public.community_posts to authenticated;
 revoke select on public.community_posts from anon, authenticated;
 grant select (id, title, body, topic, visibility, created_at, deleted_at)
   on public.community_posts to anon, authenticated;
