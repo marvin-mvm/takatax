@@ -75,6 +75,18 @@ where they differ.
   repo or the browser. This replaces the Lovable AI gateway rule above.
 - File storage: Cloudflare R2 (private buckets, signed upload links), not Supabase Storage.
   R2 keys live in Supabase Edge Function secrets.
+- Payments: PayMongo checkout sessions (GCash, Maya, cards, QR Ph) created by the
+  `create-checkout` edge function, which also works out the price on the server. The
+  `paymongo-webhook` function (JWT check off in `supabase/config.toml`; it checks PayMongo's
+  signature instead) marks runs and Premium months paid. Takatax never handles payments between
+  taxpayers and their bookkeepers.
+- Chat between taxpayers and partners: `conversations` and `messages`. Messages are a permanent
+  record: clients have no update or delete rights and a trigger refuses any change.
+- Access: taxpayers grant and remove a verified partner's access with
+  `grant_partner_access()` / `revoke_partner_access()`; every policy checks access through
+  `has_account_access()`.
+- Database changes go in a new file in `supabase/migrations/`; check them with
+  `supabase/tests/run.sh` (local Postgres) before applying them to the project.
 
 ## Pull requests
 
