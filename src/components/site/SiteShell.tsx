@@ -21,7 +21,7 @@ function SiteHeader({ action }: { action?: ReactNode }) {
   const auth = useAuth();
 
   return (
-    <header className="sticky top-0 z-20 border-b border-tk-line bg-tk-bg/90 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-tk-line bg-tk-surface/75 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1080px] items-center gap-3 px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-2 text-lg font-bold tracking-tight">
           <Logo />
@@ -84,7 +84,7 @@ interface SiteShellProps {
 /** The frame every public page shares: brand colours and fonts, header, content, footer. */
 export function SiteShell({ children, headerAction }: SiteShellProps) {
   return (
-    <div className="tk-theme flex min-h-screen flex-col bg-tk-bg font-tk-sans text-tk-ink antialiased">
+    <div className="tk-theme tk-page-gradient flex min-h-screen flex-col font-tk-sans text-tk-ink antialiased">
       <SiteHeader action={headerAction} />
       <main className="flex-1">{children}</main>
       <SiteFooter />

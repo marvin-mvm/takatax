@@ -198,7 +198,7 @@ function Kpi({
   negative?: boolean;
 }) {
   return (
-    <div className="rounded-[14px] border border-tk-line bg-tk-bg p-4">
+    <div className="rounded-[14px] border border-tk-line bg-tk-surface/80 p-4">
       <p className="text-[13px]/[18px] text-tk-muted">{label}</p>
       <p
         className={cn(

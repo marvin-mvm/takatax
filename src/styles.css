@@ -221,6 +221,56 @@
   }
 }
 
+/*
+ * Light gradients in the brand colours. The page gradient sits on a fixed layer behind the
+ * content, so it stays put while long pages scroll.
+ */
+@layer components {
+  .tk-page-gradient {
+    position: relative;
+    isolation: isolate;
+    background-color: var(--tk-bg);
+  }
+
+  .tk-page-gradient::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(
+        70rem 42rem at 0% 0%,
+        color-mix(in oklch, var(--tk-brand-soft) 95%, transparent) 0%,
+        transparent 65%
+      ),
+      radial-gradient(
+        56rem 36rem at 100% 0%,
+        color-mix(in oklch, var(--tk-accent) 12%, transparent) 0%,
+        transparent 70%
+      ),
+      linear-gradient(
+        180deg,
+        var(--tk-bg) 0%,
+        color-mix(in oklch, var(--tk-brand-soft) 70%, var(--tk-bg)) 100%
+      );
+  }
+
+  .tk-slide-gradient {
+    background-color: var(--tk-surface);
+    background-image: linear-gradient(
+      150deg,
+      var(--tk-surface) 0%,
+      var(--tk-surface) 45%,
+      color-mix(in oklch, var(--tk-brand-soft) 80%, var(--tk-surface)) 100%
+    );
+  }
+
+  .tk-gradient-swatch {
+    background-image: linear-gradient(135deg, var(--tk-bg) 0%, var(--tk-brand-soft) 100%);
+  }
+}
+
 /* The deck prints one slide per page. */
 @media print {
   .deck-chrome {

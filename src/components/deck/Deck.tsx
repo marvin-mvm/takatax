@@ -122,8 +122,8 @@ export function Deck() {
   const activeSection = SECTIONS.filter((section) => section.index <= active).at(-1)?.id;
 
   return (
-    <div className="tk-theme min-h-screen bg-tk-bg font-tk-sans text-tk-ink antialiased">
-      <header className="deck-chrome sticky top-0 z-20 border-b border-tk-line bg-tk-bg/90 backdrop-blur">
+    <div className="tk-theme tk-page-gradient min-h-screen font-tk-sans text-tk-ink antialiased">
+      <header className="deck-chrome sticky top-0 z-20 border-b border-tk-line bg-tk-surface/75 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[1120px] items-center gap-4 px-4 sm:px-6">
           <a href="#cover" className="flex items-center gap-2 font-bold tracking-tight">
             <span

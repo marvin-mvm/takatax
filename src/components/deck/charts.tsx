@@ -130,7 +130,7 @@ function ChartFrame({
   const isClient = useIsClient();
 
   return (
-    <figure>
+    <figure className="rounded-[14px] border border-tk-line bg-tk-surface p-4">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="font-semibold">{title}</span>
         <Legend series={series} />
