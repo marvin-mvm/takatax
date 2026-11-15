@@ -83,6 +83,16 @@ where they differ.
 - CI (`.github/workflows/ci.yml`) runs lint, type-check, test, and build on every PR;
   keep it green.
 
+## Code layout
+
+- Shared, unit-tested logic (tax rules, deadlines, the document reader, redaction, upload
+  pricing) lives in `supabase/functions/_shared/`. The web app imports it as `@shared/...`;
+  edge functions import it with relative `.ts` paths. No Node, Deno or browser APIs there.
+- Edge functions (Deno) are in `supabase/functions/<name>/index.ts`, with Deno-only helpers in
+  `supabase/functions/_lib/`.
+- What still needs keys or setup is listed in `docs/MISSING_PIECES.md`; code marks each spot
+  with `MISSING:`.
+
 ## Reference
 
 - `marvin-mvm/Takatax2` is the reference project (specs in its `docs/`); port its
