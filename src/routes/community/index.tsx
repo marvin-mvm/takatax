@@ -8,6 +8,7 @@ import { SiteShell } from "@/components/site/SiteShell";
 import { buttonPrimary } from "@/components/site/styles";
 import { useAuth } from "@/lib/auth/use-auth";
 import { usePosts } from "@/lib/data/queries";
+import { listPosts } from "@/lib/data/repository";
 import { cn } from "@/lib/utils";
 
 const title = "Tax questions, answered by verified bookkeepers | Takatax Community";
@@ -23,6 +24,16 @@ export const Route = createFileRoute("/community/")({
       { property: "og:description", content: description },
     ],
   }),
+  // Public questions are loaded on the server so search engines see them in the HTML.
+  // Members-only questions never come back here; logged-in members load them in the browser.
+  // If the server cannot reach the database, render without them; the browser loads the list.
+  loader: async () => {
+    try {
+      return await listPosts(false);
+    } catch {
+      return null;
+    }
+  },
   component: CommunityPage,
 });
 
@@ -30,13 +41,17 @@ function CommunityPage() {
   const auth = useAuth();
   const signedIn = auth.status === "signedIn";
   const query = usePosts(signedIn);
+  const serverPosts = Route.useLoaderData();
   const [topic, setTopic] = useState("All");
 
+  // The server's public list shows until the browser's own list (with members-only posts
+  // when logged in) arrives.
+  const loaded = query.data ?? serverPosts ?? undefined;
   const topics = useMemo(
-    () => ["All", ...new Set((query.data?.data ?? []).map((p) => p.topic))],
-    [query.data],
+    () => ["All", ...new Set((loaded?.data ?? []).map((p) => p.topic))],
+    [loaded],
   );
-  const posts = (query.data?.data ?? []).filter((p) => topic === "All" || p.topic === topic);
+  const posts = (loaded?.data ?? []).filter((p) => topic === "All" || p.topic === topic);
 
   return (
     <SiteShell>
@@ -51,9 +66,7 @@ function CommunityPage() {
       >
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex flex-col gap-4">
-            {query.data ? (
-              <SampleDataNotice source={query.data.source} what="example questions" />
-            ) : null}
+            {loaded ? <SampleDataNotice source={loaded.source} what="example questions" /> : null}
             <div role="radiogroup" aria-label="Topic" className="flex flex-wrap gap-2">
               {topics.map((t) => (
                 <button
@@ -73,7 +86,7 @@ function CommunityPage() {
                 </button>
               ))}
             </div>
-            {query.isPending ? (
+            {!loaded ? (
               <LoadingBlock label="Loading questions…" />
             ) : (
               <ul className="flex flex-col gap-3">

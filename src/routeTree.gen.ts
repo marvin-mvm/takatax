@@ -14,7 +14,9 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as DeckRouteImport } from './routes/deck'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppCorRouteImport } from './routes/app/cor'
 import { Route as AppUploadRouteImport } from './routes/app/upload'
@@ -52,9 +54,19 @@ const PricingRoute = PricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -119,7 +131,9 @@ export interface FileRoutesByFullPath {
   '/deck': typeof DeckRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/app/cor': typeof AppCorRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
@@ -137,7 +151,9 @@ export interface FileRoutesByTo {
   '/deck': typeof DeckRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/app/cor': typeof AppCorRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
@@ -157,7 +173,9 @@ export interface FileRoutesById {
   '/deck': typeof DeckRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/app/cor': typeof AppCorRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
@@ -178,7 +196,9 @@ export interface FileRouteTypes {
     | '/deck'
     | '/login'
     | '/pricing'
+    | '/robots.txt'
     | '/signup'
+    | '/sitemap.xml'
     | '/app/cor'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
@@ -196,7 +216,9 @@ export interface FileRouteTypes {
     | '/deck'
     | '/login'
     | '/pricing'
+    | '/robots.txt'
     | '/signup'
+    | '/sitemap.xml'
     | '/app/cor'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
@@ -215,7 +237,9 @@ export interface FileRouteTypes {
     | '/deck'
     | '/login'
     | '/pricing'
+    | '/robots.txt'
     | '/signup'
+    | '/sitemap.xml'
     | '/app/cor'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
@@ -235,7 +259,9 @@ export interface RootRouteChildren {
   DeckRoute: typeof DeckRoute
   LoginRoute: typeof LoginRoute
   PricingRoute: typeof PricingRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   SignupRoute: typeof SignupRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   BookkeepersPartnerIdRoute: typeof BookkeepersPartnerIdRoute
   CommunityPostIdRoute: typeof CommunityPostIdRoute
   CommunityNewRoute: typeof CommunityNewRoute
@@ -280,11 +306,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/': {
@@ -393,7 +433,9 @@ const rootRouteChildren: RootRouteChildren = {
   DeckRoute: DeckRoute,
   LoginRoute: LoginRoute,
   PricingRoute: PricingRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   SignupRoute: SignupRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   BookkeepersPartnerIdRoute: BookkeepersPartnerIdRoute,
   CommunityPostIdRoute: CommunityPostIdRoute,
   CommunityNewRoute: CommunityNewRoute,

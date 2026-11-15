@@ -69,11 +69,20 @@ failing. Search the code for `MISSING:` to find every spot.
 
 - [ ] Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` if Lovable's `.env` is not used
       in the Netlify build (both values are public).
+- [ ] After the first deploy, add the site to Google Search Console and submit
+      `https://<your-domain>/sitemap.xml`. The sitemap lists public community questions and
+      verified partner profiles once the database tables exist; until then it lists the main
+      pages only. `/robots.txt` keeps `/app`, `/login` and `/signup` out of search results.
 
 ## 8. Product decisions
 
 - [ ] Premium allowance: the site now says **1,000 documents a month**. The what-if model on
-      `/deck` has sliders for the limit and how much of it Premium customers use.
+      `/deck` has sliders for the limit and how much of it Premium customers use, and a
+      "300 vs 1,000" table that compares both limits at the current slider settings.
+- [ ] The outcomes on the landing page marked "After launch" and "After year 1" (taxpayer
+      profile, lender sharing, investor newsletter) are plans, not features. Each needs its own
+      design, consent flow and legal review (BIR confidentiality, Data Privacy Act) before it
+      is built.
 - [ ] Privacy notice and terms (Data Privacy Act), community rules, and partner terms, reviewed
       by a Philippine lawyer.
 - [ ] A CPA review of the tax rules in `supabase/functions/_shared/domain/` against real filed
