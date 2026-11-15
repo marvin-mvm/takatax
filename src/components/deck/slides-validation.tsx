@@ -34,7 +34,7 @@ export function CoverSlide() {
           Your BIR figures, straight from your receipts.
         </span>
       }
-      lead="Takatax reads your receipts, invoices and 2307s with AI. A tested tax engine then computes every return. ₱199 per run, no subscription."
+      lead="Takatax reads your receipts, invoices, sales records, withholding records, 2307s and COR with AI. A tested tax engine then computes every return, per tax type. ₱199 per run; a subscription is optional."
       className="lg:min-h-[680px]"
     >
       <div className="grid gap-4 sm:grid-cols-3">
@@ -74,8 +74,9 @@ export function CoverSlide() {
 const STEPS: { href: string; question: string; answer: string }[] = [
   {
     href: "#problem",
-    question: "Is the problem real?",
-    answer: "Yes. Filing is hard, so people skip it or get it wrong.",
+    question: "Is tax filing a real problem for Filipinos?",
+    answer:
+      "Yes. It takes time and a lot of manual paperwork, so businesses try to skip it or get it wrong.",
   },
   {
     href: "#users",
@@ -140,8 +141,8 @@ export function ProblemSlide() {
       id="problem"
       eyebrow={PHASE_1}
       tag="Step 1 of 7"
-      title="Is the problem real?"
-      lead="Yes. Computing your own taxes is hard. So many Filipinos get it wrong, avoid registering with the BIR, or never start the business at all."
+      title="Is tax filing a real problem for Filipinos?"
+      lead="Yes. It takes time, with a lot of manual looking up of expenses and sales. So many Filipinos get it wrong, avoid registering with the BIR, or never start the business at all."
     >
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat
@@ -385,7 +386,7 @@ const COMPETITORS: { name: string; how: ReactNode; price: ReactNode; highlight?:
   {
     name: "Takatax",
     how: "Upload photos. AI reads them. The engine computes every return.",
-    price: "₱199 per run. No subscription.",
+    price: "₱199 per tax compute (up to 250 documents parsed by AI). A subscription is optional.",
     highlight: true,
   },
 ];
@@ -459,7 +460,7 @@ const EDGES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: Wallet,
     title: "Pay per run",
-    text: "₱199. No monthly plan. No parse, no fee.",
+    text: "₱199 per run. A monthly plan is optional. No parse, no fee.",
   },
   {
     icon: Handshake,
@@ -540,7 +541,7 @@ export function TestSlide() {
               </Point>
             ))}
           </Points>
-          <p className="mt-6 rounded-[14px] bg-tk-bg p-4 text-[15px]/[22px] text-tk-muted">
+          <p className="mt-6 rounded-[14px] bg-tk-surface/80 p-4 text-[15px]/[22px] text-tk-muted">
             <strong className="font-semibold text-tk-ink">Cost: about ₱64.</strong> That is the AI
             bill for a 200-document test <Cite source="Takatax" refs={[21]} />.
           </p>

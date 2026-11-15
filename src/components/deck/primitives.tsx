@@ -29,7 +29,7 @@ export function Slide({ id, eyebrow, tag, title, lead, children, className }: Sl
       data-slide
       aria-labelledby={`${id}-title`}
       className={cn(
-        "deck-slide flex scroll-mt-20 flex-col rounded-[20px] border border-tk-line bg-tk-surface",
+        "deck-slide tk-slide-gradient flex scroll-mt-20 flex-col rounded-[20px] border border-tk-line",
         "px-5 py-8 shadow-[0_1px_2px_rgb(0_0_0/0.05),0_4px_16px_rgb(0_0_0/0.04)]",
         "sm:px-10 sm:py-12 lg:min-h-[620px] lg:px-14 lg:py-14",
         className,
@@ -114,7 +114,7 @@ export function Stat({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-[14px] border border-tk-line bg-tk-bg p-5", className)}>
+    <div className={cn("rounded-[14px] border border-tk-line bg-tk-surface/80 p-5", className)}>
       <p className="font-tk-mono text-[28px]/9 font-medium tracking-tight tabular-nums lg:text-[32px]/10">
         {value}
       </p>
