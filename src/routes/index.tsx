@@ -52,7 +52,7 @@ function LandingPage() {
         </h1>
         <p className="mt-6 max-w-[56ch] text-lg/7 text-tk-muted text-pretty sm:text-xl/8">
           Upload your receipts, invoices and 2307s. Takatax reads them and computes your tax
-          returns, line by line. ₱199 per run. No subscription.
+          returns, line by line. ₱199 per run. A subscription is optional.
         </p>
         <Link to="/signup" className={`${buttonStart} mt-10`}>
           Start
@@ -67,7 +67,7 @@ function LandingPage() {
         </p>
       </section>
 
-      <section aria-labelledby="what-we-do" className="border-y border-tk-line bg-tk-surface">
+      <section aria-labelledby="what-we-do" className="border-y border-tk-line bg-tk-surface/70">
         <div className="mx-auto max-w-[1080px] px-4 py-14 sm:px-6 sm:py-16">
           <h2 id="what-we-do" className="text-[28px]/[34px] font-bold tracking-tight">
             What Takatax does
