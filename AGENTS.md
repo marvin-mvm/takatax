@@ -1,4 +1,5 @@
 <!-- LOVABLE:BEGIN -->
+
 > [!IMPORTANT]
 > This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
 > published git history — force pushing, or rebasing/amending/squashing commits
@@ -27,6 +28,7 @@ use the editor.
   `LOVABLE_API_KEY`. When Lovable does not provide one, users can bring their
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
+
 <!-- LOVABLE:END -->
 
 # Project rules (marvin-mvm)
@@ -35,6 +37,7 @@ These rules are the project owner's and take precedence over the Lovable block a
 where they differ.
 
 ## Authorship
+
 - Every commit is authored as `marvin-mvm <marvinmata19@gmail.com>`. Set
   `git config user.name "marvin-mvm"` and `git config user.email "marvinmata19@gmail.com"`
   in each checkout before committing.
@@ -43,11 +46,13 @@ where they differ.
   or comments. All credit goes to marvin-mvm.
 
 ## Workflow
+
 1. All frontend and backend (Supabase) work happens on branch `v0.002`.
 2. The AI developer opens the PR `v0.002` -> `main` with the title and description filled
    in; the owner reviews and merges it.
 3. The owner deploys `main` to Netlify.
 4. The owner back-fills Lovable with a PR `main` -> `v0.001`.
+
 - Push to `v0.002` only when the owner asks for it. Never push to `main` or `v0.001`.
 - Lovable is a backup editor and is used rarely; the owner will say when it was used.
 - Every commit pushed to `v0.002` ends its message with `[skip netlify]` so Netlify does
@@ -57,17 +62,28 @@ where they differ.
   `[skip netlify]` lines into `main` and the production deploy would be skipped.
 
 ## Supabase
+
 - Project ref: `thiznrxojzrxkjwqhtjt`. The AI developer reads and edits the database
   (schema, migrations, data) directly; Lovable is not the source of truth for it.
 - Never commit secret keys (service role key, access tokens). The anon/publishable key
   is public and may be committed.
 
+## Architecture
+
+- AI: document reading (images and PDFs) goes through OpenRouter, called only from Supabase
+  Edge Functions. The OpenRouter key lives in Supabase Edge Function secrets, never in the
+  repo or the browser. This replaces the Lovable AI gateway rule above.
+- File storage: Cloudflare R2 (private buckets, signed upload links), not Supabase Storage.
+  R2 keys live in Supabase Edge Function secrets.
+
 ## Pull requests
+
 - Title: short and descriptive of the change.
 - Description: a summary of changes as a list of items done.
 - CI (`.github/workflows/ci.yml`) runs lint, type-check, test, and build on every PR;
   keep it green.
 
 ## Reference
+
 - `marvin-mvm/Takatax2` is the reference project (specs in its `docs/`); port its
   features into this TanStack Start app.

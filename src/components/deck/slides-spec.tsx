@@ -37,7 +37,7 @@ function Node({
     <div
       className={cn(
         "rounded-[14px] border p-4",
-        highlight ? "border-tk-brand bg-tk-brand-soft" : "border-tk-line bg-tk-bg",
+        highlight ? "border-tk-brand bg-tk-brand-soft" : "border-tk-line bg-tk-surface/80",
       )}
     >
       <p className="font-semibold">{title}</p>
@@ -71,46 +71,56 @@ export function ArchitectureSlide() {
       <div className="grid gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
         <Node
           title="Browser"
-          subtitle="TanStack Start app"
+          subtitle="TanStack Start app on Netlify"
           items={["Upload photos and PDFs", "Photo check before upload", "Review and results"]}
         />
         <FlowArrow />
         <Node
-          title="Netlify"
-          subtitle="Server functions"
-          items={["Checks every input", "Runs the reading jobs", "Holds the API keys"]}
+          title="Supabase Edge Functions"
+          subtitle="TypeScript on the server"
+          items={[
+            "Checks every input and payment",
+            "Signs upload links",
+            "Calls the AI, holds the keys",
+          ]}
           highlight
         />
         <FlowArrow />
         <Node
-          title="Supabase"
-          subtitle="Postgres, Auth, Storage"
-          items={["One account per TIN", "Row-level security", "Private file storage"]}
+          title="OpenRouter"
+          subtitle="One API for the AI models"
+          items={["Reads images and PDFs", "Gemini Flash and Pro", "Claude Haiku"]}
         />
-        <div className="lg:col-start-3">
-          <ArrowDown aria-hidden className="mx-auto size-5 text-tk-muted" />
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:w-[200%] lg:-translate-x-1/4">
-            <Node
-              title="AI reader"
-              subtitle="Called by the server only"
-              items={["Reads each document", "Scores every field"]}
-            />
-            <Node
-              title="Tax engine"
-              subtitle="Plain TypeScript, unit-tested"
-              items={["1701Q, 2551Q, SAWT", "A reason for every exclusion"]}
-            />
-          </div>
-        </div>
+      </div>
+      <ArrowDown aria-hidden className="mx-auto mt-3 size-5 rotate-0 text-tk-muted" />
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <Node
+          title="Supabase Postgres and Auth"
+          subtitle="Data and login"
+          items={["One account per TIN", "Row-level security", "Paywall in the database"]}
+        />
+        <Node
+          title="Cloudflare R2"
+          subtitle="File storage"
+          items={["Private buckets", "Uploads by signed link", "No download fees"]}
+        />
+        <Node
+          title="Tax engine"
+          subtitle="Plain TypeScript, unit-tested"
+          items={["1701Q, 2551Q, SAWT", "A reason for every exclusion"]}
+        />
       </div>
       <Points className="mt-8 max-w-[72ch]">
         <Point title="Pay before any reading.">
           AI runs only for a paid run or the one free trial.
         </Point>
-        <Point title="The database enforces the rules.">
-          The paywall and privacy live in Postgres, not in the browser.
+        <Point title="Files go straight to R2.">
+          The browser uploads with a short-lived signed link. The edge function reads each file back
+          and sends it to OpenRouter.
         </Point>
-        <Point title="No secrets in the repo.">Keys live in Netlify and Supabase settings.</Point>
+        <Point title="No secrets in the repo or the browser.">
+          The OpenRouter and R2 keys live in Supabase Edge Function secrets.
+        </Point>
       </Points>
     </Slide>
   );
@@ -159,7 +169,10 @@ export function ReaderSlide() {
     >
       <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {READER_STEPS.map((step, index) => (
-          <li key={step.title} className="rounded-[14px] border border-tk-line bg-tk-bg p-4">
+          <li
+            key={step.title}
+            className="rounded-[14px] border border-tk-line bg-tk-surface/80 p-4"
+          >
             <div className="flex items-center justify-between gap-3">
               <span className="flex size-7 items-center justify-center rounded-full bg-tk-brand-soft font-tk-mono text-sm text-tk-brand">
                 {index + 1}
@@ -173,9 +186,9 @@ export function ReaderSlide() {
       </ol>
       <p className="mt-6 text-[15px]/[22px] text-tk-muted">
         <strong className="font-semibold text-tk-ink">₱0.23 to ₱0.32 per document</strong> once
-        blended: Gemini Flash, then Claude Haiku, then Gemini Pro{" "}
-        <Cite source="Takatax" refs={[21, 19, 20]} />. A full 250-document run costs at most ₱80 in
-        AI against a ₱199 price.
+        blended: Gemini Flash, then Claude Haiku, then Gemini Pro, all through OpenRouter{" "}
+        <Cite source="Takatax" refs={[21, 19, 20, 22]} />. A full 250-document run costs at most ₱80
+        in AI against a ₱199 price.
       </p>
     </Slide>
   );
@@ -185,9 +198,10 @@ const STACK: { layer: string; choice: string }[] = [
   { layer: "App", choice: "TanStack Start, React 19, TypeScript, Vite" },
   { layer: "Interface", choice: "Tailwind CSS 4, shadcn/ui on Radix, Recharts" },
   { layer: "Validation", choice: "Zod with React Hook Form" },
-  { layer: "Backend", choice: "TanStack Start server functions on Netlify" },
-  { layer: "Data", choice: "Supabase: Postgres, Auth, Storage, row-level security" },
-  { layer: "AI", choice: "Gemini Flash and Pro, Claude Haiku, server-side only" },
+  { layer: "Backend", choice: "Supabase Edge Functions, TypeScript" },
+  { layer: "Data", choice: "Supabase: Postgres, Auth, row-level security" },
+  { layer: "Storage", choice: "Cloudflare R2, private, with signed upload links" },
+  { layer: "AI", choice: "OpenRouter: Gemini Flash and Pro, Claude Haiku, server-side only" },
   { layer: "Tests and CI", choice: "Vitest, with GitHub Actions on every pull request" },
   { layer: "Hosting", choice: "Netlify, deployed from the main branch" },
 ];
@@ -346,7 +360,7 @@ function Branch({
     <div
       className={cn(
         "rounded-[14px] border p-4",
-        highlight ? "border-tk-brand bg-tk-brand-soft" : "border-tk-line bg-tk-bg",
+        highlight ? "border-tk-brand bg-tk-brand-soft" : "border-tk-line bg-tk-surface/80",
       )}
     >
       <p className="font-tk-mono text-[15px] font-medium">{name}</p>
@@ -396,7 +410,7 @@ const SWATCHES: { name: string; hex: string; className: string }[] = [
   { name: "Ink", hex: "#14201B", className: "bg-tk-ink" },
   { name: "Muted", hex: "#5B6B64", className: "bg-tk-muted" },
   { name: "Line", hex: "#D9E2DE", className: "bg-tk-line" },
-  { name: "Background", hex: "#F6F8F7", className: "bg-tk-bg" },
+  { name: "Page gradient", hex: "#F6F8F7 → #E1F2EB", className: "tk-gradient-swatch" },
   { name: "Please check", hex: "#9A5B00", className: "bg-tk-warn" },
   { name: "Error", hex: "#B3261E", className: "bg-tk-danger" },
 ];
@@ -473,7 +487,7 @@ export function BuildSlide() {
               {
                 task: "Scaffold the application",
                 status: "Done",
-                note: "The TanStack Start app, CI and Netlify are live. The Supabase project is ready.",
+                note: "The TanStack Start app, Supabase sign-up and login, CI and Netlify are in place.",
               },
               {
                 task: "Implement the core AI feature",
@@ -493,7 +507,7 @@ export function BuildSlide() {
               {
                 task: "Check secrets and input validation",
                 status: "In progress",
-                note: "No secrets in the repo. Zod will validate every form and server input.",
+                note: "No secrets in the repo. Zod checks the sign-up and login forms; edge functions will check every input.",
               },
             ]}
           />

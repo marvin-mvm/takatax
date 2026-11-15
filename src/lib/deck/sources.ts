@@ -160,4 +160,18 @@ export const SOURCES: Source[] = [
     title: "Feasibility study and financial model (project document, November 2026)",
     note: "Prices, unit costs, partner targets and the tax treatment used in the what-if model.",
   },
+  {
+    id: 22,
+    publisher: "OpenRouter",
+    title: "Models and pricing",
+    note: "One API for the Gemini and Claude models the reader uses, called from a Supabase Edge Function.",
+    url: "https://openrouter.ai/models",
+  },
+  {
+    id: 23,
+    publisher: "Cloudflare",
+    title: "R2 pricing",
+    note: "Object storage for uploaded documents, with no fees for downloads.",
+    url: "https://developers.cloudflare.com/r2/pricing/",
+  },
 ];
