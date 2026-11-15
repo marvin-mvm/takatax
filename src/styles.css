@@ -8,6 +8,9 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -70,6 +73,23 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Takatax brand tokens (see the design system slide on /deck). */
+  --color-tk-bg: var(--tk-bg);
+  --color-tk-surface: var(--tk-surface);
+  --color-tk-surface-2: var(--tk-surface-2);
+  --color-tk-ink: var(--tk-ink);
+  --color-tk-muted: var(--tk-muted);
+  --color-tk-line: var(--tk-line);
+  --color-tk-brand: var(--tk-brand);
+  --color-tk-brand-soft: var(--tk-brand-soft);
+  --color-tk-accent: var(--tk-accent);
+  --color-tk-warn: var(--tk-warn);
+  --color-tk-warn-soft: var(--tk-warn-soft);
+  --color-tk-danger: var(--tk-danger);
+  --color-tk-danger-soft: var(--tk-danger-soft);
+  --font-tk-sans: "Plus Jakarta Sans Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-tk-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
 
 :root {
@@ -106,6 +126,20 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+
+  --tk-bg: oklch(0.977 0.002 165.1);
+  --tk-surface: oklch(1 0 0);
+  --tk-surface-2: oklch(0.96 0.006 170.4);
+  --tk-ink: oklch(0.23 0.02 167);
+  --tk-muted: oklch(0.512 0.022 167.2);
+  --tk-line: oklch(0.905 0.011 167.8);
+  --tk-brand: oklch(0.516 0.103 166.2);
+  --tk-brand-soft: oklch(0.947 0.02 169.3);
+  --tk-accent: oklch(0.787 0.147 73);
+  --tk-warn: oklch(0.531 0.119 65.1);
+  --tk-warn-soft: oklch(0.962 0.031 81.8);
+  --tk-danger: oklch(0.501 0.178 28.7);
+  --tk-danger-soft: oklch(0.943 0.022 24.4);
 }
 
 .dark {
@@ -141,6 +175,20 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+
+  --tk-bg: oklch(0.184 0.01 172.9);
+  --tk-surface: oklch(0.226 0.013 170.3);
+  --tk-surface-2: oklch(0.266 0.016 168.8);
+  --tk-ink: oklch(0.942 0.01 164.9);
+  --tk-muted: oklch(0.717 0.021 167.7);
+  --tk-line: oklch(0.323 0.019 169.7);
+  --tk-brand: oklch(0.749 0.128 165.5);
+  --tk-brand-soft: oklch(0.295 0.04 166.1);
+  --tk-accent: oklch(0.821 0.126 74.9);
+  --tk-warn: oklch(0.793 0.126 76.8);
+  --tk-warn-soft: oklch(0.281 0.042 82.9);
+  --tk-danger: oklch(0.736 0.133 25.3);
+  --tk-danger-soft: oklch(0.268 0.048 24.7);
 }
 
 @layer base {
@@ -151,5 +199,88 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+  }
+}
+
+/*
+ * Takatax surfaces: point the shadcn variables at the brand tokens so sliders, switches and
+ * focus rings inside a .tk-theme container use the Takatax palette.
+ */
+@layer components {
+  .tk-theme {
+    --background: var(--tk-surface);
+    --foreground: var(--tk-ink);
+    --primary: var(--tk-brand);
+    --primary-foreground: var(--tk-surface);
+    --muted: var(--tk-surface-2);
+    --muted-foreground: var(--tk-muted);
+    --border: var(--tk-line);
+    --input: var(--tk-line);
+    --ring: var(--tk-brand);
+    color-scheme: light;
+  }
+}
+
+/*
+ * Light gradients in the brand colours. The page gradient sits on a fixed layer behind the
+ * content, so it stays put while long pages scroll.
+ */
+@layer components {
+  .tk-page-gradient {
+    position: relative;
+    isolation: isolate;
+    background-color: var(--tk-bg);
+  }
+
+  .tk-page-gradient::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(
+        70rem 42rem at 0% 0%,
+        color-mix(in oklch, var(--tk-brand-soft) 95%, transparent) 0%,
+        transparent 65%
+      ),
+      radial-gradient(
+        56rem 36rem at 100% 0%,
+        color-mix(in oklch, var(--tk-accent) 12%, transparent) 0%,
+        transparent 70%
+      ),
+      linear-gradient(
+        180deg,
+        var(--tk-bg) 0%,
+        color-mix(in oklch, var(--tk-brand-soft) 70%, var(--tk-bg)) 100%
+      );
+  }
+
+  .tk-slide-gradient {
+    background-color: var(--tk-surface);
+    background-image: linear-gradient(
+      150deg,
+      var(--tk-surface) 0%,
+      var(--tk-surface) 45%,
+      color-mix(in oklch, var(--tk-brand-soft) 80%, var(--tk-surface)) 100%
+    );
+  }
+
+  .tk-gradient-swatch {
+    background-image: linear-gradient(135deg, var(--tk-bg) 0%, var(--tk-brand-soft) 100%);
+  }
+}
+
+/* The deck prints one slide per page. */
+@media print {
+  .deck-chrome {
+    display: none !important;
+  }
+
+  .deck-slide {
+    break-after: page;
+    break-inside: avoid;
+    box-shadow: none !important;
+    min-height: 0 !important;
   }
 }
