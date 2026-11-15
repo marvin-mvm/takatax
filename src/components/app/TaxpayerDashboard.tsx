@@ -1,7 +1,16 @@
 /** The taxpayer's home: next deadlines, the tracker, and the records assistant. */
 
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, FileUp, ScanLine, Sparkles, Upload } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  FileUp,
+  ScanLine,
+  Sparkles,
+  Upload,
+  type LucideIcon,
+} from "lucide-react";
+import type { ReactNode } from "react";
 
 import { daysBetween, formatIsoDate, parseIso } from "@shared/domain/dates.ts";
 import { upcomingFilings } from "@shared/domain/deadlines.ts";
@@ -17,27 +26,45 @@ import { useAppUser } from "./app-user";
 import { TrackerPanel } from "./TrackerPanel";
 import { Card, LoadingBlock, PageHeader, SampleDataNotice } from "./ui";
 
-const STEPS = [
-  {
-    icon: FileUp,
-    title: "Add your COR",
-    text: "Upload BIR Form 2303. It sets your tax types and deadlines.",
-    to: "/app/cor" as const,
-    cta: "Add COR",
-  },
+/**
+ * The three steps, worded as on the landing page. Step 1 starts with the COR because it sets the
+ * tax types and deadlines that everything else is computed against.
+ */
+const STEPS: { icon: LucideIcon; title: string; text: string; actions: ReactNode }[] = [
   {
     icon: Upload,
-    title: "Upload receipts, sales collections, withholding and more",
-    text: "Photos or PDFs of receipts, sales invoices and 2307s. Your first 10 are free.",
-    to: "/app/upload" as const,
-    cta: "Upload",
+    title: "Upload receipts, sales collections, withholding, etc.",
+    text: "Start with your COR (BIR Form 2303): it sets your tax types and deadlines. Then add receipts, sales invoices and 2307s, as photos or PDFs. Your first 10 documents are free.",
+    actions: (
+      <>
+        <Link to="/app/upload" search={{ kind: "cor" }} className={buttonPrimary}>
+          <FileUp aria-hidden className="size-5" /> Upload my COR
+        </Link>
+        <Link to="/app/upload" className={buttonOutline}>
+          Upload documents
+        </Link>
+      </>
+    ),
   },
   {
     icon: ScanLine,
+    title: "AI will read each document",
+    text: "A fast model reads every document, a second one double-checks anything doubtful, and arithmetic checks catch wrong totals. You only confirm the few it is unsure about.",
+    actions: (
+      <Link to="/app/documents" className={buttonOutline}>
+        My documents
+      </Link>
+    ),
+  },
+  {
+    icon: BarChart3,
     title: "Get your tax figures",
-    text: "AI reads each document. Your tracker and returns fill in on their own.",
-    to: "/app" as const,
-    cta: null,
+    text: "Your tracker, deadlines and return figures fill in on their own, per tax type. File them yourself, or with a bookkeeper you choose.",
+    actions: (
+      <Link to="/app/cor" className={buttonOutline}>
+        My COR and deadlines
+      </Link>
+    ),
   },
 ];
 
@@ -45,23 +72,20 @@ const STEPS = [
 function Onboarding() {
   return (
     <ol className="grid gap-4 md:grid-cols-3">
-      {STEPS.map(({ icon: Icon, title, text, to, cta }, index) => (
+      {STEPS.map(({ icon: Icon, title, text, actions }, index) => (
         <li
           key={title}
           className="flex flex-col rounded-[18px] border border-tk-line bg-tk-surface p-5"
         >
-          <span className="flex size-11 items-center justify-center rounded-[12px] bg-tk-brand-soft text-tk-brand">
-            <Icon aria-hidden className="size-5" />
-          </span>
-          <h2 className="mt-4 text-lg font-semibold text-pretty">
-            <span className="font-tk-mono text-base text-tk-muted">{index + 1}.</span> {title}
-          </h2>
+          <div className="flex items-center gap-3">
+            <span className="flex size-11 items-center justify-center rounded-[12px] bg-tk-brand text-white">
+              <Icon aria-hidden className="size-5" />
+            </span>
+            <span className="font-tk-mono text-2xl font-medium text-tk-brand">{index + 1}</span>
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-pretty">{title}</h2>
           <p className="mt-1 flex-1 text-tk-muted text-pretty">{text}</p>
-          {cta ? (
-            <Link to={to} className={`${buttonOutline} mt-4 self-start`}>
-              {cta}
-            </Link>
-          ) : null}
+          <div className="mt-4 flex flex-wrap gap-2">{actions}</div>
         </li>
       ))}
     </ol>
@@ -93,7 +117,7 @@ export function TaxpayerDashboard() {
     <div className="flex flex-col gap-8">
       <PageHeader
         title={`Welcome, ${displayName(user)}.`}
-        subtitle={profile ? account.displayName : "Let's set up your account in three steps."}
+        subtitle={profile ? account.displayName : "Three steps to your tax figures."}
         action={
           <>
             <Link to="/app/upload" className={buttonPrimary}>
