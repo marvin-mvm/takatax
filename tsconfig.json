@@ -4,7 +4,8 @@
     "src/**/*.tsx",
     "vite.config.ts",
     "vitest.config.ts",
-    "eslint.config.js"
+    "eslint.config.js",
+    "supabase/functions/_shared/**/*.ts"
   ],
   "compilerOptions": {
     "target": "ES2022",
@@ -30,7 +31,8 @@
     "exactOptionalPropertyTypes": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@shared/*": ["./supabase/functions/_shared/*"]
     }
   }
 }
