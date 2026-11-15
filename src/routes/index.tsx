@@ -3,16 +3,19 @@ import {
   ArrowRight,
   BadgeCheck,
   BarChart3,
+  Briefcase,
   Building2,
   CalendarClock,
+  Camera,
   ChevronDown,
   Clock3,
   FileUp,
   Landmark,
-  MessageCircleQuestion,
   Newspaper,
   ScanLine,
+  ShieldCheck,
   Sparkles,
+  Star,
   TrendingDown,
   Users,
   type LucideIcon,
@@ -98,12 +101,12 @@ const PROBLEMS: { icon: LucideIcon; value: string; text: string; source: string 
 const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: FileUp,
-    title: "Upload receipts, sales collections, withholding and more",
+    title: "Upload receipts, sales collections, withholding, etc.",
     text: "Snap photos or upload PDFs: receipts, sales invoices, Form 2307s and your COR. We check each photo for blur before it goes up.",
   },
   {
     icon: ScanLine,
-    title: "AI reads each document",
+    title: "AI will read each document",
     text: "A fast model reads everything, a second model double-checks anything doubtful, and arithmetic checks catch wrong totals. You only confirm the few it is unsure about.",
   },
   {
@@ -113,58 +116,99 @@ const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
   },
 ];
 
-type Status = "Ready" | "Coming soon" | "After launch";
+type Stage = "Live now" | "After launch" | "After year 1";
 
+const STAGE_STYLE: Record<Stage, string> = {
+  "Live now": "bg-tk-brand-soft text-tk-brand",
+  "After launch": "bg-tk-warn-soft text-tk-warn",
+  "After year 1": "bg-tk-surface-2 text-tk-muted",
+};
+
+/**
+ * What the AI reader makes possible, after the community. Shown as cards stacked on the reader.
+ * These are plans, so each one carries the stage it is planned for.
+ */
+const OUTCOMES: { icon: LucideIcon; title: string; text: string; stage: Stage }[] = [
+  {
+    icon: ShieldCheck,
+    title: "A taxpayer profile in good standing",
+    text: "Every return filed on time, backed by the documents behind it, builds a record of income filed and deadlines met: proof of a well-run business.",
+    stage: "After launch",
+  },
+  {
+    icon: Building2,
+    title: "A trusted place for lenders",
+    text: "Share your profile with a bank, lender or credit provider when you apply for a loan. They see figures backed by real receipts and filed returns, only when you choose.",
+    stage: "After launch",
+  },
+  {
+    icon: Newspaper,
+    title: "Tax intelligence for investors",
+    text: "A premium newsletter: which industries are thriving, and which business to open where, from how taxpayers' declared sales grew over recent quarters. Anonymous, combined data only.",
+    stage: "After year 1",
+  },
+];
+
+/** The community's promises, shown in the lead outcome. */
+const COMMUNITY_POINTS: [string, string][] = [
+  [
+    "You stay anonymous",
+    "Your name is never shown, and TINs, phone numbers, emails and amounts are blurred.",
+  ],
+  [
+    "Real professionals, rated",
+    "Bookkeepers, CPAs and tax lawyers answer under their own name, rated 1 to 5 stars by clients.",
+  ],
+  ["Public or private, your choice", "Posts help others on Google, unless you make them private."],
+  ["No middleman", "Takatax takes no platform fee and never handles payments between you."],
+];
+
+type Status = "Ready" | "Coming soon";
+
+const STATUS_STYLE: Record<Status, string> = {
+  Ready: "bg-tk-brand-soft text-tk-brand",
+  "Coming soon": "bg-tk-warn-soft text-tk-warn",
+};
+
+/** Secondary features: the parts of the platform you use day to day. */
 const FEATURES: { icon: LucideIcon; title: string; text: string; status: Status }[] = [
   {
     icon: BarChart3,
     title: "Tax tracker",
-    text: "What you earned, spent and owe each month, by tax type, as a line, bar or pie chart. Every row links to its receipt or invoice.",
+    text: "What you earned, spent and owe each month, by tax type, as a line, bar or pie chart. Every row links to its receipt, invoice or 2307.",
     status: "Ready",
   },
   {
     icon: CalendarClock,
     title: "My COR and deadlines",
-    text: "Your tax types, every return you file, the due dates, and what to have ready before each one.",
+    text: "Your tax types, every return you file, the due dates, the amount to expect and what to have ready before each one.",
+    status: "Ready",
+  },
+  {
+    icon: Camera,
+    title: "Scan with your phone",
+    text: "Take photos straight from the app. Blurry, dark or glary photos are flagged before they upload, so you can retake them.",
     status: "Ready",
   },
   {
     icon: Sparkles,
     title: "AI records assistant",
-    text: "Ask about your own figures: “Which month had my highest sales?” Answers come from your records only.",
+    text: "Ask about your own figures next to your charts: “Which month had my highest sales?” Answers come from your records only.",
     status: "Coming soon",
   },
   {
-    icon: BadgeCheck,
-    title: "Trusted bookkeepers, CPAs and tax lawyers",
-    text: "Credentials checked by us and rated 1 to 5 stars by their clients. Hire one on demand to check and file for you.",
+    icon: Star,
+    title: "Bookkeeper directory",
+    text: "Verified bookkeepers, CPAs and tax lawyers with 1 to 5 star ratings and reviews from their own clients.",
     status: "Ready",
   },
   {
-    icon: MessageCircleQuestion,
-    title: "Anonymous community",
-    text: "Ask without your name. Verified professionals answer under theirs. Posts are public unless you make them private.",
+    icon: Briefcase,
+    title: "Client dashboard for partners",
+    text: "Bookkeepers, CPAs and tax lawyers see every client in one list, with each client's charts, tax types and amounts due.",
     status: "Ready",
-  },
-  {
-    icon: Building2,
-    title: "A profile lenders trust",
-    text: "Share a summary of the income you filed with a bank or lender, free, when you apply for a loan.",
-    status: "After launch",
-  },
-  {
-    icon: Newspaper,
-    title: "Industry insights",
-    text: "A premium newsletter for investors and founders: which industries and places are growing, from anonymous, combined data.",
-    status: "After launch",
   },
 ];
-
-const STATUS_STYLE: Record<Status, string> = {
-  Ready: "bg-tk-brand-soft text-tk-brand",
-  "Coming soon": "bg-tk-warn-soft text-tk-warn",
-  "After launch": "bg-tk-surface-2 text-tk-muted",
-};
 
 const FAQ: { q: string; a: ReactNode }[] = [
   {
@@ -249,7 +293,8 @@ function LandingPage() {
         </h1>
         <p className="mt-6 max-w-[58ch] text-lg/7 text-tk-muted text-pretty sm:text-xl/8">
           Upload your receipts, sales invoices and 2307s. AI reads each one and Takatax computes
-          your tax returns, line by line. ₱199 per run. A subscription is optional.
+          your tax returns, line by line. Verified bookkeepers and an anonymous community help you
+          file. ₱199 per run; a subscription is optional.
         </p>
         <div className="mt-10">
           <StartButton />
@@ -316,13 +361,124 @@ function LandingPage() {
         </ol>
       </Section>
 
-      {/* What we build on top of the parser. */}
+      {/* The outcomes we build on top of the AI reader. The community comes first: it is the
+          main feature after the reader. The rest are plans, each marked with its stage. */}
       <Section
-        id="platform"
-        eyebrow="Built on top of the AI reader"
-        title="More than a calculator: a place to get taxes right."
-        intro="Once your documents are read, Takatax keeps working for you, and connects you with people who can help."
+        id="outcomes"
+        eyebrow="On top of the AI reader"
+        title="More than a calculator: a trusted place to get taxes right."
+        intro="Once your documents are read, Takatax connects you with people who can help, and turns your records into a profile that opens doors."
         className="bg-tk-surface/70"
+      >
+        <div className="flex flex-col gap-4">
+          {/* Lead outcome: the community. */}
+          <div
+            id="community"
+            className="grid scroll-mt-20 gap-0 overflow-hidden rounded-[22px] border border-tk-brand/30 bg-tk-surface shadow-[0_1px_2px_rgb(0_0_0/0.04),0_10px_30px_rgb(0_0_0/0.06)] lg:grid-cols-[1.25fr_1fr]"
+          >
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="flex size-11 items-center justify-center rounded-[12px] bg-tk-brand text-white">
+                  <Users aria-hidden className="size-5" />
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[13px] font-medium ${STAGE_STYLE["Live now"]}`}
+                >
+                  Live now
+                </span>
+              </div>
+              <h3 className="mt-4 text-2xl font-bold tracking-tight text-balance">
+                A community where taxpayers and bookkeepers meet, anonymously.
+              </h3>
+              <p className="mt-2 text-tk-muted text-pretty">
+                Ask a tax question without your name. Verified professionals answer under theirs,
+                and you can hire one when you need more, to help Filipinos file their taxes right.
+              </p>
+              <ul className="mt-5 flex flex-col gap-3">
+                {COMMUNITY_POINTS.map(([heading, text]) => (
+                  <li key={heading} className="flex gap-3">
+                    <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-tk-brand" />
+                    <span>
+                      <strong className="font-semibold">{heading}.</strong>{" "}
+                      <span className="text-tk-muted">{text}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link to="/community" className={buttonOutline}>
+                  <Users aria-hidden className="size-5" /> Visit the community
+                </Link>
+                <Link to="/bookkeepers" className={buttonOutline}>
+                  <BadgeCheck aria-hidden className="size-5" /> Find a bookkeeper
+                </Link>
+              </div>
+            </div>
+            <div className="flex flex-col justify-between gap-5 bg-tk-brand p-6 text-white sm:p-8">
+              <div>
+                <p className="text-sm font-semibold tracking-[0.08em] text-white/80 uppercase">
+                  For bookkeepers, CPAs and tax lawyers
+                </p>
+                <p className="mt-2 text-2xl font-bold text-balance">
+                  25% off every client run. No platform fee.
+                </p>
+                <p className="mt-2 text-white/85 text-pretty">
+                  Manage every client in one dashboard, answer questions to build your reputation,
+                  and get found by taxpayers who need you. You agree on fees and get paid directly.
+                </p>
+              </div>
+              <Link
+                to="/signup"
+                className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-[10px] bg-white px-4 font-semibold text-tk-brand hover:bg-tk-brand-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Join as a partner <ArrowRight aria-hidden className="size-5" />
+              </Link>
+            </div>
+          </div>
+
+          {/* What comes next, built on the same records. */}
+          <ul className="grid gap-4 md:grid-cols-3">
+            {OUTCOMES.map(({ icon: Icon, title: outcomeTitle, text, stage }) => (
+              <li
+                key={outcomeTitle}
+                className="flex flex-col rounded-[18px] border border-tk-line bg-tk-surface p-5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="flex size-10 items-center justify-center rounded-[11px] bg-tk-warn-soft text-tk-warn">
+                    <Icon aria-hidden className="size-5" />
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[13px] font-medium ${STAGE_STYLE[stage]}`}
+                  >
+                    {stage}
+                  </span>
+                </div>
+                <h3 className="mt-4 text-lg font-semibold text-pretty">{outcomeTitle}</h3>
+                <p className="mt-1 text-tk-muted text-pretty">{text}</p>
+              </li>
+            ))}
+          </ul>
+
+          {/* The foundation everything above stands on. */}
+          <div className="flex items-center gap-4 rounded-[18px] border border-dashed border-tk-brand/40 bg-tk-brand-soft px-5 py-4">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-tk-brand text-white">
+              <ScanLine aria-hidden className="size-5" />
+            </span>
+            <p className="text-pretty">
+              <strong className="font-semibold">Built on the AI reader.</strong>{" "}
+              <span className="text-tk-muted">
+                Every receipt, sales invoice and 2307 read, checked and turned into tax figures.
+              </span>
+            </p>
+          </div>
+        </div>
+      </Section>
+
+      {/* Secondary features: the parts of the platform you use day to day. */}
+      <Section
+        id="features"
+        eyebrow="Platform features"
+        title="Everything you need between deadlines."
       >
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title: featureTitle, text, status }) => (
@@ -345,75 +501,6 @@ function LandingPage() {
             </li>
           ))}
         </ul>
-      </Section>
-
-      {/* Community and trusted help: the main emphasis after the parser. */}
-      <Section
-        id="community"
-        eyebrow="Community"
-        title="Meet trusted help, anonymously."
-        intro="Ask a tax question without your name. Verified bookkeepers, CPAs and tax lawyers answer under theirs, and you can hire one when you need more. We never stand between you and them."
-      >
-        <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-          <div className="rounded-[20px] border border-tk-line bg-tk-surface p-6">
-            <ul className="flex flex-col gap-4">
-              {[
-                [
-                  "You stay anonymous",
-                  "Your name is never shown, and TINs, phone numbers, emails and amounts are blurred.",
-                ],
-                [
-                  "Public or private, your choice",
-                  "Posts help others on Google, unless you make them members-only.",
-                ],
-                [
-                  "Real professionals, rated",
-                  "Answers come from verified pros with a 1 to 5 star rating from their clients.",
-                ],
-                [
-                  "No middleman",
-                  "Takatax takes no platform fee and never handles payments between you.",
-                ],
-              ].map(([heading, text]) => (
-                <li key={heading} className="flex gap-3">
-                  <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-tk-brand" />
-                  <span>
-                    <strong className="font-semibold">{heading}.</strong>{" "}
-                    <span className="text-tk-muted">{text}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/community" className={buttonOutline}>
-                <Users aria-hidden className="size-5" /> Visit the community
-              </Link>
-              <Link to="/bookkeepers" className={buttonOutline}>
-                <BadgeCheck aria-hidden className="size-5" /> Find a bookkeeper
-              </Link>
-            </div>
-          </div>
-          <div className="flex flex-col justify-between gap-4 rounded-[20px] bg-tk-brand p-6 text-white">
-            <div>
-              <p className="text-sm font-semibold tracking-[0.08em] text-white/80 uppercase">
-                For bookkeepers, CPAs and tax lawyers
-              </p>
-              <p className="mt-2 text-2xl font-bold text-balance">
-                25% off every client run. No platform fee.
-              </p>
-              <p className="mt-2 text-white/85 text-pretty">
-                Manage every client in one dashboard, answer questions to build your reputation, and
-                get found by taxpayers near you.
-              </p>
-            </div>
-            <Link
-              to="/signup"
-              className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-[10px] bg-white px-4 font-semibold text-tk-brand hover:bg-tk-brand-soft"
-            >
-              Join as a partner <ArrowRight aria-hidden className="size-5" />
-            </Link>
-          </div>
-        </div>
       </Section>
 
       {/* Pricing in brief. */}
