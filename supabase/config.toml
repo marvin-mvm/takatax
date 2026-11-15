@@ -1,1 +1,5 @@
 project_id = "thiznrxojzrxkjwqhtjt"
+
+# PayMongo calls this webhook without a Supabase login; the function checks its signature.
+[functions.paymongo-webhook]
+verify_jwt = false

@@ -1,0 +1,210 @@
+// POST { purpose: "run", accountId, documentIds }          -> a new run for these documents
+// POST { purpose: "run", accountId, runId }                -> pay again for an unpaid run
+// POST { purpose: "premium_month", accountId }             -> 30 days of Premium
+//   -> { runId, free, checkoutUrl, total, summary }
+//
+// Works out the price on the server with the same rules the upload screen shows (quoteRun):
+// the free trial (first 10 documents, once), the Premium allowance, and the 25% partner price
+// when a bookkeeper, CPA or tax lawyer runs a client's documents. Free runs are marked paid at
+// once. Paid ones get a PayMongo checkout; the paymongo-webhook function marks them paid.
+//
+// Answers 503 { code: "not_configured" } for paid checkouts until the PayMongo keys are set.
+import { adminClient, authorize } from "../_lib/clients.ts";
+import { HttpError, json, requireEnv, serve } from "../_lib/http.ts";
+import { createCheckoutSession } from "../_lib/paymongo.ts";
+import { PRICING, quoteRun } from "../_shared/uploads/rules.ts";
+
+const DAY = 86_400_000;
+
+serve(async (request) => {
+  const body = (await request.json()) as {
+    purpose: "run" | "premium_month";
+    accountId: string;
+    documentIds?: string[];
+    runId?: string;
+  };
+  if (!body.accountId || (body.purpose !== "run" && body.purpose !== "premium_month")) {
+    throw new HttpError(400, "bad_request", "Send a purpose and an account");
+  }
+  const { userId } = await authorize(request, body.accountId);
+  const admin = adminClient();
+  // Where PayMongo sends the browser back: the site that called us.
+  const origin = request.headers.get("origin") ?? Deno.env.get("SITE_URL") ?? "";
+
+  const { data: account, error: accountError } = await admin
+    .from("accounts")
+    .select("id, owner_user_id, trial_used, premium_started_at, premium_until")
+    .eq("id", body.accountId)
+    .single();
+  if (accountError) throw accountError;
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const partner = account.owner_user_id !== userId && profile?.role !== "taxpayer";
+
+  // ---- Premium month -------------------------------------------------------------------------
+  if (body.purpose === "premium_month") {
+    if (account.owner_user_id !== userId) {
+      throw new HttpError(403, "forbidden", "Only the account owner can buy Premium");
+    }
+    requireEnv("PAYMONGO_SECRET_KEY");
+    const amount = PRICING.premiumMonthly * 100;
+    const { data: payment, error } = await admin
+      .from("payments")
+      .insert({
+        account_id: account.id,
+        payer_user_id: userId,
+        purpose: "premium_month",
+        amount_centavos: amount,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    const session = await createCheckoutSession({
+      amountCentavos: amount,
+      name: "Takatax Premium, 30 days",
+      description: `Up to ${PRICING.premiumDocuments.toLocaleString("en-PH")} documents read and ${PRICING.premiumStorageGb} GB of storage`,
+      referenceNumber: payment.id,
+      successUrl: `${origin}/app/plan?paid=premium`,
+      cancelUrl: `${origin}/app/plan`,
+      metadata: { payment_id: payment.id, account_id: account.id },
+    });
+    await admin.from("payments").update({ provider_checkout_id: session.id }).eq("id", payment.id);
+    return json({
+      runId: null,
+      free: false,
+      checkoutUrl: session.checkoutUrl,
+      total: PRICING.premiumMonthly,
+      summary: "Premium, 30 days",
+    });
+  }
+
+  // ---- A run of documents ------------------------------------------------------------------
+  let runId = body.runId ?? null;
+  let total: number;
+  let summary: string;
+
+  if (runId) {
+    // Paying again for a run whose checkout was abandoned.
+    const { data: run, error } = await admin
+      .from("runs")
+      .select("id, account_id, status, price_centavos")
+      .eq("id", runId)
+      .single();
+    if (error) throw error;
+    if (run.account_id !== account.id)
+      throw new HttpError(403, "forbidden", "Not this account's run");
+    if (run.status !== "awaiting_payment") {
+      return json({ runId, free: true, checkoutUrl: null, total: 0, summary: "Already paid" });
+    }
+    total = run.price_centavos / 100;
+    summary = "Parse run";
+  } else {
+    const ids = Array.isArray(body.documentIds) ? body.documentIds : [];
+    const { data: documents, error } = await admin
+      .from("documents")
+      .select("id")
+      .eq("account_id", account.id)
+      .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"])
+      .eq("status", "waiting_for_reader")
+      .is("run_id", null);
+    if (error) throw error;
+    if (!documents?.length) {
+      throw new HttpError(400, "nothing_to_read", "These documents are not waiting to be read");
+    }
+
+    // Premium covers documents read inside the current 30-day window, up to the allowance.
+    let premiumRemaining: number | undefined;
+    const now = Date.now();
+    if (!partner && account.premium_until && Date.parse(account.premium_until) > now) {
+      const windowStart = new Date(
+        Math.max(
+          Date.parse(account.premium_started_at ?? account.premium_until) || 0,
+          now - 30 * DAY,
+        ),
+      ).toISOString();
+      const { data: used } = await admin
+        .from("runs")
+        .select("document_count")
+        .eq("account_id", account.id)
+        .eq("kind", "premium_month")
+        .gte("created_at", windowStart);
+      const usedCount = (used ?? []).reduce((sum, r) => sum + r.document_count, 0);
+      premiumRemaining = Math.max(PRICING.premiumDocuments - usedCount, 0);
+    }
+
+    const quote = quoteRun(documents.length, {
+      partner,
+      trialAvailable: !partner && !account.trial_used,
+      ...(premiumRemaining !== undefined ? { premiumRemaining } : {}),
+    });
+    total = quote.total;
+    summary = quote.summary;
+    // Check the keys before creating anything, so a missing key leaves no unpaid run behind.
+    if (total > 0) requireEnv("PAYMONGO_SECRET_KEY");
+
+    const kind =
+      total === 0
+        ? quote.summary === "Free trial"
+          ? "trial"
+          : "premium_month"
+        : partner
+          ? "partner"
+          : "regular";
+    const { data: run, error: runError } = await admin
+      .from("runs")
+      .insert({
+        account_id: account.id,
+        kind,
+        document_count: documents.length,
+        price_centavos: Math.round(total * 100),
+        status: total === 0 ? "paid" : "awaiting_payment",
+        paid_at: total === 0 ? new Date().toISOString() : null,
+        created_by: userId,
+      })
+      .select("id")
+      .single();
+    if (runError) throw runError;
+    runId = run.id;
+    const { error: linkError } = await admin
+      .from("documents")
+      .update({ run_id: runId })
+      .in(
+        "id",
+        documents.map((d) => d.id),
+      );
+    if (linkError) throw linkError;
+    if (kind === "trial") {
+      await admin.from("accounts").update({ trial_used: true }).eq("id", account.id);
+    }
+    if (total === 0) return json({ runId, free: true, checkoutUrl: null, total: 0, summary });
+  }
+
+  const amount = Math.round(total * 100);
+  const { data: payment, error: paymentError } = await admin
+    .from("payments")
+    .insert({
+      account_id: account.id,
+      payer_user_id: userId,
+      purpose: "run",
+      run_id: runId,
+      amount_centavos: amount,
+    })
+    .select("id")
+    .single();
+  if (paymentError) throw paymentError;
+  const back = `${origin}/app/upload?${partner ? `account=${account.id}&` : ""}run=${runId}`;
+  const session = await createCheckoutSession({
+    amountCentavos: amount,
+    name: "Takatax parse run",
+    description: summary,
+    referenceNumber: payment.id,
+    successUrl: back,
+    cancelUrl: `${origin}/app/plan`,
+    metadata: { payment_id: payment.id, run_id: runId ?? "", account_id: account.id },
+  });
+  await admin.from("payments").update({ provider_checkout_id: session.id }).eq("id", payment.id);
+  return json({ runId, free: false, checkoutUrl: session.checkoutUrl, total, summary });
+});

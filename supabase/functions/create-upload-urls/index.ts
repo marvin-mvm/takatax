@@ -68,7 +68,7 @@ serve(async (request) => {
       uploadUrl: await signedUploadUrl(storageKey),
     });
   }
-  // MISSING: an R2 event (or a `confirm-upload` call from the browser) should move each document
-  // from waiting_for_storage to waiting_for_reader once its file has arrived.
+  // After the PUTs, the browser calls `confirm-upload`, which checks each file is in R2 and moves
+  // its document from waiting_for_storage to waiting_for_reader.
   return json({ slots });
 });

@@ -37,3 +37,10 @@ async function signedUrl(method: "PUT" | "GET", key: string): Promise<string> {
 
 export const signedUploadUrl = (key: string) => signedUrl("PUT", key);
 export const signedDownloadUrl = (key: string) => signedUrl("GET", key);
+
+/** True when the object is in the bucket (a signed HEAD request). */
+export async function objectExists(key: string): Promise<boolean> {
+  const { client, base } = r2();
+  const response = await client.fetch(`${base}/${key}`, { method: "HEAD" });
+  return response.ok;
+}

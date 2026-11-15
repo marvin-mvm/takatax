@@ -3,10 +3,12 @@
 //
 // Answers questions about the user's own records. The figures come from the database here,
 // never from the browser, and the model only explains them; it does not give tax advice.
-// Answers 503 { code: "not_configured" } until OPENROUTER_API_KEY is set.
-import { authorize } from "../_lib/clients.ts";
+// Answers 429 over the daily AI spending cap, and 503 { code: "not_configured" } until
+// OPENROUTER_API_KEY is set.
+import { adminClient, authorize } from "../_lib/clients.ts";
 import { HttpError, json, requireEnv, serve } from "../_lib/http.ts";
 import { chat } from "../_lib/openrouter.ts";
+import { assertUnderDailyCap } from "../_lib/spend.ts";
 import { DEFAULT_ASSISTANT_MODEL } from "../_shared/parser/models.ts";
 
 const SYSTEM = `You are the Takatax records assistant for a Filipino small business owner.
@@ -32,6 +34,8 @@ serve(async (request) => {
   }
   const { client } = await authorize(request, scope.accountId);
   requireEnv("OPENROUTER_API_KEY");
+  const admin = adminClient();
+  await assertUnderDailyCap(admin);
 
   const from = `${scope.year}-${String(scope.fromMonth).padStart(2, "0")}-01`;
   const to = `${scope.year}-${String(scope.toMonth).padStart(2, "0")}-31`;
@@ -73,6 +77,7 @@ serve(async (request) => {
       ...messages.slice(-10),
     ],
     maxTokens: 800,
+    spend: { admin, functionName: "assistant-chat", accountId: scope.accountId },
   });
   return json({ reply });
 });
