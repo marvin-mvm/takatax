@@ -4,7 +4,9 @@ import {
   DEFAULT_INPUTS,
   MICRO_ENTERPRISES,
   aiCostPerDocument,
+  compareLimits,
   customersAtMonth,
+  premiumMonth,
   runModel,
   type ModelInputs,
 } from "./model";
@@ -169,5 +171,36 @@ describe("runModel", () => {
     const years = runModel(DEFAULT_INPUTS).years;
     expect(years[1]?.netProfit).toBeGreaterThan(0);
     expect(years[2]?.netProfit).toBeGreaterThan(years[1]?.netProfit ?? 0);
+  });
+});
+
+describe("premiumMonth", () => {
+  it("prices a fully used 1,000-document month on the three-step reader", () => {
+    const month = premiumMonth(withInputs({ premiumDocLimit: 1_000, premiumUsagePct: 100 }));
+    expect(month.documents).toBe(1_000);
+    expect(month.aiCost).toBeCloseTo(319, 6);
+    expect(month.paymentFee).toBeCloseTo(20, 6);
+    expect(month.kept).toBeCloseTo(461, 6);
+    expect(month.keptShare).toBeCloseTo(461 / 800, 6);
+    // ₱780 after fees, at ₱0.319 a document.
+    expect(Math.round(month.breakEvenDocuments)).toBe(2_445);
+  });
+
+  it("loses money on a full month when Pro reads everything at a high limit", () => {
+    const month = premiumMonth(
+      withInputs({ reader: "pro", premiumDocLimit: 2_000, premiumUsagePct: 100 }),
+    );
+    expect(month.kept).toBeLessThan(0);
+  });
+});
+
+describe("compareLimits", () => {
+  it("compares limits with every other input unchanged", () => {
+    const [small, large] = compareLimits(DEFAULT_INPUTS, [300, 1_000]);
+    expect(small?.limit).toBe(300);
+    expect(large?.planAiCost).toBeGreaterThan(small?.planAiCost ?? 0);
+    expect(large?.planNetProfit).toBeLessThan(small?.planNetProfit ?? 0);
+    expect(large?.planNetProfitFullUse).toBeLessThan(large?.planNetProfit ?? 0);
+    expect(large?.planNetProfit).toBeCloseTo(runModel(DEFAULT_INPUTS).totals.netProfit, 4);
   });
 });

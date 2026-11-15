@@ -341,3 +341,65 @@ export function runModel(inputs: ModelInputs): ModelResult {
     },
   };
 }
+
+/** One Premium customer's month: what their documents cost us and what we keep. */
+export interface PremiumMonth {
+  /** Documents read in the month: the limit times the share of it used. */
+  documents: number;
+  aiCost: number;
+  paymentFee: number;
+  /** Price less the payment fee and AI cost. Cloud, team and marketing come out of this. */
+  kept: number;
+  /** `kept` as a share of the Premium price. */
+  keptShare: number;
+  /** Documents a month at which AI cost eats the whole price after fees. */
+  breakEvenDocuments: number;
+}
+
+export function premiumMonth(inputs: ModelInputs): PremiumMonth {
+  const costPerDoc = aiCostPerDocument(inputs.reader, inputs.recheckSharePct);
+  const price = Math.max(inputs.premiumPrice, 0);
+  const documents =
+    Math.max(inputs.premiumDocLimit, 0) * (clamp(inputs.premiumUsagePct, 0, 100) / 100);
+  const aiCost = documents * costPerDoc;
+  const paymentFee = PAYMENT_FEE * price;
+  const kept = price - paymentFee - aiCost;
+  return {
+    documents,
+    aiCost,
+    paymentFee,
+    kept,
+    keptShare: price > 0 ? kept / price : 0,
+    breakEvenDocuments: costPerDoc > 0 ? (price - paymentFee) / costPerDoc : Infinity,
+  };
+}
+
+/** One row of the Premium limit comparison. */
+export interface LimitComparison {
+  limit: number;
+  month: PremiumMonth;
+  /** AI cost over the whole plan. */
+  planAiCost: number;
+  /** Net profit over the whole plan at the chosen usage. */
+  planNetProfit: number;
+  /** Net profit over the whole plan if every Premium customer uses their full limit. */
+  planNetProfitFullUse: number;
+}
+
+/**
+ * Runs the plan once per Premium limit, with every other input unchanged, so limits can be
+ * compared side by side (for example 300 against 1,000 documents a month).
+ */
+export function compareLimits(inputs: ModelInputs, limits: number[]): LimitComparison[] {
+  return limits.map((limit) => {
+    const atUsage = runModel({ ...inputs, premiumDocLimit: limit });
+    const fullUse = runModel({ ...inputs, premiumDocLimit: limit, premiumUsagePct: 100 });
+    return {
+      limit,
+      month: premiumMonth({ ...inputs, premiumDocLimit: limit }),
+      planAiCost: atUsage.years.reduce((sum, year) => sum + year.costs.ai, 0),
+      planNetProfit: atUsage.totals.netProfit,
+      planNetProfitFullUse: fullUse.totals.netProfit,
+    };
+  });
+}

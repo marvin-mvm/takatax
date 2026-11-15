@@ -8,6 +8,7 @@ import { formatNumber, formatPercent, formatPesos, formatPesosCompact } from "@/
 import {
   DEFAULT_INPUTS,
   MICRO_ENTERPRISES,
+  compareLimits,
   runModel,
   type ModelInputs,
   type ReaderMode,
@@ -210,6 +211,112 @@ function Kpi({
       </p>
       <p className="text-[13px]/[18px] text-tk-muted">{detail}</p>
     </div>
+  );
+}
+
+/** Premium limits to compare: the old plan (300) and the new one (1,000). */
+const COMPARED_LIMITS = [300, 1_000];
+
+/**
+ * Premium limit check: the old 300 and the new 1,000 documents a month side by side, plus the
+ * slider's own value when it is different. Every other input comes from the sliders, so the
+ * comparison moves with them. "Use" buttons set the limit slider.
+ */
+function PremiumLimitCheck({
+  inputs,
+  onPick,
+}: {
+  inputs: ModelInputs;
+  onPick: (limit: number) => void;
+}) {
+  const rows = useMemo(() => {
+    const limits = COMPARED_LIMITS.includes(inputs.premiumDocLimit)
+      ? COMPARED_LIMITS
+      : [...COMPARED_LIMITS, inputs.premiumDocLimit].sort((a, b) => a - b);
+    return compareLimits(inputs, limits);
+  }, [inputs]);
+  const current = rows.find((row) => row.limit === inputs.premiumDocLimit) ?? rows[0];
+  const breakEven = current ? Math.round(current.month.breakEvenDocuments) : 0;
+
+  return (
+    <section
+      aria-labelledby="premium-check-title"
+      className="rounded-[18px] border border-tk-line bg-tk-surface/80 p-4 sm:p-5"
+    >
+      <h3 id="premium-check-title" className="font-semibold">
+        Premium limit: 300 vs 1,000 documents a month
+      </h3>
+      <p className="mt-1 text-[13px]/[18px] text-tk-muted text-pretty">
+        Same price (₱{inputs.premiumPrice}), same customers. A bigger limit earns nothing more and
+        costs more AI only for customers who use it. At your settings a Premium customer uses{" "}
+        {inputs.premiumUsagePct}% of the limit, and one Premium month breaks even at about{" "}
+        {Number.isFinite(breakEven) ? formatNumber(breakEven) : "any number of"} documents.
+      </p>
+      <div className="relative mt-3 overflow-x-auto">
+        <table className="w-full min-w-[620px] border-collapse text-right text-sm/5">
+          <caption className="sr-only">Premium limits compared</caption>
+          <thead>
+            <tr className="text-[13px] text-tk-muted">
+              <th className="py-2 pr-3 text-left font-medium">Limit</th>
+              <th className="px-3 py-2 font-medium">Read a month</th>
+              <th className="px-3 py-2 font-medium">AI a month</th>
+              <th className="px-3 py-2 font-medium">Kept a month</th>
+              <th className="px-3 py-2 font-medium">Net profit, plan</th>
+              <th className="px-3 py-2 font-medium">If all use 100%</th>
+              <th className="py-2 pl-3 font-medium">
+                <span className="sr-only">Use</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="font-tk-mono tabular-nums">
+            {rows.map((row) => {
+              const chosen = row.limit === inputs.premiumDocLimit;
+              return (
+                <tr
+                  key={row.limit}
+                  className={cn("border-t border-tk-line", chosen && "bg-tk-brand-soft/60")}
+                >
+                  <th
+                    scope="row"
+                    className="py-2 pr-3 text-left font-tk-sans font-medium whitespace-nowrap"
+                  >
+                    {formatNumber(row.limit)} docs
+                    {chosen ? (
+                      <span className="ml-1.5 text-[12px] text-tk-brand">yours</span>
+                    ) : null}
+                  </th>
+                  <td className="px-3 py-2">{formatNumber(row.month.documents)}</td>
+                  <td className="px-3 py-2">{formatPesos(row.month.aiCost)}</td>
+                  <td className={cn("px-3 py-2", row.month.kept < 0 && "text-tk-danger")}>
+                    {formatPesos(row.month.kept)} ({formatPercent(row.month.keptShare)})
+                  </td>
+                  <td className={cn("px-3 py-2", row.planNetProfit < 0 && "text-tk-danger")}>
+                    {formatPesosCompact(row.planNetProfit)}
+                  </td>
+                  <td className={cn("px-3 py-2", row.planNetProfitFullUse < 0 && "text-tk-danger")}>
+                    {formatPesosCompact(row.planNetProfitFullUse)}
+                  </td>
+                  <td className="py-1 pl-3">
+                    <button
+                      type="button"
+                      onClick={() => onPick(row.limit)}
+                      disabled={chosen}
+                      className="inline-flex min-h-8 items-center rounded-[8px] px-2 font-tk-sans text-[13px] font-medium text-tk-brand hover:bg-tk-brand-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tk-brand disabled:text-tk-muted disabled:hover:bg-transparent"
+                    >
+                      {chosen ? "In use" : "Use"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[13px]/[18px] text-tk-muted text-pretty">
+        “Kept” is the Premium price less the 2.5% payment fee and AI cost, before cloud, team and
+        marketing. Try the reader and the share of the limit used to see the worst cases.
+      </p>
+    </section>
   );
 }
 
@@ -485,6 +592,8 @@ export function WhatIfModel() {
           <StreamsChart years={years} />
         </div>
       </div>
+
+      <PremiumLimitCheck inputs={inputs} onPick={(limit) => set("premiumDocLimit", limit)} />
 
       <div className="relative overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-right text-sm/5">
