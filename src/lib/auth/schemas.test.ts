@@ -5,6 +5,7 @@ import { loginSchema, signUpSchema } from "./schemas";
 describe("signUpSchema", () => {
   it("accepts a valid sign-up and tidies the name and email", () => {
     const result = signUpSchema.safeParse({
+      accountType: "taxpayer",
       fullName: "  Maria Santos ",
       email: "  Maria@Example.COM ",
       password: "correct horse",
@@ -12,6 +13,7 @@ describe("signUpSchema", () => {
 
     expect(result.success).toBe(true);
     expect(result.data).toEqual({
+      accountType: "taxpayer",
       fullName: "Maria Santos",
       email: "maria@example.com",
       password: "correct horse",
@@ -20,6 +22,7 @@ describe("signUpSchema", () => {
 
   it("rejects a missing name, a bad email and a short password", () => {
     const result = signUpSchema.safeParse({
+      accountType: "taxpayer",
       fullName: " ",
       email: "not-an-email",
       password: "short",
@@ -34,12 +37,25 @@ describe("signUpSchema", () => {
 
   it("rejects a password longer than Supabase stores", () => {
     const result = signUpSchema.safeParse({
+      accountType: "taxpayer",
       fullName: "Maria Santos",
       email: "maria@example.com",
       password: "x".repeat(73),
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("account type", () => {
+  it("only accepts the four account types", () => {
+    const base = {
+      fullName: "Maria Santos",
+      email: "maria@example.com",
+      password: "correct horse",
+    };
+    expect(signUpSchema.safeParse({ ...base, accountType: "cpa" }).success).toBe(true);
+    expect(signUpSchema.safeParse({ ...base, accountType: "admin" }).success).toBe(false);
   });
 });
 
