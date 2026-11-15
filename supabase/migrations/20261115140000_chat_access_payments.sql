@@ -125,7 +125,8 @@ create table public.messages (
   conversation_id uuid not null references public.conversations (id) on delete cascade,
   sender_user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   body text not null check (char_length(btrim(body)) between 1 and 4000),
-  created_at timestamptz not null default now()
+  -- The real clock time, so messages sent within one transaction still keep their order.
+  created_at timestamptz not null default clock_timestamp()
 );
 create index messages_conversation_idx on public.messages (conversation_id, created_at);
 
@@ -236,8 +237,8 @@ create function public.mark_conversation_read(target uuid) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
   update public.conversations c
-  set taxpayer_read_at = case when c.taxpayer_user_id = auth.uid() then now() else c.taxpayer_read_at end,
-      partner_read_at = case when c.partner_user_id = auth.uid() then now() else c.partner_read_at end
+  set taxpayer_read_at = case when c.taxpayer_user_id = auth.uid() then clock_timestamp() else c.taxpayer_read_at end,
+      partner_read_at = case when c.partner_user_id = auth.uid() then clock_timestamp() else c.partner_read_at end
   where c.id = target and auth.uid() in (c.taxpayer_user_id, c.partner_user_id);
 end $$;
 
