@@ -18,7 +18,11 @@ import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppAccessRouteImport } from './routes/app/access'
+import { Route as AppAdminRouteImport } from './routes/app/admin'
 import { Route as AppCorRouteImport } from './routes/app/cor'
+import { Route as AppPlanRouteImport } from './routes/app/plan'
+import { Route as AppProfileRouteImport } from './routes/app/profile'
 import { Route as AppUploadRouteImport } from './routes/app/upload'
 import { Route as BookkeepersIndexRouteImport } from './routes/bookkeepers/index'
 import { Route as BookkeepersPartnerIdRouteImport } from './routes/bookkeepers/$partnerId'
@@ -28,6 +32,8 @@ import { Route as CommunityNewRouteImport } from './routes/community/new'
 import { Route as AppClientsAccountIdRouteImport } from './routes/app/clients/$accountId'
 import { Route as AppDocumentsIndexRouteImport } from './routes/app/documents/index'
 import { Route as AppDocumentsDocumentIdRouteImport } from './routes/app/documents/$documentId'
+import { Route as AppMessagesIndexRouteImport } from './routes/app/messages/index'
+import { Route as AppMessagesConversationIdRouteImport } from './routes/app/messages/$conversationId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -74,9 +80,29 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAccessRoute = AppAccessRouteImport.update({
+  id: '/access',
+  path: '/access',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppCorRoute = AppCorRouteImport.update({
   id: '/cor',
   path: '/cor',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPlanRoute = AppPlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
 const AppUploadRoute = AppUploadRouteImport.update({
@@ -124,6 +150,17 @@ const AppDocumentsDocumentIdRoute = AppDocumentsDocumentIdRouteImport.update({
   path: '/documents/$documentId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMessagesIndexRoute = AppMessagesIndexRouteImport.update({
+  id: '/messages/',
+  path: '/messages/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMessagesConversationIdRoute =
+  AppMessagesConversationIdRouteImport.update({
+    id: '/messages/$conversationId',
+    path: '/messages/$conversationId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -134,7 +171,11 @@ export interface FileRoutesByFullPath {
   '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/app/access': typeof AppAccessRoute
+  '/app/admin': typeof AppAdminRoute
   '/app/cor': typeof AppCorRoute
+  '/app/plan': typeof AppPlanRoute
+  '/app/profile': typeof AppProfileRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
   '/community/$postId': typeof CommunityPostIdRoute
@@ -144,7 +185,9 @@ export interface FileRoutesByFullPath {
   '/community/': typeof CommunityIndexRoute
   '/app/clients/$accountId': typeof AppClientsAccountIdRoute
   '/app/documents/$documentId': typeof AppDocumentsDocumentIdRoute
+  '/app/messages/$conversationId': typeof AppMessagesConversationIdRoute
   '/app/documents/': typeof AppDocumentsIndexRoute
+  '/app/messages/': typeof AppMessagesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -154,7 +197,11 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/app/access': typeof AppAccessRoute
+  '/app/admin': typeof AppAdminRoute
   '/app/cor': typeof AppCorRoute
+  '/app/plan': typeof AppPlanRoute
+  '/app/profile': typeof AppProfileRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
   '/community/$postId': typeof CommunityPostIdRoute
@@ -164,7 +211,9 @@ export interface FileRoutesByTo {
   '/community': typeof CommunityIndexRoute
   '/app/clients/$accountId': typeof AppClientsAccountIdRoute
   '/app/documents/$documentId': typeof AppDocumentsDocumentIdRoute
+  '/app/messages/$conversationId': typeof AppMessagesConversationIdRoute
   '/app/documents': typeof AppDocumentsIndexRoute
+  '/app/messages': typeof AppMessagesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -176,7 +225,11 @@ export interface FileRoutesById {
   '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/app/access': typeof AppAccessRoute
+  '/app/admin': typeof AppAdminRoute
   '/app/cor': typeof AppCorRoute
+  '/app/plan': typeof AppPlanRoute
+  '/app/profile': typeof AppProfileRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
   '/community/$postId': typeof CommunityPostIdRoute
@@ -186,7 +239,9 @@ export interface FileRoutesById {
   '/community/': typeof CommunityIndexRoute
   '/app/clients/$accountId': typeof AppClientsAccountIdRoute
   '/app/documents/$documentId': typeof AppDocumentsDocumentIdRoute
+  '/app/messages/$conversationId': typeof AppMessagesConversationIdRoute
   '/app/documents/': typeof AppDocumentsIndexRoute
+  '/app/messages/': typeof AppMessagesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -199,7 +254,11 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/signup'
     | '/sitemap.xml'
+    | '/app/access'
+    | '/app/admin'
     | '/app/cor'
+    | '/app/plan'
+    | '/app/profile'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
     | '/community/$postId'
@@ -209,7 +268,9 @@ export interface FileRouteTypes {
     | '/community/'
     | '/app/clients/$accountId'
     | '/app/documents/$documentId'
+    | '/app/messages/$conversationId'
     | '/app/documents/'
+    | '/app/messages/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -219,7 +280,11 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/signup'
     | '/sitemap.xml'
+    | '/app/access'
+    | '/app/admin'
     | '/app/cor'
+    | '/app/plan'
+    | '/app/profile'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
     | '/community/$postId'
@@ -229,7 +294,9 @@ export interface FileRouteTypes {
     | '/community'
     | '/app/clients/$accountId'
     | '/app/documents/$documentId'
+    | '/app/messages/$conversationId'
     | '/app/documents'
+    | '/app/messages'
   id:
     | '__root__'
     | '/'
@@ -240,7 +307,11 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/signup'
     | '/sitemap.xml'
+    | '/app/access'
+    | '/app/admin'
     | '/app/cor'
+    | '/app/plan'
+    | '/app/profile'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
     | '/community/$postId'
@@ -250,7 +321,9 @@ export interface FileRouteTypes {
     | '/community/'
     | '/app/clients/$accountId'
     | '/app/documents/$documentId'
+    | '/app/messages/$conversationId'
     | '/app/documents/'
+    | '/app/messages/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -334,11 +407,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/access': {
+      id: '/app/access'
+      path: '/access'
+      fullPath: '/app/access'
+      preLoaderRoute: typeof AppAccessRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/admin': {
+      id: '/app/admin'
+      path: '/admin'
+      fullPath: '/app/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/cor': {
       id: '/app/cor'
       path: '/cor'
       fullPath: '/app/cor'
       preLoaderRoute: typeof AppCorRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/plan': {
+      id: '/app/plan'
+      path: '/plan'
+      fullPath: '/app/plan'
+      preLoaderRoute: typeof AppPlanRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/profile': {
+      id: '/app/profile'
+      path: '/profile'
+      fullPath: '/app/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/upload': {
@@ -404,25 +505,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDocumentsDocumentIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/messages/': {
+      id: '/app/messages/'
+      path: '/messages'
+      fullPath: '/app/messages/'
+      preLoaderRoute: typeof AppMessagesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/messages/$conversationId': {
+      id: '/app/messages/$conversationId'
+      path: '/messages/$conversationId'
+      fullPath: '/app/messages/$conversationId'
+      preLoaderRoute: typeof AppMessagesConversationIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAccessRoute: typeof AppAccessRoute
+  AppAdminRoute: typeof AppAdminRoute
   AppCorRoute: typeof AppCorRoute
+  AppPlanRoute: typeof AppPlanRoute
+  AppProfileRoute: typeof AppProfileRoute
   AppUploadRoute: typeof AppUploadRoute
   AppIndexRoute: typeof AppIndexRoute
   AppClientsAccountIdRoute: typeof AppClientsAccountIdRoute
   AppDocumentsDocumentIdRoute: typeof AppDocumentsDocumentIdRoute
+  AppMessagesConversationIdRoute: typeof AppMessagesConversationIdRoute
   AppDocumentsIndexRoute: typeof AppDocumentsIndexRoute
+  AppMessagesIndexRoute: typeof AppMessagesIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAccessRoute: AppAccessRoute,
+  AppAdminRoute: AppAdminRoute,
   AppCorRoute: AppCorRoute,
+  AppPlanRoute: AppPlanRoute,
+  AppProfileRoute: AppProfileRoute,
   AppUploadRoute: AppUploadRoute,
   AppIndexRoute: AppIndexRoute,
   AppClientsAccountIdRoute: AppClientsAccountIdRoute,
   AppDocumentsDocumentIdRoute: AppDocumentsDocumentIdRoute,
+  AppMessagesConversationIdRoute: AppMessagesConversationIdRoute,
   AppDocumentsIndexRoute: AppDocumentsIndexRoute,
+  AppMessagesIndexRoute: AppMessagesIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

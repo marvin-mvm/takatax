@@ -1,14 +1,24 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
-import { ThumbsUp } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { ThumbsUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { MessageButton } from "@/components/app/MessageButton";
 import { Stars } from "@/components/app/ui";
 import { CommunityRules, VisibilityBadge } from "@/components/community/parts";
 import { SiteShell } from "@/components/site/SiteShell";
-import { buttonPrimary } from "@/components/site/styles";
+import { buttonOutline, buttonPrimary } from "@/components/site/styles";
 import { useAuth } from "@/lib/auth/use-auth";
-import { usePost } from "@/lib/data/queries";
-import { NotConnectedError, createAnswer, getPost, isPartner, roleOf } from "@/lib/data/repository";
+import { useIsMyPost, usePost } from "@/lib/data/queries";
+import {
+  NotConnectedError,
+  createAnswer,
+  deleteMyPost,
+  getPost,
+  isPartner,
+  markAnswerHelpful,
+  roleOf,
+} from "@/lib/data/repository";
 import { PARTNER_KIND_LABEL } from "@/lib/data/types";
 
 export const Route = createFileRoute("/community/$postId")({
@@ -46,6 +56,12 @@ function PostPage() {
   const query = usePost(postId, signedIn);
   const post = query.data?.data ?? serverPost;
   const canAnswer = auth.status === "signedIn" && isPartner(roleOf(auth.user));
+  const isTaxpayer = auth.status === "signedIn" && !isPartner(roleOf(auth.user));
+  // Only the asker gets "This helped" and "Delete"; nobody else learns who asked.
+  const mine = useIsMyPost(postId, signedIn).data === true;
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["post", postId] });
   const [answer, setAnswer] = useState("");
   const [answerMessage, setAnswerMessage] = useState<string | null>(null);
 
@@ -74,12 +90,33 @@ function PostPage() {
       await createAnswer(post.id, answer);
       setAnswerMessage("Thank you. Your answer is posted.");
       setAnswer("");
+      void refresh();
     } catch (error) {
       setAnswerMessage(
         error instanceof NotConnectedError
           ? "Answers are not connected yet, so this was not saved."
           : "We could not post your answer.",
       );
+    }
+  };
+
+  const toggleHelpful = async (answerId: string, helped: boolean) => {
+    try {
+      await markAnswerHelpful(answerId, helped);
+      await refresh();
+    } catch {
+      // Nothing to show: the button simply stays as it was.
+    }
+  };
+
+  const removePost = async () => {
+    if (!window.confirm("Delete your question? Answers to it will no longer be shown.")) return;
+    try {
+      await deleteMyPost(post.id);
+      void queryClient.invalidateQueries({ queryKey: ["posts"] });
+      await navigate({ to: "/community" });
+    } catch {
+      setAnswerMessage("We could not delete the question. Please try again.");
     }
   };
 
@@ -109,6 +146,18 @@ function PostPage() {
               {post.title}
             </h1>
             <p className="mt-3 text-lg/7 whitespace-pre-wrap text-pretty">{post.body}</p>
+            {mine ? (
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-tk-line pt-4 text-sm text-tk-muted">
+                <span>You asked this. Only you can see this note.</span>
+                <button
+                  type="button"
+                  onClick={() => void removePost()}
+                  className={`${buttonOutline} min-h-9 px-3 text-sm hover:border-tk-danger hover:text-tk-danger`}
+                >
+                  <Trash2 aria-hidden className="size-4" /> Delete my question
+                </button>
+              </div>
+            ) : null}
           </header>
 
           <section aria-labelledby="answers-title" className="flex flex-col gap-3">
@@ -137,12 +186,33 @@ function PostPage() {
                 <p className="mt-3 whitespace-pre-wrap text-pretty">{a.body}</p>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-tk-muted">
                   <span>From {a.partnerName}. Not reviewed by Takatax.</span>
-                  {a.helpful ? (
+                  {mine ? (
+                    <button
+                      type="button"
+                      aria-pressed={a.helpful}
+                      onClick={() => void toggleHelpful(a.id, !a.helpful)}
+                      className={`${buttonOutline} min-h-9 px-3 text-sm ${a.helpful ? "border-tk-brand text-tk-brand" : ""}`}
+                    >
+                      <ThumbsUp aria-hidden className="size-4" />
+                      {a.helpful ? "This helped" : "Mark as helpful"}
+                    </button>
+                  ) : a.helpful ? (
                     <span className="inline-flex items-center gap-1 font-medium text-tk-brand">
                       <ThumbsUp aria-hidden className="size-4" /> This helped the asker
                     </span>
                   ) : null}
                 </div>
+                {isTaxpayer ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-tk-line pt-3">
+                    <MessageButton
+                      otherUserId={a.partnerId}
+                      label={`Message ${a.partnerName.split(",")[0]}`}
+                    />
+                    <span className="text-[13px] text-tk-muted">
+                      A private chat shows them your name, not which question you asked.
+                    </span>
+                  </div>
+                ) : null}
               </div>
             ))}
           </section>

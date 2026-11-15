@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ImageOff, RefreshCw } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ExternalLink, ImageOff, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { formatIsoDate } from "@shared/domain/dates.ts";
@@ -22,6 +23,7 @@ import { buttonOutline } from "@/components/site/styles";
 import { useClientWorkspace, useMyWorkspace } from "@/lib/data/queries";
 import { fileSize, peso } from "@/lib/money";
 import { startReading } from "@/lib/services/reader";
+import { getDocumentLink } from "@/lib/services/uploads";
 
 export const Route = createFileRoute("/app/documents/$documentId")({
   // `account` is set when a partner opens a client's document.
@@ -65,7 +67,7 @@ function DocumentPage() {
 
   const reread = async () => {
     setRereadMessage("Asking the reader…");
-    const result = await startReading(workspace.account.id, [doc.id]);
+    const result = await startReading({ accountId: workspace.account.id, documentIds: [doc.id] });
     setRereadMessage(
       result.ok
         ? "Sent to be read again."
@@ -171,22 +173,75 @@ function DocumentPage() {
 
         <Card>
           <CardTitle>The document</CardTitle>
-          {doc.previewUrl ? (
-            <img
-              src={doc.previewUrl}
-              alt={`Photo of ${doc.fileName}`}
-              className="mt-3 w-full rounded-[12px] border border-tk-line"
-            />
-          ) : (
-            // MISSING: once R2 is connected, ask an edge function for a short-lived download
-            // link and show the photo or PDF here.
-            <div className="mt-3 flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-tk-line bg-tk-surface-2 p-6 text-center text-tk-muted">
-              <ImageOff aria-hidden className="size-8" />
-              <p>The photo appears here once file storage is connected.</p>
-            </div>
-          )}
+          <DocumentPreview
+            accountId={workspace.account.id}
+            documentId={doc.id}
+            fileName={doc.fileName}
+            enabled={source === "live" && doc.status !== "waiting_for_storage"}
+          />
         </Card>
       </div>
+    </div>
+  );
+}
+
+/** The uploaded photo or PDF, through a short-lived link from the `document-link` function. */
+function DocumentPreview({
+  accountId,
+  documentId,
+  fileName,
+  enabled,
+}: {
+  accountId: string;
+  documentId: string;
+  fileName: string;
+  enabled: boolean;
+}) {
+  const link = useQuery({
+    queryKey: ["document-link", documentId],
+    queryFn: () => getDocumentLink(accountId, documentId),
+    enabled,
+    // The link is valid for 10 minutes; fetch a fresh one before it runs out.
+    staleTime: 8 * 60_000,
+    refetchInterval: 8 * 60_000,
+  });
+  const result = link.data;
+  if (result?.ok) {
+    const { url, mimeType } = result.data;
+    return (
+      <div className="mt-3 flex flex-col gap-2">
+        {mimeType === "application/pdf" ? (
+          <iframe
+            src={url}
+            title={fileName}
+            className="aspect-[3/4] w-full rounded-[12px] border border-tk-line"
+          />
+        ) : (
+          <img
+            src={url}
+            alt={`Photo of ${fileName}`}
+            className="w-full rounded-[12px] border border-tk-line"
+          />
+        )}
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 self-start text-sm font-semibold text-tk-brand hover:underline"
+        >
+          Open in a new tab <ExternalLink aria-hidden className="size-4" />
+        </a>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-tk-line bg-tk-surface-2 p-6 text-center text-tk-muted">
+      <ImageOff aria-hidden className="size-8" />
+      <p>
+        {enabled && link.isPending
+          ? "Loading the file…"
+          : "The photo appears here once file storage is connected."}
+      </p>
     </div>
   );
 }

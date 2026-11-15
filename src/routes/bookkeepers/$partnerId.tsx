@@ -1,17 +1,20 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { BadgeCheck, KeyRound, MessageSquare } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { BadgeCheck, KeyRound, MessageSquare, UserX } from "lucide-react";
 import { useState } from "react";
 
+import { MessageButton } from "@/components/app/MessageButton";
 import { Stars } from "@/components/app/ui";
 import { SiteShell } from "@/components/site/SiteShell";
 import { buttonOutline, buttonPrimary } from "@/components/site/styles";
 import { useAuth } from "@/lib/auth/use-auth";
-import { usePartner } from "@/lib/data/queries";
+import { useMyAccess, usePartner } from "@/lib/data/queries";
 import {
   NotConnectedError,
   getPartner,
   grantPartnerAccess,
   isPartner,
+  revokePartnerAccess,
   roleOf,
   submitReview,
 } from "@/lib/data/repository";
@@ -48,6 +51,10 @@ function PartnerPage() {
   const auth = useAuth();
   const isTaxpayer = auth.status === "signedIn" && !isPartner(roleOf(auth.user));
   const isOwnProfile = auth.status === "signedIn" && auth.user.id === partnerId;
+  const signedInId = auth.status === "signedIn" ? auth.user.id : "";
+  const access = useMyAccess(signedInId, isTaxpayer);
+  const queryClient = useQueryClient();
+  const activeGrant = access.data?.data.find((g) => g.partnerId === partnerId && !g.revokedAt);
   const [message, setMessage] = useState<string | null>(null);
   const [rating, setRating] = useState(5);
   const [review, setReview] = useState("");
@@ -76,6 +83,7 @@ function PartnerPage() {
     try {
       await action();
       setMessage(done);
+      void queryClient.invalidateQueries({ queryKey: ["access"] });
     } catch (error) {
       setMessage(
         error instanceof NotConnectedError
@@ -244,21 +252,49 @@ function PartnerPage() {
           </div>
           <div className="flex flex-col gap-3 rounded-[18px] border border-tk-line bg-tk-surface p-5">
             {isTaxpayer ? (
-              <button
-                type="button"
-                onClick={() =>
-                  void run(
-                    () => grantPartnerAccess(partner.id),
-                    `${partner.name} can now see your account. You can remove access at any time.`,
-                  )
-                }
-                className={buttonPrimary}
-              >
-                <KeyRound aria-hidden className="size-5" /> Give access to my account
-              </button>
+              <>
+                <MessageButton
+                  otherUserId={partner.id}
+                  label={`Message ${partner.name.split(",")[0]}`}
+                  primary
+                  className="[&>button]:w-full"
+                />
+                {activeGrant ? (
+                  <div className="flex flex-col gap-2 rounded-[12px] bg-tk-brand-soft p-3">
+                    <p className="flex items-center gap-2 text-sm font-medium text-tk-brand">
+                      <KeyRound aria-hidden className="size-4" /> Can see your account
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void run(
+                          () => revokePartnerAccess(partner.id),
+                          `${partner.name} can no longer see your account.`,
+                        )
+                      }
+                      className={`${buttonOutline} hover:border-tk-danger hover:text-tk-danger`}
+                    >
+                      <UserX aria-hidden className="size-5" /> Remove access
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void run(
+                        () => grantPartnerAccess(partner.id),
+                        `${partner.name} can now see your account. You can remove access at any time under Access.`,
+                      )
+                    }
+                    className={buttonOutline}
+                  >
+                    <KeyRound aria-hidden className="size-5" /> Give access to my account
+                  </button>
+                )}
+              </>
             ) : auth.status !== "signedIn" ? (
               <Link to="/signup" className={buttonPrimary}>
-                Sign up to work with them
+                Sign up to message them
               </Link>
             ) : null}
             <Link to="/community" className={buttonOutline}>

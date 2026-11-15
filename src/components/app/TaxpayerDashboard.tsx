@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BarChart3,
   FileUp,
+  KeyRound,
   ScanLine,
   Sparkles,
   Upload,
@@ -16,12 +17,13 @@ import { daysBetween, formatIsoDate, parseIso } from "@shared/domain/dates.ts";
 import { upcomingFilings } from "@shared/domain/deadlines.ts";
 import { estimateFiling } from "@shared/domain/tax-estimates.ts";
 import { buttonOutline, buttonPrimary } from "@/components/site/styles";
-import { useMyWorkspace } from "@/lib/data/queries";
+import { useMyAccess, useMyWorkspace } from "@/lib/data/queries";
 import { todayInManila } from "@/lib/data/repository";
 import { peso } from "@/lib/money";
 import { displayName } from "@/lib/auth/use-auth";
 
 import { AssistantSheet } from "./AssistantSheet";
+import { CorConfirm } from "./CorConfirm";
 import { useAppUser } from "./app-user";
 import { TrackerPanel } from "./TrackerPanel";
 import { Card, LoadingBlock, PageHeader, SampleDataNotice } from "./ui";
@@ -67,6 +69,34 @@ const STEPS: { icon: LucideIcon; title: string; text: string; actions: ReactNode
     ),
   },
 ];
+
+/** Who can see the account: always visible on the home screen, so nobody is surprised. */
+function AccessSummary({ userId }: { userId: string }) {
+  const query = useMyAccess(userId);
+  const active = (query.data?.data ?? []).filter((g) => !g.revokedAt);
+  const names = active.map((g) => g.partnerName);
+  return (
+    <Link
+      to="/app/access"
+      className="flex items-center gap-3 rounded-[16px] border border-tk-line bg-tk-surface px-4 py-3 transition-colors hover:border-tk-brand"
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-tk-brand-soft text-tk-brand">
+        <KeyRound aria-hidden className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Who can see your account</span>
+        <span className="block truncate text-sm text-tk-muted">
+          {query.isPending
+            ? "Checking…"
+            : names.length === 0
+              ? "Only you."
+              : `You and ${names.length === 1 ? names[0] : `${names.length} professionals: ${names.join(", ")}`}.`}
+        </span>
+      </span>
+      <ArrowRight aria-hidden className="size-4 shrink-0 text-tk-brand" />
+    </Link>
+  );
+}
 
 /** Shown to a real account with no COR yet: the three steps to get started. */
 function Onboarding() {
@@ -133,6 +163,8 @@ export function TaxpayerDashboard() {
         }
       />
       <SampleDataNotice source={source} what={`an example business (${account.displayName})`} />
+      <AccessSummary userId={user.id} />
+      <CorConfirm accountId={account.id} />
 
       {!profile ? (
         <Onboarding />

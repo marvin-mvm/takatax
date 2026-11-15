@@ -5,6 +5,7 @@ import { useState } from "react";
 import { filingsForPeriodYear, upcomingFilings } from "@shared/domain/deadlines.ts";
 import { formatIsoDate, parseIso } from "@shared/domain/dates.ts";
 import { estimateFiling } from "@shared/domain/tax-estimates.ts";
+import { CorConfirm } from "@/components/app/CorConfirm";
 import {
   CorDetails,
   CorDocumentLink,
@@ -55,6 +56,7 @@ function MyCorPage() {
         }
       />
       <SampleDataNotice source={source} what={`an example business (${account.displayName})`} />
+      <CorConfirm accountId={account.id} />
 
       {!profile ? (
         <EmptyState

@@ -1,8 +1,7 @@
 /**
- * Reads and writes the app's data in Supabase. Until the tables in
- * `supabase/migrations/20261115120000_takatax_core.sql` are applied (or when the network is
- * down), reads fall back to the built-in sample data and say so through `source: "sample"`,
- * and writes throw `NotConnectedError` so the screen can explain what is missing.
+ * Reads and writes the app's data in Supabase (tables from `supabase/migrations/`). When a table
+ * is missing or the network is down, reads fall back to the built-in sample data and say so
+ * through `source: "sample"`, and writes throw `NotConnectedError` so the screen can explain.
  */
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
@@ -16,10 +15,27 @@ import { redactPersonalInfo } from "@shared/community/redact.ts";
 import type { CheckFlag } from "@shared/parser/checks.ts";
 import type { DocumentKind } from "@shared/parser/schema.ts";
 
-import { SAMPLE_PARTNERS, SAMPLE_POSTS, samplePartnerClients, sampleWorkspace } from "./sample";
+import {
+  SAMPLE_PARTNERS,
+  SAMPLE_POSTS,
+  sampleAccess,
+  sampleConversationWith,
+  sampleConversations,
+  samplePartnerClients,
+  sampleThread,
+  sampleWorkspace,
+} from "./sample";
 import type {
+  AccessGrant,
   AccountRole,
+  ChatMessageRecord,
   CommunityAnswer,
+  ConversationSummary,
+  ConversationThread,
+  CorDetails,
+  MyPartnerProfile,
+  PartnerForReview,
+  PlanStatus,
   CommunityPost,
   DocumentStatus,
   Loaded,
@@ -31,9 +47,8 @@ import type {
   Workspace,
 } from "./types";
 
-// MISSING: after applying the migration, regenerate src/integrations/supabase/types.ts
-// (supabase gen types typescript --project-id thiznrxojzrxkjwqhtjt) and switch to the typed
-// client. Until then the tables are unknown to the generated types, hence this untyped view.
+// The generated types in src/integrations/supabase/types.ts are Lovable's and do not list these
+// tables, so the client is used untyped here and rows are mapped by hand below.
 const db = supabase as unknown as SupabaseClient;
 
 /** Thrown when a write needs a table or function that is not set up yet. */
@@ -76,8 +91,9 @@ export function todayInManila(): string {
 }
 
 /**
- * The role a user signed up with. MISSING: once `profiles` exists, read the role from there; a
- * partner role only counts after Takatax staff verify the partner's credentials.
+ * The role a user signed up with, for choosing which screens to show. The database keeps its
+ * own copy in `profiles.role`, which users cannot change, and every partner permission also
+ * needs a verified partner profile, so editing this value unlocks nothing.
  */
 export function roleOf(user: Pick<User, "user_metadata">): AccountRole {
   const value: unknown = user.user_metadata["account_type"];
@@ -147,7 +163,8 @@ function toRecord(row: Row): LedgerRecord {
 
 async function loadWorkspaceRows(accountRow: Row): Promise<Workspace> {
   const accountId = text(accountRow["id"]);
-  const [documents, records] = await Promise.all([
+  const ownerUserId = text(accountRow["owner_user_id"]);
+  const [documents, records, owner] = await Promise.all([
     db
       .from("documents")
       .select("*")
@@ -158,11 +175,14 @@ async function loadWorkspaceRows(accountRow: Row): Promise<Workspace> {
       .select("*")
       .eq("account_id", accountId)
       .order("record_date", { ascending: false }),
+    db.from("profiles").select("full_name").eq("user_id", ownerUserId).maybeSingle(),
   ]);
   const profile = toProfile(accountRow);
   return {
     account: {
       id: accountId,
+      ownerUserId,
+      ownerName: text((owner.data as Row | null)?.["full_name"]),
       displayName:
         text(accountRow["trade_name"]) || text(accountRow["registered_name"]) || "My business",
       profile,
@@ -189,7 +209,14 @@ export function loadMyWorkspace(userId: string): Promise<Loaded<Workspace>> {
       );
       if (!account) {
         return {
-          account: { id: "", displayName: "My business", profile: null, corDocumentId: null },
+          account: {
+            id: "",
+            ownerUserId: userId,
+            ownerName: "",
+            displayName: "My business",
+            profile: null,
+            corDocumentId: null,
+          },
           documents: [],
           records: [],
         };
@@ -236,8 +263,9 @@ export function loadPartnerClients(partnerUserId: string): Promise<Loaded<Partne
           const next = profile ? (upcomingFilings(profile, today, 1)[0] ?? null) : null;
           return {
             accountId: workspace.account.id,
+            ownerUserId: workspace.account.ownerUserId,
             displayName: workspace.account.displayName,
-            ownerName: profile?.registeredName ?? "",
+            ownerName: workspace.account.ownerName || profile?.registeredName || "",
             tin: profile?.tin ?? "",
             taxTypes: profile ? taxTypesFor(profile) : [],
             nextFiling:
@@ -316,14 +344,67 @@ export function getPartner(partnerId: string): Promise<Loaded<PartnerProfile | n
   );
 }
 
-/** Lets a partner work inside the signed-in taxpayer's account. */
-export async function grantPartnerAccess(partnerUserId: string): Promise<void> {
-  // MISSING: needs the `partner_access` table (migration) and an account for the taxpayer.
-  const { error } = await db.from("partner_access").insert({ partner_user_id: partnerUserId });
+/** Runs a database function, turning "not set up" into NotConnectedError. */
+async function rpc<T = unknown>(name: string, args: Record<string, unknown>, what: string) {
+  const { data, error } = await db.rpc(name, args);
   if (error) {
-    if (isNotConnected(error)) throw new NotConnectedError("Bookkeeper access");
+    if (isNotConnected(error)) throw new NotConnectedError(what);
     throw error;
   }
+  return data as T;
+}
+
+/**
+ * Lets a verified partner work inside the signed-in taxpayer's account (or lets them back in).
+ * Creates the taxpayer's account first if they have none.
+ */
+export async function grantPartnerAccess(partnerUserId: string): Promise<void> {
+  await rpc("grant_partner_access", { partner: partnerUserId }, "Bookkeeper access");
+}
+
+/** Removes a partner's access to the signed-in taxpayer's account, at once. */
+export async function revokePartnerAccess(partnerUserId: string): Promise<void> {
+  await rpc("revoke_partner_access", { partner: partnerUserId }, "Bookkeeper access");
+}
+
+/** A partner stops working on a client's account. */
+export async function leaveClient(accountId: string): Promise<void> {
+  await rpc("leave_client", { account: accountId }, "Client access");
+}
+
+/** Everyone who has, or had, access to the signed-in taxpayer's account, newest first. */
+export function listMyAccess(userId: string): Promise<Loaded<AccessGrant[]>> {
+  return liveOrSample(
+    async () => {
+      const account = rows<Row | null>(
+        await db.from("accounts").select("id").eq("owner_user_id", userId).maybeSingle(),
+      );
+      if (!account) return [];
+      const grants = rows<Row[]>(
+        await db
+          .from("partner_access")
+          .select(
+            "granted_at, revoked_at, partner_user_id, partner_profiles(display_name, kind, city, rating_avg, rating_count)",
+          )
+          .eq("account_id", text(account["id"]))
+          .order("granted_at", { ascending: false }),
+      );
+      return grants.map((grant): AccessGrant => {
+        const partner = (grant["partner_profiles"] ?? {}) as Row;
+        return {
+          partnerId: text(grant["partner_user_id"]),
+          partnerName: text(partner["display_name"]) || "A professional",
+          partnerKind: (text(partner["kind"]) || "bookkeeper") as PartnerKind,
+          city: text(partner["city"]),
+          rating: typeof partner["rating_avg"] === "number" ? partner["rating_avg"] : 0,
+          reviewCount: typeof partner["rating_count"] === "number" ? partner["rating_count"] : 0,
+          grantedAt: text(grant["granted_at"]),
+          revokedAt: text(grant["revoked_at"]) || null,
+        };
+      });
+    },
+    () => sampleAccess(todayInManila()),
+  );
 }
 
 /** A review from a client the partner has worked with (checked by row-level security). */
@@ -475,4 +556,342 @@ export async function createAnswer(postId: string, body: string): Promise<void> 
     if (isNotConnected(error)) throw new NotConnectedError("Community answers");
     throw error;
   }
+}
+
+/** Marks or unmarks a partner's answer as "This helped" (only the person who asked can). */
+export async function markAnswerHelpful(answerId: string, helped: boolean): Promise<void> {
+  await rpc("mark_answer_helpful", { answer: answerId, helped }, "Community answers");
+}
+
+/** True when the signed-in user asked this question. The author is never shown to anyone. */
+export async function isMyPost(postId: string): Promise<boolean> {
+  try {
+    return (await rpc<boolean>("is_my_post", { post: postId }, "Community")) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Removes the signed-in user's own question from the community. */
+export async function deleteMyPost(postId: string): Promise<void> {
+  await rpc("delete_my_post", { post: postId }, "Community");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Chat between taxpayers and partners. Messages cannot be edited or deleted: the database has
+// no update or delete rights on them and a trigger refuses any change.
+// ---------------------------------------------------------------------------------------------
+
+function toConversation(row: Row, myUserId: string): ConversationSummary {
+  const iAmTaxpayer = row["taxpayer_user_id"] === myUserId;
+  const lastAt = text(row["last_message_at"]) || null;
+  const myReadAt = text(iAmTaxpayer ? row["taxpayer_read_at"] : row["partner_read_at"]);
+  const lastFromMe = row["last_sender_user_id"] === myUserId;
+  return {
+    id: text(row["id"]),
+    otherUserId: text(iAmTaxpayer ? row["partner_user_id"] : row["taxpayer_user_id"]),
+    otherName: iAmTaxpayer
+      ? text(row["partner_name"]) || "A professional"
+      : text(row["taxpayer_name"]) || "A client",
+    otherKind: iAmTaxpayer ? ((text(row["partner_kind"]) || "bookkeeper") as PartnerKind) : null,
+    lastMessage: text(row["last_body"]) || null,
+    lastMessageFromMe: lastFromMe,
+    lastMessageAt: lastAt,
+    unread: Boolean(lastAt && !lastFromMe && lastAt > myReadAt),
+  };
+}
+
+const toMessage = (row: Row): ChatMessageRecord => ({
+  id: text(row["id"]),
+  senderUserId: text(row["sender_user_id"]),
+  body: text(row["body"]),
+  createdAt: text(row["created_at"]),
+});
+
+/** The signed-in user's conversations, most recent first. */
+export function listConversations(
+  myUserId: string,
+  role: AccountRole,
+): Promise<Loaded<ConversationSummary[]>> {
+  return liveOrSample(
+    async () =>
+      rows<Row[]>(
+        await db
+          .from("conversation_list")
+          .select("*")
+          .order("last_message_at", { ascending: false, nullsFirst: false }),
+      ).map((row) => toConversation(row, myUserId)),
+    () => sampleConversations(isPartner(role) ? "partner" : "taxpayer", myUserId, todayInManila()),
+  );
+}
+
+/** One conversation and all its messages, oldest first. */
+export function loadConversation(
+  conversationId: string,
+  myUserId: string,
+  role: AccountRole,
+): Promise<Loaded<ConversationThread | null>> {
+  return liveOrSample(
+    async () => {
+      const row = rows<Row | null>(
+        await db.from("conversation_list").select("*").eq("id", conversationId).maybeSingle(),
+      );
+      if (!row) return null;
+      const messages = rows<Row[]>(
+        await db
+          .from("messages")
+          .select("id, sender_user_id, body, created_at")
+          .eq("conversation_id", conversationId)
+          .order("created_at", { ascending: true }),
+      );
+      return { conversation: toConversation(row, myUserId), messages: messages.map(toMessage) };
+    },
+    () =>
+      sampleThread(
+        conversationId,
+        isPartner(role) ? "partner" : "taxpayer",
+        myUserId,
+        todayInManila(),
+      ),
+  );
+}
+
+/**
+ * Opens the conversation with a partner (for a taxpayer) or a client (for a partner), creating
+ * it if needed, and returns its id. With sample data, returns the sample conversation if any.
+ */
+export async function startConversation(otherUserId: string): Promise<string> {
+  try {
+    const id = await rpc<string>("start_conversation", { other: otherUserId }, "Chat");
+    return text(id);
+  } catch (error) {
+    const sample = sampleConversationWith(otherUserId);
+    if (error instanceof NotConnectedError && sample) return sample;
+    throw error;
+  }
+}
+
+/** Sends a message. It can never be edited or deleted afterwards. */
+export async function sendMessage(conversationId: string, body: string): Promise<void> {
+  const trimmed = body.trim();
+  if (!trimmed) return;
+  if (conversationId.startsWith("sample-")) throw new NotConnectedError("Chat");
+  const { error } = await db
+    .from("messages")
+    .insert({ conversation_id: conversationId, body: trimmed.slice(0, 4000) });
+  if (error) {
+    if (isNotConnected(error)) throw new NotConnectedError("Chat");
+    throw error;
+  }
+}
+
+/** Marks a conversation as read for the signed-in user. Quietly does nothing if offline. */
+export async function markConversationRead(conversationId: string): Promise<void> {
+  if (conversationId.startsWith("sample-")) return;
+  await db.rpc("mark_conversation_read", { target: conversationId });
+}
+
+/**
+ * Calls `onMessage` for each new message in a conversation (Supabase Realtime), and returns a
+ * function that stops listening. Row-level security decides who receives each message.
+ */
+export function subscribeToMessages(
+  conversationId: string,
+  onMessage: (message: ChatMessageRecord) => void,
+): () => void {
+  if (conversationId.startsWith("sample-")) return () => {};
+  const channel = supabase
+    .channel(`messages:${conversationId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => onMessage(toMessage(payload.new as Row)),
+    )
+    .subscribe();
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Partner profile (their own) and verification by Takatax staff
+// ---------------------------------------------------------------------------------------------
+
+function toMyPartnerProfile(row: Row): MyPartnerProfile {
+  return {
+    displayName: text(row["display_name"]),
+    kind: (text(row["kind"]) || "bookkeeper") as PartnerKind,
+    city: text(row["city"]),
+    bio: text(row["bio"]),
+    specialties: Array.isArray(row["specialties"]) ? (row["specialties"] as string[]) : [],
+    yearsInPractice: typeof row["years_in_practice"] === "number" ? row["years_in_practice"] : 0,
+    birAccreditationNo: text(row["bir_accreditation_no"]),
+    prcLicenseNo: text(row["prc_license_no"]),
+    verifiedAt: text(row["verified_at"]) || null,
+  };
+}
+
+/** The signed-in partner's own profile, verified or not. */
+export function loadMyPartnerProfile(
+  userId: string,
+  fallback: { name: string; kind: PartnerKind },
+): Promise<Loaded<MyPartnerProfile | null>> {
+  return liveOrSample(
+    async () => {
+      const row = rows<Row | null>(
+        await db.from("partner_profiles").select("*").eq("user_id", userId).maybeSingle(),
+      );
+      return row ? toMyPartnerProfile(row) : null;
+    },
+    () => ({
+      displayName: fallback.name,
+      kind: fallback.kind,
+      city: "",
+      bio: "",
+      specialties: [],
+      yearsInPractice: 0,
+      birAccreditationNo: "",
+      prcLicenseNo: "",
+      verifiedAt: null,
+    }),
+  );
+}
+
+export type PartnerProfileEdit = Omit<MyPartnerProfile, "kind" | "verifiedAt">;
+
+/** Saves the signed-in partner's profile. Changing a licence number needs a new check. */
+export async function saveMyPartnerProfile(
+  userId: string,
+  edit: PartnerProfileEdit,
+): Promise<void> {
+  const { error } = await db
+    .from("partner_profiles")
+    .update({
+      display_name: edit.displayName.trim(),
+      city: edit.city.trim(),
+      bio: edit.bio.trim().slice(0, 1000),
+      specialties: edit.specialties
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 8),
+      years_in_practice: Math.min(Math.max(Math.round(edit.yearsInPractice), 0), 80),
+      bir_accreditation_no: edit.birAccreditationNo.trim() || null,
+      prc_license_no: edit.prcLicenseNo.trim() || null,
+    })
+    .eq("user_id", userId);
+  if (error) {
+    if (isNotConnected(error)) throw new NotConnectedError("Partner profiles");
+    throw error;
+  }
+}
+
+/** True when the signed-in user is Takatax staff. */
+export async function isAdmin(): Promise<boolean> {
+  const { data, error } = await db.rpc("is_admin");
+  return !error && data === true;
+}
+
+/** Every partner profile, unverified first, for Takatax staff. */
+export async function listPartnersForReview(): Promise<PartnerForReview[]> {
+  const result = rows<Row[]>(
+    await db
+      .from("partner_profiles")
+      .select("*")
+      .order("verified_at", { ascending: true, nullsFirst: true })
+      .order("created_at", { ascending: true }),
+  );
+  return result.map((row) => ({
+    ...toMyPartnerProfile(row),
+    userId: text(row["user_id"]),
+    createdAt: text(row["created_at"]),
+  }));
+}
+
+/** Staff approve a partner (or withdraw the approval). */
+export async function verifyPartner(partnerUserId: string, approve: boolean): Promise<void> {
+  await rpc("verify_partner", { partner: partnerUserId, approve }, "Partner verification");
+}
+
+// ---------------------------------------------------------------------------------------------
+// COR confirmation and the plan
+// ---------------------------------------------------------------------------------------------
+
+/** The COR the reader has read but nobody has confirmed yet, with what it read. */
+export async function loadCorToConfirm(
+  accountId: string,
+): Promise<{ documentId: string; read: Partial<CorDetails> } | null> {
+  if (!accountId || accountId.startsWith("sample-")) return null;
+  const { data, error } = await db
+    .from("documents")
+    .select("id, extracted")
+    .eq("account_id", accountId)
+    .eq("kind", "cor")
+    .eq("status", "needs_review")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as Row;
+  const read = (row["extracted"] ?? {}) as Row;
+  return {
+    documentId: text(row["id"]),
+    read: {
+      tin: text(read["tin"]),
+      registeredName: text(read["registeredName"]),
+      tradeName: text(read["tradeName"]),
+      rdoCode: text(read["rdoCode"]),
+      registeredAddress: text(read["registeredAddress"]),
+      lineOfBusiness: text(read["lineOfBusiness"]),
+      registrationDate: text(read["registrationDate"]),
+      vatRegistered: read["vatRegistered"] === true,
+      incomeTaxOption: read["eightPercentIndicated"] === true ? "eight_percent" : "graduated_osd",
+    },
+  };
+}
+
+/** Saves the confirmed COR: this sets the account's tax types and deadlines. */
+export async function confirmCor(documentId: string, details: CorDetails): Promise<void> {
+  await rpc("confirm_cor", { document: documentId, details }, "COR confirmation");
+}
+
+/** The free trial, the Premium window and past payments for the signed-in user's account. */
+export function loadPlan(userId: string): Promise<Loaded<PlanStatus>> {
+  return liveOrSample(
+    async () => {
+      const account = rows<Row | null>(
+        await db
+          .from("accounts")
+          .select("id, trial_used, premium_until")
+          .eq("owner_user_id", userId)
+          .maybeSingle(),
+      );
+      const payments = rows<Row[]>(
+        await db
+          .from("payments")
+          .select("id, run_id, purpose, amount_centavos, status, created_at")
+          .eq("payer_user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(50),
+      );
+      return {
+        accountId: text(account?.["id"]),
+        trialUsed: account?.["trial_used"] === true,
+        premiumUntil: text(account?.["premium_until"]) || null,
+        payments: payments.map((p) => ({
+          id: text(p["id"]),
+          runId: text(p["run_id"]) || null,
+          purpose: p["purpose"] === "premium_month" ? "premium_month" : "run",
+          amount: money(p["amount_centavos"]),
+          status: (text(p["status"]) || "pending") as PlanStatus["payments"][number]["status"],
+          createdAt: text(p["created_at"]),
+        })),
+      };
+    },
+    () => ({ accountId: "", trialUsed: false, premiumUntil: null, payments: [] }),
+  );
 }

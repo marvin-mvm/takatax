@@ -14,12 +14,19 @@ import type { CheckFlag } from "@shared/parser/checks.ts";
 import type { DocumentKind } from "@shared/parser/schema.ts";
 
 import type {
+  AccessGrant,
+  ChatMessageRecord,
   CommunityPost,
+  ConversationSummary,
+  ConversationThread,
   PartnerClientSummary,
   PartnerProfile,
   StoredDocument,
   Workspace,
 } from "./types";
+
+/** The sample login that owns a sample business. */
+const ownerOf = (accountId: string) => `sample-owner-${accountId.replace(/^sample-/, "")}`;
 
 /** Small deterministic random number generator (mulberry32). */
 function random(seed: number) {
@@ -350,6 +357,8 @@ function buildWorkspace(business: SampleBusiness, today: string): Workspace {
   return {
     account: {
       id: business.accountId,
+      ownerUserId: ownerOf(business.accountId),
+      ownerName: business.profile.registeredName,
       displayName: business.displayName,
       profile: business.profile,
       corDocumentId: corId,
@@ -372,6 +381,7 @@ export function samplePartnerClients(today: string): PartnerClientSummary[] {
     const next = upcomingFilings(profile, today, 1)[0] ?? null;
     return {
       accountId: business.accountId,
+      ownerUserId: ownerOf(business.accountId),
       displayName: business.displayName,
       ownerName: profile.registeredName,
       tin: profile.tin,
@@ -590,3 +600,163 @@ export const SAMPLE_POSTS: CommunityPost[] = [
     answers: [],
   },
 ];
+
+// ---------------------------------------------------------------------------------------------
+// Access and chat
+// ---------------------------------------------------------------------------------------------
+
+/** Professionals with access to the sample taxpayer's account: two now, one in the past. */
+export function sampleAccess(today: string): AccessGrant[] {
+  const year = Number(today.slice(0, 4));
+  const grant = (partnerId: string, grantedAt: string, revokedAt: string | null): AccessGrant => {
+    const partner = SAMPLE_PARTNERS.find((p) => p.id === partnerId);
+    if (!partner) throw new Error(`No sample partner ${partnerId}`);
+    return {
+      partnerId,
+      partnerName: partner.name,
+      partnerKind: partner.kind,
+      city: partner.city,
+      rating: partner.rating,
+      reviewCount: partner.reviewCount,
+      grantedAt,
+      revokedAt,
+    };
+  };
+  return [
+    grant("sample-partner-1", isoDate(year, 1, 8), null),
+    grant("sample-partner-2", isoDate(year, 4, 2), null),
+    grant("sample-partner-4", isoDate(year - 1, 3, 15), isoDate(year - 1, 12, 20)),
+  ];
+}
+
+interface SampleChat {
+  id: string;
+  /** For the taxpayer view: the partner. For the partner view: the sample client. */
+  partnerId: string;
+  clientAccountId: string;
+  lines: { from: "taxpayer" | "partner"; body: string; daysAgo: number; minute: number }[];
+}
+
+const SAMPLE_CHATS: SampleChat[] = [
+  {
+    id: "sample-chat-1",
+    partnerId: "sample-partner-1",
+    clientAccountId: "sample-dela-cruz",
+    lines: [
+      {
+        from: "taxpayer",
+        body: "Hi Liza! I uploaded my September receipts. Can you check the 2551Q before I file?",
+        daysAgo: 3,
+        minute: 2,
+      },
+      {
+        from: "partner",
+        body: "Hi! Yes, I can see them. Two receipts have no TIN, so I left them out of the expenses for now.",
+        daysAgo: 3,
+        minute: 40,
+      },
+      {
+        from: "taxpayer",
+        body: "Thanks. I will ask the supplier for official receipts.",
+        daysAgo: 2,
+        minute: 15,
+      },
+      {
+        from: "partner",
+        body: "Great. Your percentage tax for the quarter looks right. File by the 25th.",
+        daysAgo: 1,
+        minute: 5,
+      },
+    ],
+  },
+  {
+    id: "sample-chat-2",
+    partnerId: "sample-partner-2",
+    clientAccountId: "sample-reyes-dental",
+    lines: [
+      {
+        from: "partner",
+        body: "Good morning, Doc. I added the clinic's 2307s from HMO payments to your SAWT.",
+        daysAgo: 6,
+        minute: 10,
+      },
+      {
+        from: "taxpayer",
+        body: "Thank you! Do I still need to send the paper copies?",
+        daysAgo: 6,
+        minute: 55,
+      },
+    ],
+  },
+];
+
+function chatMessages(
+  chat: SampleChat,
+  me: "taxpayer" | "partner",
+  myUserId: string,
+  today: string,
+) {
+  const base = new Date(`${today}T09:00:00+08:00`).getTime();
+  const other = me === "taxpayer" ? chat.partnerId : ownerOf(chat.clientAccountId);
+  return chat.lines.map((line, index): ChatMessageRecord => ({
+    id: `${chat.id}-${index}`,
+    senderUserId: line.from === me ? myUserId : other,
+    body: line.body,
+    createdAt: new Date(base - line.daysAgo * 86_400_000 + line.minute * 60_000).toISOString(),
+  }));
+}
+
+function chatSummary(
+  chat: SampleChat,
+  me: "taxpayer" | "partner",
+  myUserId: string,
+  today: string,
+): ConversationSummary {
+  const messages = chatMessages(chat, me, myUserId, today);
+  const last = messages.at(-1) ?? null;
+  const partner = SAMPLE_PARTNERS.find((p) => p.id === chat.partnerId);
+  const client = BUSINESSES.find((b) => b.accountId === chat.clientAccountId);
+  return {
+    id: chat.id,
+    otherUserId: me === "taxpayer" ? chat.partnerId : ownerOf(chat.clientAccountId),
+    otherName: me === "taxpayer" ? (partner?.name ?? "") : (client?.profile.registeredName ?? ""),
+    otherKind: me === "taxpayer" ? (partner?.kind ?? null) : null,
+    lastMessage: last?.body ?? null,
+    lastMessageFromMe: last?.senderUserId === myUserId,
+    lastMessageAt: last?.createdAt ?? null,
+    unread: last ? last.senderUserId !== myUserId : false,
+  };
+}
+
+/** Sample conversations for the chat list. */
+export function sampleConversations(
+  role: "taxpayer" | "partner",
+  myUserId: string,
+  today: string,
+): ConversationSummary[] {
+  return SAMPLE_CHATS.map((chat) => chatSummary(chat, role, myUserId, today));
+}
+
+/** One sample conversation with its messages. */
+export function sampleThread(
+  conversationId: string,
+  role: "taxpayer" | "partner",
+  myUserId: string,
+  today: string,
+): ConversationThread | null {
+  const chat = SAMPLE_CHATS.find((c) => c.id === conversationId);
+  if (!chat) return null;
+  return {
+    conversation: { ...chatSummary(chat, role, myUserId, today), unread: false },
+    messages: chatMessages(chat, role, myUserId, today),
+  };
+}
+
+/** The sample conversation with a partner or client, if there is one. */
+export function sampleConversationWith(otherUserId: string): string | null {
+  return (
+    SAMPLE_CHATS.find(
+      (c) => c.partnerId === otherUserId || ownerOf(c.clientAccountId) === otherUserId,
+    )?.id ?? null
+  );
+}

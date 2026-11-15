@@ -47,3 +47,22 @@ export async function putToStorage(
   });
   return response.ok;
 }
+
+/**
+ * Tells the server the files are in storage: the `confirm-upload` function checks each one in
+ * R2 and moves it to "waiting to be read". Returns the documents that arrived.
+ */
+export function confirmUploads(
+  accountId: string,
+  documentIds: string[],
+): Promise<FunctionResult<{ arrived: string[] }>> {
+  return callFunction("confirm-upload", { accountId, documentIds });
+}
+
+/** A short-lived link to view one uploaded file (owner or partner with access). */
+export function getDocumentLink(
+  accountId: string,
+  documentId: string,
+): Promise<FunctionResult<{ url: string; mimeType: string }>> {
+  return callFunction("document-link", { accountId, documentId });
+}

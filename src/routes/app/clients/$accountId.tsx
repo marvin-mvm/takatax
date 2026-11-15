@@ -1,9 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { Upload, UserX } from "lucide-react";
+import { useState } from "react";
 
 import { parseIso } from "@shared/domain/dates.ts";
 import { upcomingFilings } from "@shared/domain/deadlines.ts";
 import { formatTin } from "@shared/domain/tax-profile.ts";
 import { AssistantSheet } from "@/components/app/AssistantSheet";
+import { CorConfirm } from "@/components/app/CorConfirm";
+import { DocumentTable } from "@/components/app/DocumentTable";
+import { MessageButton } from "@/components/app/MessageButton";
 import {
   CorDetails,
   CorDocumentLink,
@@ -18,17 +24,25 @@ import {
   PageHeader,
   SampleDataNotice,
 } from "@/components/app/ui";
+import { buttonOutline, buttonPrimary } from "@/components/site/styles";
 import { useClientWorkspace } from "@/lib/data/queries";
-import { todayInManila } from "@/lib/data/repository";
+import { NotConnectedError, leaveClient, todayInManila } from "@/lib/data/repository";
 
 export const Route = createFileRoute("/app/clients/$accountId")({
   component: ClientView,
 });
 
-/** A partner's view of one client: their tracker, tax types and what they need to pay. */
+/**
+ * A partner's view of one client's profile: what they need to pay next, their tracker, tax
+ * types, COR and documents. The partner can message the client, upload documents for them, or
+ * stop working on the account. Row-level security checks the access on every read.
+ */
 function ClientView() {
   const { accountId } = Route.useParams();
   const query = useClientWorkspace(accountId);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [problem, setProblem] = useState<string | null>(null);
   const today = todayInManila();
   const { year, month } = parseIso(today);
 
@@ -41,8 +55,24 @@ function ClientView() {
     );
   }
   const { data: workspace, source } = query.data;
-  const { account, records } = workspace;
+  const { account, records, documents } = workspace;
   const profile = account.profile;
+
+  const leave = async () => {
+    if (!window.confirm(`Stop working on ${account.displayName}? You will lose access at once.`))
+      return;
+    try {
+      await leaveClient(account.id);
+      await queryClient.invalidateQueries({ queryKey: ["partner-clients"] });
+      await navigate({ to: "/app" });
+    } catch (error) {
+      setProblem(
+        error instanceof NotConnectedError
+          ? "Client access is not connected yet."
+          : "That did not work. Please try again.",
+      );
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -50,14 +80,42 @@ function ClientView() {
       <PageHeader
         title={account.displayName}
         subtitle={
-          profile
-            ? `${profile.registeredName} · TIN ${formatTin(profile.tin)} · RDO ${profile.rdoCode}`
-            : "No COR yet"
+          <>
+            {account.ownerName ? `${account.ownerName} · ` : ""}
+            {profile
+              ? `${profile.registeredName} · TIN ${formatTin(profile.tin)} · RDO ${profile.rdoCode}`
+              : "No COR yet"}
+          </>
+        }
+        action={
+          <>
+            <MessageButton otherUserId={account.ownerUserId} label="Message client" primary />
+            <Link to="/app/upload" search={{ account: account.id }} className={buttonOutline}>
+              <Upload aria-hidden className="size-5" /> Upload for them
+            </Link>
+          </>
         }
       />
       <SampleDataNotice source={source} what="an example client" />
+      <CorConfirm accountId={account.id} />
+      {problem ? (
+        <p role="alert" className="text-tk-danger">
+          {problem}
+        </p>
+      ) : null}
       {!profile ? (
-        <EmptyState title="This client has not added their COR yet." />
+        <EmptyState
+          title="This client has not added their COR yet."
+          action={
+            <Link
+              to="/app/upload"
+              search={{ account: account.id, kind: "cor" }}
+              className={buttonPrimary}
+            >
+              Upload their COR
+            </Link>
+          }
+        />
       ) : (
         <>
           <section className="flex flex-col gap-3">
@@ -88,11 +146,28 @@ function ClientView() {
             profile={profile}
             corLink={<CorDocumentLink documentId={account.corDocumentId} accountId={account.id} />}
           />
+          <section className="flex flex-col gap-3">
+            <h2 className="text-xl font-semibold">Documents</h2>
+            {documents.length ? (
+              <DocumentTable documents={documents} clientAccountId={account.id} limit={50} />
+            ) : (
+              <p className="text-tk-muted">No documents yet.</p>
+            )}
+          </section>
           <AssistantSheet
             scope={{ accountId: account.id, year, fromMonth: 1, toMonth: month, taxType: "all" }}
           />
         </>
       )}
+      <div className="border-t border-tk-line pt-6">
+        <button
+          type="button"
+          onClick={() => void leave()}
+          className={`${buttonOutline} hover:border-tk-danger hover:text-tk-danger`}
+        >
+          <UserX aria-hidden className="size-5" /> Stop working on this account
+        </button>
+      </div>
     </div>
   );
 }

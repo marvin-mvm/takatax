@@ -60,6 +60,10 @@ export interface StoredDocument {
 
 export interface TaxpayerAccount {
   id: string;
+  /** The taxpayer who owns the account (for messaging them). Empty for sample data. */
+  ownerUserId: string;
+  /** The owner's own name, when the viewer may see it. */
+  ownerName: string;
   /** Business or trade name to show in lists. */
   displayName: string;
   /** Null until the COR has been uploaded and confirmed. */
@@ -76,6 +80,8 @@ export interface Workspace {
 
 export interface PartnerClientSummary {
   accountId: string;
+  /** The client's login, to message them. */
+  ownerUserId: string;
   displayName: string;
   ownerName: string;
   tin: string;
@@ -132,4 +138,96 @@ export interface CommunityPost {
   answers: CommunityAnswer[];
   /** True when the post was kept in this browser only because the database is not connected. */
   localOnly?: boolean;
+}
+
+/** A conversation between a taxpayer and a bookkeeper, CPA or tax lawyer. */
+export interface ConversationSummary {
+  id: string;
+  /** The other person: the partner for a taxpayer, the taxpayer for a partner. */
+  otherUserId: string;
+  otherName: string;
+  /** Set when the other person is a partner. */
+  otherKind: PartnerKind | null;
+  lastMessage: string | null;
+  lastMessageFromMe: boolean;
+  lastMessageAt: string | null;
+  unread: boolean;
+}
+
+/** One chat message. Messages can never be edited or deleted once sent. */
+export interface ChatMessageRecord {
+  id: string;
+  senderUserId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ConversationThread {
+  conversation: ConversationSummary;
+  messages: ChatMessageRecord[];
+}
+
+/** A professional who has (or had) access to the signed-in taxpayer's account. */
+export interface AccessGrant {
+  partnerId: string;
+  partnerName: string;
+  partnerKind: PartnerKind;
+  city: string;
+  rating: number;
+  reviewCount: number;
+  grantedAt: string;
+  /** Null while the access is active. */
+  revokedAt: string | null;
+}
+
+/** A partner's own profile, as they edit it (including details that are not public). */
+export interface MyPartnerProfile {
+  displayName: string;
+  kind: PartnerKind;
+  city: string;
+  bio: string;
+  specialties: string[];
+  yearsInPractice: number;
+  birAccreditationNo: string;
+  prcLicenseNo: string;
+  verifiedAt: string | null;
+}
+
+/** A partner waiting for (or holding) verification, as Takatax staff see them. */
+export interface PartnerForReview extends MyPartnerProfile {
+  userId: string;
+  createdAt: string;
+}
+
+/** The fields a person confirms from their COR (BIR Form 2303). */
+export interface CorDetails {
+  tin: string;
+  registeredName: string;
+  tradeName: string;
+  rdoCode: string;
+  registeredAddress: string;
+  lineOfBusiness: string;
+  registrationDate: string;
+  vatRegistered: boolean;
+  withholdingAgent: boolean;
+  incomeTaxOption: "eight_percent" | "graduated_osd" | "graduated_itemized";
+  businessType: "services" | "goods";
+  mixedIncome: boolean;
+}
+
+/** The account's plan: free trial, Premium window and past payments. */
+export interface PlanStatus {
+  /** Empty until the account exists (first upload or first payment). */
+  accountId: string;
+  trialUsed: boolean;
+  premiumUntil: string | null;
+  payments: {
+    id: string;
+    /** For a run that was never paid, so the payment can be tried again. */
+    runId: string | null;
+    purpose: "run" | "premium_month";
+    amount: number;
+    status: "pending" | "paid" | "failed" | "expired";
+    createdAt: string;
+  }[];
 }

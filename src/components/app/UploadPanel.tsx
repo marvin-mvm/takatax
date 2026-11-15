@@ -1,12 +1,16 @@
 /**
  * Upload and scan: pick or photograph documents, check each photo in the browser (blur,
- * darkness, glare), show the price, then upload to Cloudflare R2 and start the AI reader.
+ * darkness, glare), show the price, upload to Cloudflare R2, pay (or use the free trial or
+ * Premium), and start the AI reader.
  *
- * The storage and reader steps call edge functions that are not connected yet; the screen says
- * so and keeps the files listed here. See docs/MISSING_PIECES.md.
+ * Steps: ensure the account -> signed upload links -> PUT each file to R2 -> confirm-upload ->
+ * create-checkout (free: read now; paid: PayMongo, then back here with ?run=) -> read-documents.
+ * Each step that needs a key says so plainly when it is missing. See docs/MISSING_PIECES.md.
  */
 
 import { Camera, FileText, FolderOpen, Loader2, Trash2, TriangleAlert } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { DOCUMENT_KIND_LABEL, type DocumentKind } from "@shared/parser/schema.ts";
@@ -20,12 +24,15 @@ import {
 } from "@shared/uploads/rules.ts";
 import { buttonOutline, buttonPrimary } from "@/components/site/styles";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlan } from "@/lib/data/queries";
 import { fileSize, peso } from "@/lib/money";
+import { checkoutRun } from "@/lib/services/payments";
 import { startReading } from "@/lib/services/reader";
-import { putToStorage, requestUploadSlots } from "@/lib/services/uploads";
+import { confirmUploads, putToStorage, requestUploadSlots } from "@/lib/services/uploads";
 import { PHOTO_FLAG_TEXT, type PhotoFlag, preparePhoto } from "@/lib/uploads/photo-prep";
 import { cn } from "@/lib/utils";
 
+import { useAppUser } from "./app-user";
 import { NotConnectedNotice } from "./ui";
 
 const KIND_CHOICES: { kind: DocumentKind; label: string; hint: string }[] = [
@@ -51,11 +58,28 @@ type Stage =
   | { step: "idle" }
   | { step: "working"; message: string }
   | { step: "storage_not_connected" }
+  | { step: "payments_not_connected"; uploaded: number }
   | { step: "reader_not_connected"; uploaded: number }
   | { step: "done"; read: number; needsReview: number }
   | { step: "error"; message: string };
 
-export function UploadPanel({ initialKind }: { initialKind: DocumentKind }) {
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export function UploadPanel({
+  initialKind,
+  clientAccountId,
+  returningRunId,
+}: {
+  initialKind: DocumentKind;
+  /** Set when a partner uploads for a client: their account, at the partner price. */
+  clientAccountId?: string | undefined;
+  /** Set when PayMongo sends the browser back after paying for this run. */
+  returningRunId?: string | undefined;
+}) {
+  const { user } = useAppUser();
+  const plan = usePlan(user.id);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [kind, setKind] = useState<DocumentKind>(initialKind);
   const [queue, setQueue] = useState<QueuedFile[]>([]);
   const [stage, setStage] = useState<Stage>({ step: "idle" });
@@ -117,20 +141,78 @@ export function UploadPanel({ initialKind }: { initialKind: DocumentKind }) {
     });
 
   const ready = queue.filter((q) => !q.problem);
-  const quote = quoteRun(ready.length, { trialAvailable: true });
+  // An estimate for the button; create-checkout works out the real price on the server.
+  const premiumActive =
+    !clientAccountId &&
+    plan.data?.data.premiumUntil != null &&
+    new Date(plan.data.data.premiumUntil) > new Date();
+  const quote = quoteRun(ready.length, {
+    partner: Boolean(clientAccountId),
+    trialAvailable: !clientAccountId && plan.data?.data.trialUsed !== true,
+    ...(premiumActive ? { premiumRemaining: PRICING.premiumDocuments } : {}),
+  });
   const busy = stage.step === "working" || ready.some((q) => q.checking);
+
+  /** Reads a run, waiting a little for PayMongo's confirmation if it has not arrived yet. */
+  const readRun = async (runId: string, uploaded: number) => {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      setStage({
+        step: "working",
+        message: attempt === 0 ? "Reading your documents…" : "Waiting for the payment to clear…",
+      });
+      const result = await startReading({ runId });
+      if (result.ok) {
+        setStage({ step: "done", read: result.data.read, needsReview: result.data.needsReview });
+        void queryClient.invalidateQueries({ queryKey: ["workspace"] });
+        void queryClient.invalidateQueries({ queryKey: ["plan"] });
+        return;
+      }
+      if (result.code !== "payment_required") {
+        setStage(
+          result.reason === "not_connected"
+            ? { step: "reader_not_connected", uploaded }
+            : { step: "error", message: result.message },
+        );
+        return;
+      }
+      await wait(3_000);
+    }
+    setStage({
+      step: "error",
+      message:
+        "We have not received the payment confirmation yet. If you paid, it will be read once PayMongo confirms; check Documents in a few minutes.",
+    });
+  };
+
+  // Back from PayMongo: read the run that was just paid for.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!returningRunId || resumed.current) return;
+    resumed.current = true;
+    void readRun(returningRunId, 0).then(() =>
+      navigate({
+        to: "/app/upload",
+        search: clientAccountId ? { account: clientAccountId } : {},
+        replace: true,
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on return
+  }, [returningRunId]);
 
   const upload = async () => {
     if (!ready.length) return;
-    setStage({ step: "working", message: "Preparing your account…" });
+    setStage({ step: "working", message: "Preparing the account…" });
 
-    // MISSING: needs the migration applied (ensure_my_account). Payment (PayMongo or Xendit)
-    // goes here too, before anything is read, once checkout exists.
-    const { data: accountId, error } = await supabase.rpc("ensure_my_account" as never);
-    const account = typeof accountId === "string" ? accountId : "";
-    if (error || !account) {
-      setStage({ step: "storage_not_connected" });
-      return;
+    // A partner uploads into their client's account; a taxpayer into their own (created now if
+    // this is their first upload).
+    let account = clientAccountId ?? "";
+    if (!account) {
+      const { data: accountId, error } = await supabase.rpc("ensure_my_account" as never);
+      account = typeof accountId === "string" ? accountId : "";
+      if (error || !account) {
+        setStage({ step: "storage_not_connected" });
+        return;
+      }
     }
 
     setStage({ step: "working", message: "Getting upload links…" });
@@ -168,20 +250,39 @@ export function UploadPanel({ initialKind }: { initialKind: DocumentKind }) {
         uploaded++;
     }
 
-    setStage({ step: "working", message: "Reading your documents…" });
-    const result = await startReading(
+    setStage({ step: "working", message: "Checking the uploads…" });
+    const confirmed = await confirmUploads(
       account,
       slots.data.slots.map((s) => s.documentId),
     );
-    if (!result.ok) {
+    if (!confirmed.ok || confirmed.data.arrived.length === 0) {
       setStage(
-        result.reason === "not_connected"
-          ? { step: "reader_not_connected", uploaded }
-          : { step: "error", message: result.message },
+        confirmed.ok
+          ? { step: "error", message: "None of the files reached storage. Please try again." }
+          : confirmed.reason === "not_connected"
+            ? { step: "storage_not_connected" }
+            : { step: "error", message: confirmed.message },
       );
       return;
     }
-    setStage({ step: "done", read: result.data.read, needsReview: result.data.needsReview });
+    setQueue([]);
+
+    setStage({ step: "working", message: "Working out the price…" });
+    const checkout = await checkoutRun(account, confirmed.data.arrived);
+    if (!checkout.ok) {
+      setStage(
+        checkout.reason === "not_connected"
+          ? { step: "payments_not_connected", uploaded }
+          : { step: "error", message: checkout.message },
+      );
+      return;
+    }
+    if (checkout.data.checkoutUrl) {
+      setStage({ step: "working", message: "Opening the payment page…" });
+      window.location.assign(checkout.data.checkoutUrl);
+      return;
+    }
+    if (checkout.data.runId) await readRun(checkout.data.runId, uploaded);
   };
 
   return (
@@ -372,15 +473,17 @@ export function UploadPanel({ initialKind }: { initialKind: DocumentKind }) {
                 <Loader2 aria-hidden className="size-5 animate-spin" /> {stage.message}
               </>
             ) : quote.total > 0 ? (
-              `Pay ${peso(quote.total)} and read`
+              `Upload and pay ${peso(quote.total)}`
             ) : (
               "Upload and read"
             )}
           </button>
           <p className="mt-3 text-[13px]/[18px] text-tk-muted">
-            Your first {PRICING.trialDocuments} documents are free. Then ₱{PRICING.runPrice} reads
-            up to {PRICING.runDocuments}; extra documents are ₱{PRICING.extraDocument} each. No
-            parse, no fee.
+            {clientAccountId
+              ? `Your partner price: ₱${Math.round(PRICING.runPrice * (1 - PRICING.partnerDiscount))} reads up to ${PRICING.runDocuments} documents for this client; extra documents are ₱${PRICING.extraDocument} each.`
+              : `Your first ${PRICING.trialDocuments} documents are free. Then ₱${PRICING.runPrice} reads up to ${PRICING.runDocuments}; extra documents are ₱${PRICING.extraDocument} each.`}{" "}
+            Payment is by GCash, Maya or card through PayMongo. The final price is confirmed at
+            checkout.
           </p>
         </div>
 
@@ -388,6 +491,13 @@ export function UploadPanel({ initialKind }: { initialKind: DocumentKind }) {
           <NotConnectedNotice title="File storage is not connected yet">
             Your files were checked here, but nothing was uploaded. Uploading turns on once the
             Cloudflare R2 storage and the database are connected.
+          </NotConnectedNotice>
+        ) : null}
+        {stage.step === "payments_not_connected" ? (
+          <NotConnectedNotice title="Payments are not connected yet">
+            {stage.uploaded} file{stage.uploaded === 1 ? " was" : "s were"} uploaded. They will be
+            read once you pay, after Takatax adds its PayMongo keys. Free-trial and Premium
+            documents are read without paying.
           </NotConnectedNotice>
         ) : null}
         {stage.step === "reader_not_connected" ? (
