@@ -30,6 +30,19 @@ function event(
 }
 
 describe("describeAccessEvent", () => {
+  it("says what a professional deleted, and how many records went with it", () => {
+    const deleted = describeAccessEvent(
+      event("deleted_document", "2026-11-17T01:00:00Z", {
+        fileName: "rent.jpg",
+        documentKind: "expense_receipt",
+        records: 1,
+      }),
+    );
+    expect(deleted.title).toBe("Liza Mendoza deleted rent.jpg");
+    expect(deleted.lines.join(" ")).toContain("1 record removed from your tracker");
+    expect(ACTION_GROUP.deleted_document).toBe("changed");
+  });
+
   it("names the professional and the file", () => {
     const opened = describeAccessEvent(
       event("opened_document", "2026-11-15T01:00:00Z", {

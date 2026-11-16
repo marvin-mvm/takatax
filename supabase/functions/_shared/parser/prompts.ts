@@ -24,7 +24,7 @@ export const REGISTRATION_SYSTEM_PROMPT = `You read a Philippine BIR Form 2303, 
 
 Return:
 - isCor: false when the image is not a COR; then leave every other field null or empty.
-- tin: the TIN with dashes as printed, without the branch code (for example "435-361-750"). branchCode: the branch code printed with it (for example "00000"), or null.
+- tin: the TIN with dashes as printed, without the branch code (for example "123-456-789"). branchCode: the branch code printed with it (for example "00000"), or null.
 - registeredName: the taxpayer's registered name exactly as printed (a person's full name or the business's registered name).
 - tradeName: the business or trade name, if one is printed; otherwise null.
 - registeredAddress: the complete registered address as printed, every part (unit, street, barangay, city or municipality, province, ZIP code), in one line.

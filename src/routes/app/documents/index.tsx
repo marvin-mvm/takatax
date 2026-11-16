@@ -6,8 +6,9 @@ import { DocumentTable } from "@/components/app/DocumentTable";
 import { useAppUser } from "@/components/app/app-user";
 import { EmptyState, LoadingBlock, PageHeader, SampleDataNotice } from "@/components/app/ui";
 import { buttonPrimary } from "@/components/site/styles";
-import { useMyWorkspace } from "@/lib/data/queries";
+import { useMyWorkspace, usePlan } from "@/lib/data/queries";
 import type { DocumentStatus } from "@/lib/data/types";
+import { deletePlan } from "@/lib/documents/delete";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/documents/")({
@@ -30,6 +31,7 @@ const FILTERS: { value: Filter; label: string; matches: (status: DocumentStatus)
 function DocumentsPage() {
   const { user } = useAppUser();
   const query = useMyWorkspace(user.id);
+  const plan = usePlan(user.id);
   const [filter, setFilter] = useState<Filter>("all");
 
   const documents = useMemo(() => {
@@ -45,7 +47,7 @@ function DocumentsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Documents"
-        subtitle="Everything you uploaded. Open one to see what was read from it and the records it created."
+        subtitle="Everything you uploaded. Open one to see what was read from it and the records it created, or delete it here."
         action={
           <Link to="/app/upload" className={buttonPrimary}>
             <Upload aria-hidden className="size-5" /> Upload
@@ -75,7 +77,10 @@ function DocumentsPage() {
       {documents.length === 0 ? (
         <EmptyState title="No documents here yet." />
       ) : (
-        <DocumentTable documents={documents} />
+        <DocumentTable
+          documents={documents}
+          plan={deletePlan(plan.data?.data.premiumUntil, "owner")}
+        />
       )}
     </div>
   );

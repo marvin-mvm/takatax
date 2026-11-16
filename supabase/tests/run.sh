@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs the database behaviour checks against a throwaway local Postgres (16 or newer):
 # a stand-in for what Supabase provides (roles, auth.users, auth.uid()), then every migration,
-# then the checks in 10_behaviour.sql, 30_invitations.sql and 40_cor_tax_types.sql. Nothing touches the real Supabase project.
+# then the checks in 10_behaviour.sql, 30_invitations.sql, 40_cor_tax_types.sql and
+# 50_document_delete.sql. Nothing touches the real Supabase project.
 #
 #   PGHOST=/path/to/socket PGPORT=5432 PGUSER=postgres supabase/tests/run.sh
 set -euo pipefail
@@ -15,7 +16,7 @@ psql_cmd=(psql -v ON_ERROR_STOP=1 -q)
 for migration in "$root"/supabase/migrations/*.sql; do
   "${psql_cmd[@]}" -d "$db" -f "$migration"
 done
-for checks in 10_behaviour.sql 30_invitations.sql 40_cor_tax_types.sql; do
+for checks in 10_behaviour.sql 30_invitations.sql 40_cor_tax_types.sql 50_document_delete.sql; do
   "${psql_cmd[@]}" -d "$db" -f "$here/$checks" | grep -E "PASSED" || {
     echo "Database checks failed in $checks" >&2
     exit 1

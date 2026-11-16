@@ -24,7 +24,7 @@ end $$;
 set role authenticated;
 select public.t_as('cccccccc-cccc-cccc-cccc-cccccccccccc');
 select public.confirm_cor('cccccccc-0000-0000-0000-0000000000d1', '{
-  "tin": "435-361-750", "registeredName": "CORA LIM", "rdoCode": "039",
+  "tin": "912-345-678", "registeredName": "CORA LIM", "rdoCode": "039",
   "registeredAddress": "1 Mabini St., Brgy. 1, Manila", "lineOfBusiness": "Bookkeeping services",
   "withholdingAgent": true, "incomeTaxOption": "graduated_osd",
   "taxTypes": [
@@ -40,7 +40,7 @@ do $$ begin
 end $$;
 
 -- 3. Anything that is not a list is stored as an empty list.
-select public.confirm_cor('cccccccc-0000-0000-0000-0000000000d1', '{"tin":"435-361-750","registeredName":"CORA LIM","rdoCode":"039","taxTypes":"2551Q"}');
+select public.confirm_cor('cccccccc-0000-0000-0000-0000000000d1', '{"tin":"912-345-678","registeredName":"CORA LIM","rdoCode":"039","taxTypes":"2551Q"}');
 do $$ begin
   assert (select cor_tax_types from public.accounts) = '[]'::jsonb, 'non-list ignored';
 end $$;

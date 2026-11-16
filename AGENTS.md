@@ -113,6 +113,11 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
 - Activity log: `access_events` is owner-only and cannot be edited. Triggers log invitation
   steps and what a professional changes (records, uploads, runs, COR); `log_access_event()`
   logs what they open (the app, `document-link` and `assistant-chat` call it).
+- Deleting documents: on Standard, and for a professional on a client's account, deleting a file
+  also deletes the records read from it. On Premium the owner's file goes but its records stay
+  until the owner deletes them as a second step. The `delete-document` function removes the file
+  from R2 and then calls `delete_document()`; a professional's deletion is in the activity log.
+  The screens' rules and wording are in `src/lib/documents/delete.ts`.
 - Database changes go in a new file in `supabase/migrations/`; check them with
   `supabase/tests/run.sh` (local Postgres) before applying them to the project.
 

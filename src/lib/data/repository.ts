@@ -175,6 +175,7 @@ function toDocument(row: Row): StoredDocument {
     readerPath: Array.isArray(row["reader_path"]) ? (row["reader_path"] as string[]) : [],
     flags: Array.isArray(row["flags"]) ? (row["flags"] as CheckFlag[]) : [],
     previewUrl: null,
+    fileDeleted: Boolean(row["file_deleted_at"]),
   };
 }
 
