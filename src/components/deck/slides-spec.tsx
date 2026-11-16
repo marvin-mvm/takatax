@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { SOURCES } from "@/lib/deck/sources";
 import { cn } from "@/lib/utils";
 
+import { PRICE, RUN_AI_COST_AT_MOST } from "@/lib/pricing-copy";
 import { Block, Cite, Pill, Point, Points, Slide } from "./primitives";
 import { WhatIfModel } from "./WhatIfModel";
 
@@ -192,8 +193,8 @@ export function ReaderSlide() {
       <p className="mt-6 text-[15px]/[22px] text-tk-muted">
         <strong className="font-semibold text-tk-ink">₱0.23 to ₱0.32 per page</strong> once blended:
         Gemini Flash, then Claude Haiku, then Gemini Pro, all through OpenRouter{" "}
-        <Cite source="Takatax" refs={[21, 19, 20, 22]} />. A full 250-page run costs at most ₱80 in
-        AI against a ₱199 price.
+        <Cite source="Takatax" refs={[21, 19, 20, 22]} />. A full {PRICE.runPages}-page run costs at
+        most {RUN_AI_COST_AT_MOST} in AI against a {PRICE.run} price.
       </p>
     </Slide>
   );

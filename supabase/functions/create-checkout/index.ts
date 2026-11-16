@@ -5,13 +5,14 @@
 //
 // Works out the price on the server with the same rules the upload screen shows (quoteRun),
 // counted in pages (a photo is one page, a PDF every page): the free trial (first 10 pages,
-// once), Premium's pages left this month, ₱199 for up to 250 pages, ₱2 for each page over a
-// limit, and the 25% partner price when a bookkeeper, CPA or tax lawyer runs a client's pages.
+// once), Premium's pages left this month (then ₱2.65 a page), ₱149 for up to 80 pages (then
+// ₱3.50 a page), and the 25% partner price when a bookkeeper, CPA or tax lawyer runs a client's
+// pages. The figures live in PRICING (_shared/uploads/rules.ts).
 // Free runs are marked paid at once. Paid ones get a Xendit checkout (_lib/payments.ts);
 // payments-webhook marks them paid.
 //
-// LAUNCH ("coming soon"): while PAYMENTS_LIVE is false, Standard runs of up to 250 pages are
-// free for everyone and marked paid at once; Premium and runs over 250 pages answer
+// LAUNCH ("coming soon"): while PAYMENTS_LIVE is false, Standard runs of up to 80 pages are
+// free for everyone and marked paid at once; Premium and runs over 80 pages answer
 // 409 { code: "coming_soon" }.
 //
 // With payments live, answers 503 { code: "not_configured" } for paid checkouts until Xendit's
@@ -109,7 +110,7 @@ serve(async (request) => {
       return json({ runId, free: true, checkoutUrl: null, total: 0, summary: "Already paid" });
     }
     total = run.price_centavos / 100;
-    summary = "Parse run";
+    summary = "Standard run";
   } else {
     const ids = Array.isArray(body.documentIds) ? body.documentIds : [];
     const { data: documents, error } = await admin

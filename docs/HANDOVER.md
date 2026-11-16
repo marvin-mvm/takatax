@@ -130,10 +130,14 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
 - Reader: either the Trigger.dev task `read-run` (`trigger/`) or the Supabase edge function
   `read-step`, chosen by the Supabase secret `READER` (`trigger` default, `supabase`). The live
   project uses **`READER=supabase`** because Trigger.dev deploys are blocked (section 4).
-- Pricing by pages (a photo is 1 page, a PDF every page). Launch mode: `PAYMENTS_LIVE = false`
-  in `supabase/functions/_shared/uploads/rules.ts`: Standard runs up to 250 pages are free;
-  extra pages (₱2) and Premium (₱800 a month) show "coming soon". Payments provider: Xendit,
-  built but switched off.
+- Pricing by pages (a photo is 1 page, a PDF every page). Every figure is in `PRICING` in
+  `supabase/functions/_shared/uploads/rules.ts`: a Standard run is ₱149 for up to 80 pages, then
+  ₱3.50 a page; Premium is ₱649 a month for 300 pages and 15 GB of storage, then ₱2.65 a page;
+  bookkeepers, CPAs and tax lawyers pay 25% less for a client's run (₱112). The site, the app
+  and the deck take their figures from `PRICING` (through `src/lib/pricing-copy.ts`), so a price
+  changes in one place.
+- Launch mode: `PAYMENTS_LIVE = false` in the same file. Standard runs up to 80 pages are free;
+  extra pages and Premium show "coming soon". Payments provider: Xendit, built but switched off.
 
 ---
 
@@ -242,9 +246,11 @@ tax calendar on 2026-11-16), and each repeating return a COR names is put on the
 form numbers on old CORs are swapped for today's forms, and retired ones such as 0605 never
 show.
 
-1. **Redeploy `read-step` from `main`** (owner's go-ahead) once the table of BIR forms is merged:
-   the COR reader spells form numbers with it (for example 1702-RT, 1604-C). Until then the live
-   reader still knows only the older, shorter list.
+1. **Redeploy four functions from `main`** (owner's go-ahead) once the table of BIR forms and the
+   new prices are merged: `read-step` (the COR reader spells form numbers with the table, for
+   example 1702-RT and 1604-C), and `create-checkout`, `create-upload-urls` and
+   `payments-webhook` (they carry the price list). Until then the server still allows free runs
+   of up to 250 pages while the screens say 80.
 2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff
    tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); an SMTP

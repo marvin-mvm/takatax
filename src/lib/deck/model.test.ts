@@ -111,13 +111,15 @@ describe("runModel", () => {
   });
 
   it("prices a simple case by hand", () => {
-    // One year, no Premium, no partners' discount effects on the regular line:
+    // One year, no Premium, runs that just fit the 80 pages, no partners' discount effects on
+    // the regular line:
     // customers ramp 1/12..12/12 of 1,127, so the average month holds 6.5/12 of them.
     const result = runModel(
       withInputs({
         years: 1,
         premiumSharePct: 0,
         runsPerYear: 12,
+        pagesPerRun: 80,
         includeAds: false,
         includeSubscriptions: false,
       }),
@@ -131,7 +133,7 @@ describe("runModel", () => {
       storageMonths += (customers * 50) / 900;
       partnerRuns += (1_608 * month) / 36;
     }
-    expect(result.years[0]?.revenue.parser).toBeCloseTo(regularRuns * 199 + partnerRuns * 149, 4);
+    expect(result.years[0]?.revenue.parser).toBeCloseTo(regularRuns * 149 + partnerRuns * 112, 4);
     expect(result.years[0]?.revenue.storage).toBeCloseTo(storageMonths * 250, 4);
     expect(result.years[0]?.revenue.ads).toBe(0);
     expect(result.years[0]?.revenue.subscriptions).toBe(0);
@@ -183,7 +185,10 @@ describe("runModel", () => {
     for (let month = 1; month <= 12; month++) {
       premiumMonths += Math.round((MICRO_ENTERPRISES * 0.001 * month) / 12) * 0.1;
     }
-    expect((full?.pages ?? 0) - (none?.pages ?? 0)).toBeCloseTo(premiumMonths * 1_000, 4);
+    expect((full?.pages ?? 0) - (none?.pages ?? 0)).toBeCloseTo(
+      premiumMonths * DEFAULT_INPUTS.premiumPageLimit,
+      4,
+    );
   });
 
   it("stays profitable on the default plan from year 2", () => {
@@ -194,25 +199,25 @@ describe("runModel", () => {
 });
 
 describe("premiumMonth", () => {
-  it("prices a fully used 1,000-page month on the three-step reader", () => {
+  it("prices a fully used 300-page month on the three-step reader", () => {
     const month = premiumMonth(
-      withInputs({ ...GATEWAY, premiumPageLimit: 1_000, premiumUsagePct: 100 }),
+      withInputs({ ...GATEWAY, premiumPageLimit: 300, premiumUsagePct: 100 }),
     );
-    expect(month.pages).toBe(1_000);
+    expect(month.pages).toBe(300);
     expect(month.extraRevenue).toBe(0);
-    expect(month.aiCost).toBeCloseTo(319, 6);
+    expect(month.aiCost).toBeCloseTo(95.7, 6);
     expect(month.jobsCost).toBeCloseTo(
-      1_000 * jobsCostPerPage(DEFAULT_INPUTS) + JOBS_COST_PER_RUN,
+      300 * jobsCostPerPage(DEFAULT_INPUTS) + JOBS_COST_PER_RUN,
       6,
     );
-    expect(month.paymentFee).toBeCloseTo(20, 6);
-    expect(month.kept).toBeCloseTo(800 - 20 - 319 - month.jobsCost, 6);
+    expect(month.paymentFee).toBeCloseTo(16.225, 6);
+    expect(month.kept).toBeCloseTo(649 - 16.225 - 95.7 - month.jobsCost, 6);
   });
 
-  it("charges ₱2 a page over the Premium limit", () => {
-    const month = premiumMonth(withInputs({ premiumPageLimit: 1_000, premiumUsagePct: 120 }));
-    expect(month.pages).toBe(1_200);
-    expect(month.extraRevenue).toBe(400);
+  it("charges ₱2.65 a page over the Premium limit", () => {
+    const month = premiumMonth(withInputs({ premiumPageLimit: 300, premiumUsagePct: 120 }));
+    expect(month.pages).toBe(360);
+    expect(month.extraRevenue).toBeCloseTo(60 * 2.65, 6);
   });
 
   it("loses money on a full month when Pro reads everything at a high limit", () => {
@@ -245,25 +250,25 @@ describe("Trigger.dev jobs", () => {
     expect(result.years[0]?.costs.jobs).toBeGreaterThanOrEqual(12 * TRIGGER.planUsdMonthly * 63);
   });
 
-  it("stays a small share of a 250-page run", () => {
-    const run = runEconomics(withInputs({ pagesPerRun: 250 }));
+  it("stays a small share of an 80-page run", () => {
+    const run = runEconomics(withInputs({ pagesPerRun: 80 }));
     expect(run.jobsCost).toBeLessThan(run.aiCost / 10);
-    expect(run.kept).toBeCloseTo(199 - run.paymentFee - run.aiCost - run.jobsCost, 9);
+    expect(run.kept).toBeCloseTo(149 - run.paymentFee - run.aiCost - run.jobsCost, 9);
   });
 });
 
 describe("runEconomics", () => {
-  it("adds ₱2 for each page over 250", () => {
-    const run = runEconomics(withInputs({ ...GATEWAY, pagesPerRun: 300 }));
-    expect(run.basePrice).toBe(199);
-    expect(run.extraRevenue).toBe(100);
-    expect(run.paymentFee).toBeCloseTo(0.025 * 299, 9);
+  it("adds ₱3.50 for each page over 80", () => {
+    const run = runEconomics(withInputs({ ...GATEWAY, pagesPerRun: 100 }));
+    expect(run.basePrice).toBe(149);
+    expect(run.extraRevenue).toBe(70);
+    expect(run.paymentFee).toBeCloseTo(0.025 * 219, 9);
   });
 
   it("gives partners 25% off the base price but not the extra pages", () => {
-    const run = runEconomics(withInputs({ pagesPerRun: 300 }), true);
-    expect(run.basePrice).toBe(149);
-    expect(run.extraRevenue).toBe(100);
+    const run = runEconomics(withInputs({ pagesPerRun: 100 }), true);
+    expect(run.basePrice).toBe(112);
+    expect(run.extraRevenue).toBe(70);
   });
 
   it("earns the extras in the plan", () => {
@@ -273,8 +278,8 @@ describe("runEconomics", () => {
       includeSubscriptions: false,
       premiumSharePct: 0,
     };
-    const atLimit = runModel(withInputs({ ...oneYear, pagesPerRun: 250 })).years[0];
-    const over = runModel(withInputs({ ...oneYear, pagesPerRun: 300 })).years[0];
+    const atLimit = runModel(withInputs({ ...oneYear, pagesPerRun: 80 })).years[0];
+    const over = runModel(withInputs({ ...oneYear, pagesPerRun: 100 })).years[0];
     expect((over?.revenue.parser ?? 0) - (atLimit?.revenue.parser ?? 0)).toBeGreaterThan(0);
   });
 });
@@ -286,26 +291,27 @@ describe("compareLimits", () => {
     expect(large?.planAiCost).toBeGreaterThan(small?.planAiCost ?? 0);
     expect(large?.planNetProfit).toBeLessThan(small?.planNetProfit ?? 0);
     expect(large?.planNetProfitFullUse).toBeLessThan(large?.planNetProfit ?? 0);
-    expect(large?.planNetProfit).toBeCloseTo(runModel(DEFAULT_INPUTS).totals.netProfit, 4);
+    // The plan's own limit is the smaller one.
+    expect(small?.planNetProfit).toBeCloseTo(runModel(DEFAULT_INPUTS).totals.netProfit, 4);
   });
 });
 
 describe("payment fees", () => {
   it("uses Xendit's GCash rate by default", () => {
-    expect(paymentFee(DEFAULT_INPUTS, 199)).toBeCloseTo(0.023 * 199, 9);
+    expect(paymentFee(DEFAULT_INPUTS, 149)).toBeCloseTo(0.023 * 149, 9);
   });
 
   it("charges a merchant of record its share plus $0.40 a payment", () => {
     const mor = { paymentFeePct: 5.5, paymentFeeFixedUsd: 0.4 };
-    expect(paymentFee(mor, 199)).toBeCloseTo(0.055 * 199 + 0.4 * 63, 9);
+    expect(paymentFee(mor, 149)).toBeCloseTo(0.055 * 149 + 0.4 * 63, 9);
     expect(paymentFee(mor, 0)).toBe(0);
   });
 
-  it("leaves less of a ₱199 run with a merchant of record than with a local gateway", () => {
-    const mor = runEconomics(withInputs({ ...MOR, pagesPerRun: 250 }));
-    const gateway = runEconomics(withInputs({ ...GATEWAY, pagesPerRun: 250 }));
+  it("leaves less of a ₱149 run with a merchant of record than with a local gateway", () => {
+    const mor = runEconomics(withInputs({ ...MOR, pagesPerRun: 80 }));
+    const gateway = runEconomics(withInputs({ ...GATEWAY, pagesPerRun: 80 }));
     expect(mor.paymentFee).toBeGreaterThan(30);
-    expect(gateway.paymentFee).toBeCloseTo(4.975, 9);
+    expect(gateway.paymentFee).toBeCloseTo(3.725, 9);
     expect(mor.kept).toBeLessThan(gateway.kept);
   });
 
