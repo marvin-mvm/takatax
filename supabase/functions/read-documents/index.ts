@@ -1,6 +1,13 @@
 // POST { runId }                    -> start reading a paid (or free) run
-// POST { accountId, documentIds }    -> read documents again that a paid run already covered
+// POST { accountId, documentIds }    -> "Read again": start documents whose reading failed or
+//                                       never started, that a paid run already covered
 //   -> { started: true, pages }
+//
+// A document is read once. "Read again" starts only documents waiting to be read (their reading
+// failed or never started) or whose reading stalled; a document already read (accepted, needs a
+// check, or not a tax document) answers 409 { code: "already_read" }, and one being read answers
+// 409 { code: "already_reading" }. Documents are claimed in one update before the reader starts,
+// so a double click or a second tab never starts (or pays for) the same reading twice.
 //
 // Checks the request, then hands the reading to one of two readers, chosen by the READER
 // secret (see _lib/reader.ts):
@@ -46,6 +53,8 @@ serve(async (request) => {
   let documents: { bytes: number; page_count: number }[];
   let payload: Record<string, unknown>;
   let idempotencyKey: string | undefined;
+  // "Read again": the documents this request claimed (set back to waiting if the start fails).
+  let claimedIds: string[] = [];
 
   if (body.runId) {
     const { data: run, error } = await admin
@@ -81,28 +90,37 @@ serve(async (request) => {
     await authorize(request, accountId);
     const { data, error } = await admin
       .from("documents")
-      .select("bytes, page_count, runs(status)")
+      .select("id, bytes, page_count, status, updated_at, runs(status)")
       .eq("account_id", accountId)
       .in("id", body.documentIds);
     if (error) throw error;
-    const unpaid = (data ?? []).some((d) => {
+    const rows = data ?? [];
+    const unpaid = rows.some((d) => {
       const run = d.runs as unknown as { status: string } | null;
       return !run || run.status === "awaiting_payment";
     });
     if (unpaid && !unpaidAllowed) {
       throw new HttpError(402, "payment_required", "Pay for these documents before they are read");
     }
-    documents = data ?? [];
-    payload = { accountId, documentIds: body.documentIds };
+    // Checked before claiming, so documents are never left marked as being read.
+    await assertUnderDailyCap(admin);
+    const claimed = await claimDocuments(admin, accountId, rows);
+    if (claimed.length === 0) {
+      throw rows.some((d) => d.status === "reading")
+        ? new HttpError(409, "already_reading", "This document is being read")
+        : new HttpError(409, "already_read", "This document has already been read");
+    }
+    documents = rows.filter((d) => claimed.includes(d.id));
+    payload = { accountId, documentIds: claimed };
+    claimedIds = claimed;
   }
 
-  await assertUnderDailyCap(admin);
+  if (body.runId) await assertUnderDailyCap(admin);
   const pages = documents.reduce((sum, d) => sum + (d.page_count ?? 1), 0);
 
   if (backend === "supabase") {
-    const start = body.runId
-      ? await claimRun(admin, body.runId)
-      : await claimDocuments(admin, accountId, body.documentIds ?? []);
+    // "Read again" documents were claimed above; a run is claimed here.
+    const start = body.runId ? await claimRun(admin, body.runId) : true;
     if (start) await startReadStep(payload);
     return json({ started: true, pages });
   }
@@ -127,6 +145,14 @@ serve(async (request) => {
   });
   if (!response.ok) {
     console.error("Trigger.dev", response.status, (await response.text()).slice(0, 300));
+    if (claimedIds.length) {
+      // Let the person try again: the documents go back to waiting.
+      await admin
+        .from("documents")
+        .update({ status: "waiting_for_reader", updated_at: new Date().toISOString() })
+        .in("id", claimedIds)
+        .eq("status", "reading");
+    }
     throw new HttpError(502, "reader_unavailable", "The reader could not be started");
   }
   const started = (await response.json()) as { id?: string };
@@ -167,21 +193,46 @@ async function claimRun(admin: Admin, runId: string): Promise<boolean> {
   return stalled(latest);
 }
 
-/** Queues documents to be read again. False while some of them are already being read. */
-async function claimDocuments(admin: Admin, accountId: string, ids: string[]): Promise<boolean> {
-  const { data: reading } = await admin
-    .from("documents")
-    .select("updated_at")
-    .eq("account_id", accountId)
-    .in("id", ids)
-    .eq("status", "reading");
-  if ((reading ?? []).length > 0 && !stalled(reading)) return false;
-  const { error } = await admin
-    .from("documents")
-    .update({ status: "waiting_for_reader", updated_at: new Date().toISOString() })
-    .eq("account_id", accountId)
-    .in("id", ids)
-    .neq("status", "reading");
-  if (error) throw error;
-  return true;
+/**
+ * "Read again": claims the documents that may be read, in one update each, and returns their
+ * ids. A document may be read when it is waiting to be read (its reading failed or never
+ * started), or when its reading stalled (no progress for STALLED_MS). Documents already read, or
+ * being read, are left alone; a second request for the same documents claims nothing.
+ */
+async function claimDocuments(
+  admin: Admin,
+  accountId: string,
+  rows: { id: string; status: string; updated_at: string | null }[],
+): Promise<string[]> {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - STALLED_MS).toISOString();
+  const waiting = rows.filter((d) => d.status === "waiting_for_reader").map((d) => d.id);
+  const stalledIds = rows.filter((d) => d.status === "reading" && stalled([d])).map((d) => d.id);
+  const claimed: string[] = [];
+  if (waiting.length) {
+    // Fresh start: any half-saved progress from a failed reading is cleared.
+    const { data, error } = await admin
+      .from("documents")
+      .update({ status: "reading", extracted: null, updated_at: now.toISOString() })
+      .eq("account_id", accountId)
+      .in("id", waiting)
+      .eq("status", "waiting_for_reader")
+      .select("id");
+    if (error) throw error;
+    claimed.push(...(data ?? []).map((d) => d.id as string));
+  }
+  if (stalledIds.length) {
+    // Resume: the saved progress stays, so reading carries on where it stopped.
+    const { data, error } = await admin
+      .from("documents")
+      .update({ updated_at: now.toISOString() })
+      .eq("account_id", accountId)
+      .in("id", stalledIds)
+      .eq("status", "reading")
+      .lt("updated_at", cutoff)
+      .select("id");
+    if (error) throw error;
+    claimed.push(...(data ?? []).map((d) => d.id as string));
+  }
+  return claimed;
 }
