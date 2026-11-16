@@ -233,6 +233,10 @@ do $$ begin
   assert (select count(*) from public.access_events where details ->> 'partnerName' = 'Paolo Dizon') > 0, 'name kept';
 end $$;
 delete from auth.users where id = '77777777-7777-7777-7777-777777777777';
-do $$ begin assert (select count(*) from public.access_events) = 0, 'log removed with the account'; end $$;
+do $$ begin
+  assert (select count(*) from public.access_events
+          where details ->> 'partnerName' in ('Paolo Dizon', 'Quin Sy, CPA')) = 0,
+    'log removed with the account';
+end $$;
 
 select 'ALL INVITATION CHECKS PASSED';

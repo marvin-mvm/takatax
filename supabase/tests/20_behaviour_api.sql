@@ -1,6 +1,8 @@
 -- The same checks as 10_behaviour.sql without psql variables, for a dry run through the
 -- Supabase Management API: send "begin;", both migrations, this file and "rollback;" as one
 -- query. It creates test users and rows, and the rollback removes every trace of them.
+-- Every check looks only at the test people's own rows, so it also works on a project that
+-- already has real users, posts and documents (none of which it changes).
 -- Fixed ids for the people in the test.
 
 create table public.t_vars (name text primary key, value uuid);
@@ -52,8 +54,8 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('55555555-5555-5555-5555-555555555555', 'staff@example.com', '{"full_name":"Staff","account_type":"nonsense"}');
 insert into public.admins (user_id) values ('55555555-5555-5555-5555-555555555555');
 do $$ begin
-  assert (select count(*) from public.profiles) = 5, 'five profiles';
-  assert (select count(*) from public.partner_profiles) = 2, 'two partner profiles';
+  assert (select count(*) from public.profiles where user_id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555')) = 5, 'five profiles';
+  assert (select count(*) from public.partner_profiles where user_id in ('33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444')) = 2, 'two partner profiles';
   assert (select role from public.profiles where user_id = '55555555-5555-5555-5555-555555555555') = 'taxpayer', 'unknown type becomes taxpayer';
 end $$;
 
@@ -157,7 +159,7 @@ select public.t_grant('33333333-3333-3333-3333-333333333333');
 -- 11. Ledger and account columns the browser may and may not change.
 reset role;
 insert into public.ledger_records (account_id, kind, record_date, amount_centavos)
-  select id, 'sale', '2026-10-01', 100000 from public.accounts;
+  select id, 'sale', '2026-10-01', 100000 from public.accounts where owner_user_id = '11111111-1111-1111-1111-111111111111';
 set role authenticated;
 select public.t_as('33333333-3333-3333-3333-333333333333');
 update public.ledger_records set amount_centavos = 120000, user_corrected = true;
@@ -171,7 +173,7 @@ update public.accounts set registered_name = 'ANA SANTOS', tin = '123456789000';
 -- 11b. COR confirmation: the owner or their partner; never someone else.
 reset role;
 insert into public.documents (id, account_id, kind, file_name, mime_type, bytes, status, extracted)
-  select '66666666-6666-6666-6666-666666666666', id, 'cor', 'cor.jpg', 'image/jpeg', 1000, 'needs_review', '{"tin":"999"}' from public.accounts;
+  select '66666666-6666-6666-6666-666666666666', id, 'cor', 'cor.jpg', 'image/jpeg', 1000, 'needs_review', '{"tin":"999"}' from public.accounts where owner_user_id = '11111111-1111-1111-1111-111111111111';
 set role authenticated;
 select public.t_as('22222222-2222-2222-2222-222222222222');
 select public.t_expect_error($$select public.confirm_cor('66666666-6666-6666-6666-666666666666', '{}')$$, 'COR not found');
@@ -197,35 +199,38 @@ set role authenticated;
 select public.t_as('11111111-1111-1111-1111-111111111111');
 insert into public.community_posts (title, body) values ('How do I file 2551Q?', 'My TIN is 123-456-789-000 and I earned ₱50,000.');
 select public.t_expect_error($$select author_user_id from public.community_posts$$, 'permission denied');
-insert into public.t_vars select 'post', id from public.community_posts_public limit 1;
-do $$ begin assert (select body from public.community_posts_public) like '%[TIN •••]%₱•••%', 'post redacted'; end $$;
+reset role;
+insert into public.t_vars select 'post', id from public.community_posts where author_user_id = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+select public.t_as('11111111-1111-1111-1111-111111111111');
+do $$ begin assert (select body from public.community_posts_public where id = (select value from public.t_vars where name = 'post')) like '%[TIN •••]%₱•••%', 'post redacted'; end $$;
 select public.t_expect_error(format($$update public.community_posts set title = 'Changed title' where id = %L$$, (select value from public.t_vars where name = 'post')), 'permission denied');
 select public.t_as('44444444-4444-4444-4444-444444444444');
 select public.t_expect_error(format($$insert into public.community_answers (post_id, body) values (%L, 'Unverified answer here')$$, (select value from public.t_vars where name = 'post')), 'row-level security');
 select public.t_as('33333333-3333-3333-3333-333333333333');
 insert into public.community_answers (post_id, body) values ((select value from public.t_vars where name = 'post'), 'File it by the 25th after the quarter.');
 select public.t_as('22222222-2222-2222-2222-222222222222');
-do $$ begin assert not public.is_my_post((select id from public.community_posts_public limit 1)), 'not t2s post'; end $$;
+do $$ begin assert not public.is_my_post((select value from public.t_vars where name = 'post')), 'not t2s post'; end $$;
 select public.delete_my_post((select value from public.t_vars where name = 'post'));
-select public.mark_answer_helpful((select id from public.community_answers limit 1), true);
-do $$ begin assert (select count(*) from public.community_posts_public) = 1, 't2 cannot delete'; end $$;
-do $$ begin assert not (select helpful from public.community_answers limit 1), 't2 cannot mark helpful'; end $$;
+select public.mark_answer_helpful((select id from public.community_answers where post_id = (select value from public.t_vars where name = 'post')), true);
+do $$ begin assert (select count(*) from public.community_posts_public where id = (select value from public.t_vars where name = 'post')) = 1, 't2 cannot delete'; end $$;
+do $$ begin assert not (select helpful from public.community_answers where post_id = (select value from public.t_vars where name = 'post')), 't2 cannot mark helpful'; end $$;
 select public.t_as('11111111-1111-1111-1111-111111111111');
-do $$ begin assert public.is_my_post((select id from public.community_posts_public limit 1)), 't1 owns the post'; end $$;
-select public.mark_answer_helpful((select id from public.community_answers limit 1), true);
-do $$ begin assert (select helpful from public.community_answers limit 1), 't1 marked helpful'; end $$;
+do $$ begin assert public.is_my_post((select value from public.t_vars where name = 'post')), 't1 owns the post'; end $$;
+select public.mark_answer_helpful((select id from public.community_answers where post_id = (select value from public.t_vars where name = 'post')), true);
+do $$ begin assert (select helpful from public.community_answers where post_id = (select value from public.t_vars where name = 'post')), 't1 marked helpful'; end $$;
 reset role;
 set role anon;
 select set_config('request.jwt.claims', '', false);
 do $$ begin
-  assert (select count(*) from public.community_posts_public) = 1, 'anon sees public post';
-  assert (select partner_name from public.community_answers_public) = 'Pia Cruz', 'anon sees named answer';
+  assert (select count(*) from public.community_posts_public where id = (select value from public.t_vars where name = 'post')) = 1, 'anon sees public post';
+  assert (select partner_name from public.community_answers_public where post_id = (select value from public.t_vars where name = 'post')) = 'Pia Cruz', 'anon sees named answer';
 end $$;
 reset role;
 set role authenticated;
 select public.t_as('11111111-1111-1111-1111-111111111111');
 select public.delete_my_post((select value from public.t_vars where name = 'post'));
-do $$ begin assert (select count(*) from public.community_posts_public) = 0, 't1 deleted post'; end $$;
+do $$ begin assert (select count(*) from public.community_posts_public where id = (select value from public.t_vars where name = 'post')) = 0, 't1 deleted post'; end $$;
 
 -- 14. Reviews: only clients; the author stays hidden.
 insert into public.partner_reviews (partner_user_id, rating, body) values ('33333333-3333-3333-3333-333333333333', 5, 'Very helpful');
@@ -242,13 +247,13 @@ select public.t_expect_error($$insert into public.payments (account_id, payer_us
 select public.t_expect_error($$select public.ai_spend_today()$$, 'permission denied');
 select public.t_expect_error($$select * from public.ai_spend$$, 'permission denied|row-level');
 reset role;
-do $$ begin assert public.ai_spend_today() = 0, 'server reads spend'; end $$;
+do $$ begin assert public.ai_spend_today() >= 0, 'server reads spend'; end $$;
 
 -- 16. Deleting a person removes their conversations and messages (cascades are allowed).
 delete from auth.users where id = '11111111-1111-1111-1111-111111111111';
 do $$ begin
-  assert (select count(*) from public.messages) = 0, 'messages removed with the account';
-  assert (select count(*) from public.conversations) = 0, 'conversation removed with the account';
+  assert (select count(*) from public.messages where sender_user_id in ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333')) = 0, 'messages removed with the account';
+  assert (select count(*) from public.conversations where taxpayer_user_id = '11111111-1111-1111-1111-111111111111') = 0, 'conversation removed with the account';
 end $$;
 
 select 'ALL BEHAVIOUR CHECKS PASSED';
