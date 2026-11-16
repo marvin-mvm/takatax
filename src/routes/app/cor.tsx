@@ -9,6 +9,7 @@ import { CorConfirm } from "@/components/app/CorConfirm";
 import {
   CorDetails,
   CorDocumentLink,
+  CorFormsList,
   DeadlineList,
   TaxTypeCards,
 } from "@/components/app/TaxCalendar";
@@ -76,7 +77,16 @@ function MyCorPage() {
             <h2 id="types-title" className="text-xl font-semibold">
               Your tax types
             </h2>
-            <TaxTypeCards profile={profile} />
+            {profile.corTaxTypes?.length ? (
+              <>
+                <p className="text-tk-muted">
+                  The returns listed on your COR, with the form each one is filed on.
+                </p>
+                <CorFormsList profile={profile} />
+              </>
+            ) : (
+              <TaxTypeCards profile={profile} />
+            )}
           </section>
 
           <section aria-labelledby="deadlines-title" className="flex flex-col gap-3">

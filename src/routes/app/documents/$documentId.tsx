@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, ImageOff, RefreshCw } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, ExternalLink, ImageOff, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { formatIsoDate } from "@shared/domain/dates.ts";
 import { EXPENSE_CATEGORY_LABEL, RECORD_KIND_LABEL } from "@shared/domain/records.ts";
 import { CHECK_FLAG_TEXT } from "@shared/parser/checks.ts";
 import { DOCUMENT_KIND_LABEL } from "@shared/parser/schema.ts";
+import { ReadingProgress } from "@/components/app/ReadingProgress";
 import { useAppUser } from "@/components/app/app-user";
 import {
   BackLink,
@@ -21,7 +22,7 @@ import {
 } from "@/components/app/ui";
 import { buttonOutline } from "@/components/site/styles";
 import { useClientWorkspace, useMyWorkspace } from "@/lib/data/queries";
-import { logAccessEvent } from "@/lib/data/repository";
+import { READ_FINISHED, logAccessEvent } from "@/lib/data/repository";
 import { fileSize, peso } from "@/lib/money";
 import { startReading } from "@/lib/services/reader";
 import { getDocumentLink } from "@/lib/services/uploads";
@@ -47,7 +48,11 @@ function DocumentPage() {
   const mine = useMyWorkspace(user.id);
   const client = useClientWorkspace(account ?? "");
   const query = account ? client : mine;
+  const queryClient = useQueryClient();
   const [rereadMessage, setRereadMessage] = useState<string | null>(null);
+  // True from the click until the reader has taken the document: the button is locked, so a
+  // second click can never start (or pay for) a second reading.
+  const [starting, setStarting] = useState(false);
   // A professional opening a client's document goes in the client's activity log.
   useEffect(() => {
     if (account) void logAccessEvent(account, "opened_document", documentId);
@@ -70,15 +75,38 @@ function DocumentPage() {
   }
   const records = workspace.records.filter((r) => r.documentId === doc.id);
 
+  // A document is read once. "Read again" is offered only when its reading failed or never
+  // started; while it is being read the button is locked, and once it is read it is gone. The
+  // read-documents function refuses the same cases, whatever the screen shows.
+  const finished = READ_FINISHED.includes(doc.status);
+  const canRead = doc.status === "waiting_for_reader";
+  const reading = doc.status === "reading";
+
   const reread = async () => {
-    setRereadMessage("Asking the reader…");
+    if (starting || !canRead) return;
+    setStarting(true);
+    setRereadMessage(null);
     const result = await startReading({ accountId: workspace.account.id, documentIds: [doc.id] });
+    if (result.ok) {
+      // The document is now "reading": refresh it, and the progress bar takes over.
+      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      setStarting(false);
+      return;
+    }
+    setStarting(false);
+    if (result.code === "already_read" || result.code === "already_reading") {
+      await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+    }
     setRereadMessage(
-      result.ok
-        ? "Sent to be read again."
-        : result.reason === "not_connected"
-          ? "The AI reader is not connected yet, so the document was not read again."
-          : result.message,
+      result.reason === "not_connected"
+        ? "The AI reader is not connected yet, so the document was not read."
+        : result.code === "already_read"
+          ? "This document has already been read. Each document is read once."
+          : result.code === "already_reading"
+            ? "This document is already being read."
+            : result.code === "payment_required"
+              ? "This document's run is not paid yet, so it cannot be read."
+              : result.message,
     );
   };
 
@@ -87,16 +115,53 @@ function DocumentPage() {
       <BackLink to={back}>{account ? "Back to client" : "All documents"}</BackLink>
       <PageHeader
         title={doc.fileName}
-        subtitle={`${DOCUMENT_KIND_LABEL[doc.kind]} · uploaded ${formatIsoDate(doc.uploadedAt.slice(0, 10))} · ${fileSize(doc.bytes)}`}
+        subtitle={`${DOCUMENT_KIND_LABEL[doc.kind]} · uploaded ${formatIsoDate(doc.uploadedAt.slice(0, 10))} · ${fileSize(doc.bytes)}${doc.pageCount > 1 ? ` · ${doc.pageCount} pages` : ""}`}
         action={
-          <button type="button" onClick={() => void reread()} className={buttonOutline}>
-            <RefreshCw aria-hidden className="size-4" /> Read again
-          </button>
+          canRead || starting ? (
+            <button
+              type="button"
+              onClick={() => void reread()}
+              disabled={starting}
+              aria-busy={starting}
+              className={buttonOutline}
+            >
+              {starting ? (
+                <>
+                  <Loader2 aria-hidden className="size-4 animate-spin" /> Starting…
+                </>
+              ) : (
+                <>
+                  <RefreshCw aria-hidden className="size-4" /> Read again
+                </>
+              )}
+            </button>
+          ) : reading ? (
+            <button type="button" disabled aria-busy className={buttonOutline}>
+              <Loader2 aria-hidden className="size-4 animate-spin" /> Reading…
+            </button>
+          ) : finished ? (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-tk-muted">
+              <CheckCircle2 aria-hidden className="size-4 text-tk-brand" /> Read once, final
+            </span>
+          ) : null
         }
       />
       <SampleDataNotice source={source} />
       {rereadMessage ? (
         <NotConnectedNotice title="Read again">{rereadMessage}</NotConnectedNotice>
+      ) : null}
+      {reading ? (
+        <Card>
+          <ReadingProgress
+            status={doc.status}
+            pages={doc.pageCount}
+            pagesRead={doc.pagesRead}
+            fileName={doc.fileName}
+          />
+          <p className="mt-3 text-sm text-tk-muted">
+            You can leave this page; reading carries on. The figures appear here when it is done.
+          </p>
+        </Card>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">

@@ -3,6 +3,7 @@
  * returns follow from it. Pure data and functions: no I/O.
  */
 
+import type { CorTaxType } from "../parser/registration.ts";
 import type { IsoDate } from "./dates.ts";
 
 /** How income tax is computed for the year. The choice is made once a year. */
@@ -27,6 +28,8 @@ export interface TaxProfile {
   businessType: "services" | "goods";
   /** Also earns a salary; 8% filers with a salary do not get the ₱250,000 reduction. */
   mixedIncome: boolean;
+  /** The tax types and forms printed on the COR, as confirmed by the owner. */
+  corTaxTypes?: CorTaxType[] | undefined;
 }
 
 export interface TaxTypeInfo {

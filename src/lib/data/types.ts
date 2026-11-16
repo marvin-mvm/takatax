@@ -4,6 +4,7 @@ import type { Filing } from "@shared/domain/deadlines.ts";
 import type { LedgerRecord } from "@shared/domain/records.ts";
 import type { FilingEstimate } from "@shared/domain/tax-estimates.ts";
 import type { TaxProfile, TaxTypeId } from "@shared/domain/tax-profile.ts";
+import type { CorTaxType } from "@shared/parser/registration.ts";
 import type { CheckFlag } from "@shared/parser/checks.ts";
 import type { DocumentKind } from "@shared/parser/schema.ts";
 
@@ -51,6 +52,10 @@ export interface StoredDocument {
   bytes: number;
   uploadedAt: string;
   status: DocumentStatus;
+  /** Pages the AI reads: 1 for a photo, every page of a PDF. */
+  pageCount: number;
+  /** Pages read so far: grows while the status is "reading", all of them once read. */
+  pagesRead: number;
   /** Which reader steps ran, for example ["fast", "recheck"]. */
   readerPath: string[];
   flags: CheckFlag[];
@@ -263,6 +268,8 @@ export interface CorDetails {
   incomeTaxOption: "eight_percent" | "graduated_osd" | "graduated_itemized";
   businessType: "services" | "goods";
   mixedIncome: boolean;
+  /** The tax types and forms on the COR, one per form (0619-E, 1601-EQ, 2551Q…). */
+  taxTypes: CorTaxType[];
 }
 
 /** The account's plan: free trial, Premium window and past payments. */

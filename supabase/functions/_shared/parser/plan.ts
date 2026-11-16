@@ -61,7 +61,8 @@ export const extractionRequest = (label: string): string =>
   `Read every document in ${label}. Say for each one whether it is a sale, an expense or a Form 2307.`;
 
 /** The instruction sent with a COR. */
-export const REGISTRATION_REQUEST = "Read this COR. Reply with JSON only.";
+export const REGISTRATION_REQUEST =
+  "Read this COR: every field, and every row of the tax type table with its form.";
 
 /** A COR is one or two pages: only these are read. */
 export const COR_PAGES = 2;

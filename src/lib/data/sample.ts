@@ -239,6 +239,8 @@ function buildWorkspace(business: SampleBusiness, today: string): Workspace {
       bytes: Math.round(180_000 + rand() * 900_000),
       uploadedAt: `${date}T09:00:00.000Z`,
       status,
+      pageCount: 1,
+      pagesRead: status === "accepted" || status === "needs_review" ? 1 : 0,
       readerPath: status === "accepted" ? (flags.length ? ["fast", "recheck"] : ["fast"]) : [],
       flags,
       previewUrl: null,
