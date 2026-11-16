@@ -293,3 +293,22 @@ export interface PlanStatus {
     createdAt: string;
   }[];
 }
+
+/**
+ * What the account has used of its tier: pages read by the AI and file storage. The limits are
+ * in `@shared/uploads/usage.ts`.
+ */
+export interface AccountUsage {
+  /** Empty until the account exists (first upload). */
+  accountId: string;
+  tier: "standard" | "premium";
+  premiumUntil: string | null;
+  /** Standard: pages in the latest run. Premium: pages read in the current Premium month. */
+  pagesUsed: number;
+  /** Pages read since the account opened, the pages of deleted files included. */
+  pagesReadInAll: number;
+  /** Bytes of the files in storage. A deleted file no longer counts. */
+  storageBytes: number;
+  /** Files in storage. */
+  files: number;
+}

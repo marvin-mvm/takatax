@@ -122,6 +122,8 @@ export function DocumentTable({
     if (result.ok) {
       // The documents, the tracker and the tax figures all come from the workspace.
       await queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      // A deleted file frees its storage.
+      void queryClient.invalidateQueries({ queryKey: ["usage"] });
     } else {
       setProblem(
         result.reason === "not_connected"

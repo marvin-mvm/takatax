@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 
+import { firstNameOf } from "./names";
+
 export type AuthState =
   { status: "loading" } | { status: "signedOut" } | { status: "signedIn"; user: User };
 
@@ -43,4 +45,9 @@ export function displayName(user: Pick<User, "email" | "user_metadata">): string
   const fullName: unknown = user.user_metadata["full_name"];
   if (typeof fullName === "string" && fullName.trim()) return fullName.trim();
   return user.email?.split("@")[0] ?? "there";
+}
+
+/** The first name for "Hi Maria": from the name they signed up with, else from their email. */
+export function firstName(user: Pick<User, "email" | "user_metadata">): string {
+  return firstNameOf(displayName(user)) || "there";
 }

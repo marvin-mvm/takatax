@@ -19,6 +19,12 @@ const fullDay = new Intl.DateTimeFormat("en-PH", {
   day: "numeric",
   year: "numeric",
 });
+const dayMonthYear = new Intl.DateTimeFormat("en-PH", {
+  timeZone: TIME_ZONE,
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE });
 
 /** "2026-11-15" in Manila, for grouping messages by day. */
@@ -29,6 +35,9 @@ export const clockTime = (iso: string) => timeOnly.format(new Date(iso));
 
 /** "Sunday, November 15, 2026" */
 export const longDay = (iso: string) => fullDay.format(new Date(iso));
+
+/** "Nov 15, 2026" */
+export const shortDay = (iso: string) => dayMonthYear.format(new Date(iso));
 
 /** For lists: "9:42 AM" today, "Nov 12" before. */
 export function shortWhen(iso: string, now = new Date()): string {

@@ -14,29 +14,31 @@ export const headerButton =
 
 /**
  * The top bar, in solid brand green: the brand on the left; Community, Bookkeepers and Pricing;
- * and the login link in the top right corner.
+ * and the login link in the top right corner. On a phone it scrolls away with the page, to
+ * leave the small screen to the content; from a tablet's width up it stays in view.
  */
 function SiteHeader({ action }: { action?: ReactNode }) {
   const auth = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 bg-tk-brand text-white shadow-[0_1px_0_rgb(0_0_0/0.08)]">
+    <header className="bg-tk-brand text-white shadow-[0_1px_0_rgb(0_0_0/0.08)] md:sticky md:top-0 md:z-30">
       <div className="mx-auto flex h-16 max-w-[1120px] items-center gap-2 px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2 text-lg font-bold tracking-tight">
+        <Link to="/" className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight">
           <BrandMark outlined className="size-8" />
           Takatax
         </Link>
-        <nav aria-label="Main" className="ml-auto flex items-center gap-0.5 sm:gap-1">
+        <nav aria-label="Main" className="ml-auto flex min-w-0 items-center gap-0.5 sm:gap-1">
           <Link to="/community" className={`${headerLink} hidden md:inline-flex`}>
             Community
           </Link>
           <Link to="/bookkeepers" className={`${headerLink} hidden md:inline-flex`}>
             Bookkeepers
           </Link>
-          <Link to="/pricing" className={headerLink}>
+          <Link to="/pricing" className={`${headerLink} shrink-0`}>
             Pricing
           </Link>
-          <span className="ml-1">
+          {/* The action may shrink (a long first name is cut short); the links never do. */}
+          <span className="ml-1 flex min-w-0">
             {action ??
               (auth.status === "signedIn" ? (
                 <Link to="/app" className={headerButton}>
@@ -86,7 +88,7 @@ function SiteFooter() {
 
 interface SiteShellProps {
   children: ReactNode;
-  /** Replaces the login link in the top right corner, for example with a Log out button. */
+  /** Replaces the login link in the top right corner, for example with "Hi [first name]". */
   headerAction?: ReactNode;
   /** A second bar under the header, for example the app's section tabs. */
   subnav?: ReactNode;
