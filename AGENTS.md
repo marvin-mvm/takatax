@@ -70,11 +70,29 @@ where they differ.
 
 ## Architecture
 
-- AI: document reading (images and PDFs) goes through OpenRouter, called only from Supabase
-  Edge Functions. The OpenRouter key lives in Supabase Edge Function secrets, never in the
-  repo or the browser. This replaces the Lovable AI gateway rule above.
+- AI: document reading runs in the Trigger.dev job `read-run` (`trigger/`), which sends every
+  page to the model through OpenRouter (PDFs natively, no OCR), a few pages per call, so long
+  runs never hit Supabase's edge function limits. Supabase Edge Functions only start it
+  (`read-documents`) and answer the short records-assistant chat. Keys live in Trigger.dev's
+  environment variables and Supabase Edge Function secrets, never in the repo or the browser.
+  This replaces the Lovable AI gateway rule above.
+- Pricing is per page (a photo is one page, a PDF every page): `quoteRun` in
+  `supabase/functions/_shared/uploads/rules.ts`, shared by the upload screen and
+  `create-checkout`.
 - File storage: Cloudflare R2 (private buckets, signed upload links), not Supabase Storage.
   R2 keys live in Supabase Edge Function secrets.
+- Payments: PayMongo checkout sessions (GCash, Maya, cards, QR Ph) created by the
+  `create-checkout` edge function, which also works out the price on the server. The
+  `paymongo-webhook` function (JWT check off in `supabase/config.toml`; it checks PayMongo's
+  signature instead) marks runs and Premium months paid. Takatax never handles payments between
+  taxpayers and their bookkeepers.
+- Chat between taxpayers and partners: `conversations` and `messages`. Messages are a permanent
+  record: clients have no update or delete rights and a trigger refuses any change.
+- Access: taxpayers grant and remove a verified partner's access with
+  `grant_partner_access()` / `revoke_partner_access()`; every policy checks access through
+  `has_account_access()`.
+- Database changes go in a new file in `supabase/migrations/`; check them with
+  `supabase/tests/run.sh` (local Postgres) before applying them to the project.
 
 ## Pull requests
 
@@ -82,6 +100,16 @@ where they differ.
 - Description: a summary of changes as a list of items done.
 - CI (`.github/workflows/ci.yml`) runs lint, type-check, test, and build on every PR;
   keep it green.
+
+## Code layout
+
+- Shared, unit-tested logic (tax rules, deadlines, the document reader, redaction, upload
+  pricing) lives in `supabase/functions/_shared/`. The web app imports it as `@shared/...`;
+  edge functions import it with relative `.ts` paths. No Node, Deno or browser APIs there.
+- Edge functions (Deno) are in `supabase/functions/<name>/index.ts`, with Deno-only helpers in
+  `supabase/functions/_lib/`.
+- What still needs keys or setup is listed in `docs/MISSING_PIECES.md`; code marks each spot
+  with `MISSING:`.
 
 ## Reference
 

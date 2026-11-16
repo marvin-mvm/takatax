@@ -8,8 +8,12 @@ const email = z
   .max(254, "That email address is too long.")
   .email("Enter a valid email address.");
 
+/** Who is signing up. Partners get the client dashboard after Takatax verifies them. */
+export const ACCOUNT_TYPES = ["taxpayer", "bookkeeper", "cpa", "tax_lawyer"] as const;
+
 /** What the sign-up form sends. Checked in the browser before anything goes to Supabase. */
 export const signUpSchema = z.object({
+  accountType: z.enum(ACCOUNT_TYPES),
   fullName: z
     .string()
     .trim()

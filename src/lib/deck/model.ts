@@ -9,23 +9,41 @@
 /** Operating micro enterprises in the Philippines (PSA 2023 List of Establishments, via DTI). */
 export const MICRO_ENTERPRISES = 1_127_058;
 
-/** Estimated AI cost per document for each model in the reader, in pesos. */
-export const COST_PER_DOC = { flash: 0.17, haiku: 0.05, pro: 0.62 } as const;
+/**
+ * Estimated AI cost per page for each model in the reader, in pesos. A photo is one page; a PDF
+ * counts every page. The model reads each page itself (no OCR), so it knows a sale from an
+ * expense.
+ */
+export const COST_PER_PAGE = { flash: 0.17, haiku: 0.05, pro: 0.62 } as const;
 
 /** Share of re-read documents that still disagree and go on to the top model. */
 const ESCALATION_SHARE = 0.4;
 
 const PESOS_PER_USD = 63;
 const MONTHLY_CHURN = 0.02;
-const TRIAL_DOCS = 11; // the COR plus 10 documents
-const RUN_DOC_LIMIT = 250;
-const PREMIUM_DOC_LIMIT = 300;
+const TRIAL_PAGES = 11; // the COR plus 10 pages
+/** Pages a regular run includes; each page over it costs EXTRA_PAGE_PRICE. */
+export const RUN_PAGE_LIMIT = 250;
+export const EXTRA_PAGE_PRICE = 2;
 const STORAGE_ADDON_SHARE = 50 / 900; // of regular customers
 const PARTNER_DISCOUNT = 0.25;
 const PARTNERS_TARGET = 1_608; // 20% of BIR-accredited tax agents, plus CPAs at half that
 const PARTNERS_TARGET_MONTH = 36;
 const PAYMENT_FEE = 0.025;
 
+// Background jobs on Trigger.dev, which read the pages so long PDFs never hit Supabase's
+// 150 to 400 second limit. Billed per second of compute (the default small-1x machine, which
+// is plenty: the job mostly waits for the model's reply) plus a fee per job run. The Pro plan
+// costs $50 a month and includes $50 of usage. Source: trigger.dev/pricing.
+export const TRIGGER = {
+  usdPerSecond: 0.0000338,
+  usdPerRun: 0.000025,
+  planUsdMonthly: 50,
+  /** Pages of a PDF sent to the model in one call (images go one per call). */
+  pdfPagesPerCall: 5,
+  /** Seconds the parent job of each run spends counting and splitting pages. */
+  parentSecondsPerRun: 5,
+} as const;
 // Ads: bookkeeper boosts and lender or bank placements, from month 7.
 const ADS_START_MONTH = 7;
 const BOOST_UPTAKE = 0.15;
@@ -63,14 +81,23 @@ export interface ModelInputs {
   storagePrice: number;
   /** Parse runs a regular customer buys per year. */
   runsPerYear: number;
-  /** Average documents in a parse run. */
-  docsPerRun: number;
+  /** Average pages in a parse run (photos count 1, PDFs every page). Over 250, ₱2 a page. */
+  pagesPerRun: number;
   /** Share of customers on the Premium plan, in percent. */
   premiumSharePct: number;
+  /** Pages a Premium month includes (the plan limit). Over it, ₱2 a page. */
+  premiumPageLimit: number;
+  /** How much of that limit an average Premium customer uses each month, in percent. Over 100%
+   *  the extra pages are charged ₱2 each. */
+  premiumUsagePct: number;
   /** Which models read the documents. */
   reader: ReaderMode;
-  /** Share of documents that need a second read (three-step reader only), in percent. */
+  /** Share of pages that need a second read (three-step reader only), in percent. */
   recheckSharePct: number;
+  /** Share of all pages that come from PDFs, in percent (the rest are photos). */
+  pdfPageSharePct: number;
+  /** Seconds of Trigger.dev compute billed per model call (mostly waiting for the reply). */
+  jobSecondsPerCall: number;
   /** Marketing budget as a share of revenue, in percent. */
   marketingPct: number;
   /** Team, tools and equipment as a share of revenue, in percent. */
@@ -91,10 +118,14 @@ export const DEFAULT_INPUTS: ModelInputs = {
   premiumPrice: 800,
   storagePrice: 250,
   runsPerYear: 6,
-  docsPerRun: 100,
+  pagesPerRun: 100,
   premiumSharePct: 10,
+  premiumPageLimit: 1_000,
+  premiumUsagePct: 40,
   reader: "pipeline",
   recheckSharePct: 50,
+  pdfPageSharePct: 40,
+  jobSecondsPerCall: 8,
   marketingPct: 15,
   teamPct: 20,
   fixedMonthly: 60_000,
@@ -112,6 +143,8 @@ export interface RevenueByStream {
 
 export interface CostsByKind {
   ai: number;
+  /** Trigger.dev background jobs that run the reader. */
+  jobs: number;
   cloud: number;
   fees: number;
   marketing: number;
@@ -126,8 +159,8 @@ export interface YearResult {
   customers: number;
   /** Bookkeeper and CPA partners at the end of the year. */
   partners: number;
-  /** Documents read during the year. */
-  documents: number;
+  /** Pages read during the year. */
+  pages: number;
   revenue: RevenueByStream;
   costs: CostsByKind;
   businessTaxKind: "3% percentage tax" | "VAT";
@@ -139,7 +172,9 @@ export interface YearResult {
 }
 
 export interface ModelResult {
-  aiCostPerDoc: number;
+  aiCostPerPage: number;
+  /** Trigger.dev cost per page, in pesos (before the monthly plan minimum). */
+  jobsCostPerPage: number;
   years: YearResult[];
   totals: {
     customers: number;
@@ -151,17 +186,41 @@ export interface ModelResult {
   };
 }
 
-/** Estimated AI cost of reading one document, in pesos. */
-export function aiCostPerDocument(reader: ReaderMode, recheckSharePct: number): number {
-  if (reader === "flash") return COST_PER_DOC.flash;
-  if (reader === "pro") return COST_PER_DOC.pro;
+/** Estimated AI cost of reading one page, in pesos. */
+export function aiCostPerPage(reader: ReaderMode, recheckSharePct: number): number {
+  if (reader === "flash") return COST_PER_PAGE.flash;
+  if (reader === "pro") return COST_PER_PAGE.pro;
   const recheck = clamp(recheckSharePct, 0, 100) / 100;
   return (
-    COST_PER_DOC.flash +
-    recheck * COST_PER_DOC.haiku +
-    recheck * ESCALATION_SHARE * COST_PER_DOC.pro
+    COST_PER_PAGE.flash +
+    recheck * COST_PER_PAGE.haiku +
+    recheck * ESCALATION_SHARE * COST_PER_PAGE.pro
   );
 }
+
+/**
+ * Trigger.dev cost of reading one page, in pesos: one model call per photo, one per group of
+ * PDF pages, more calls for pages that are read again, each billed for its seconds of compute
+ * plus the per-run fee.
+ */
+export function jobsCostPerPage(
+  inputs: Pick<ModelInputs, "reader" | "recheckSharePct" | "pdfPageSharePct" | "jobSecondsPerCall">,
+): number {
+  const pdf = clamp(inputs.pdfPageSharePct, 0, 100) / 100;
+  const callsPerPage = 1 - pdf + pdf / TRIGGER.pdfPagesPerCall;
+  const recheck = clamp(inputs.recheckSharePct, 0, 100) / 100;
+  const reads = inputs.reader === "pipeline" ? 1 + recheck + recheck * ESCALATION_SHARE : 1;
+  const usdPerCall =
+    Math.max(inputs.jobSecondsPerCall, 0) * TRIGGER.usdPerSecond + TRIGGER.usdPerRun;
+  return callsPerPage * reads * usdPerCall * PESOS_PER_USD;
+}
+
+/** Trigger.dev cost of the parent job that starts each run, in pesos. */
+export const JOBS_COST_PER_RUN =
+  (TRIGGER.parentSecondsPerRun * TRIGGER.usdPerSecond + TRIGGER.usdPerRun) * PESOS_PER_USD;
+
+/** The ₱2-a-page charge for pages over a limit. */
+const extraPages = (pages: number, limit: number) => Math.max(pages - limit, 0);
 
 /** Paying customers at the end of a month: a straight ramp in year 1, then steady growth. */
 export function customersAtMonth(month: number, inputs: ModelInputs): number {
@@ -198,9 +257,9 @@ function emptyYear(year: number): YearResult {
     year,
     customers: 0,
     partners: 0,
-    documents: 0,
+    pages: 0,
     revenue: { parser: 0, storage: 0, ads: 0, subscriptions: 0, total: 0 },
-    costs: { ai: 0, cloud: 0, fees: 0, marketing: 0, team: 0, fixed: 0, total: 0 },
+    costs: { ai: 0, jobs: 0, cloud: 0, fees: 0, marketing: 0, team: 0, fixed: 0, total: 0 },
     businessTaxKind: "3% percentage tax",
     businessTax: 0,
     incomeTax: 0,
@@ -211,10 +270,17 @@ function emptyYear(year: number): YearResult {
 
 export function runModel(inputs: ModelInputs): ModelResult {
   const yearCount = Math.max(Math.round(inputs.years), 1);
-  const costPerDoc = aiCostPerDocument(inputs.reader, inputs.recheckSharePct);
+  const costPerPage = aiCostPerPage(inputs.reader, inputs.recheckSharePct);
+  const jobsPerPage = jobsCostPerPage(inputs);
   const runsPerMonth = Math.max(inputs.runsPerYear, 0) / 12;
-  const docsPerRun = clamp(inputs.docsPerRun, 0, RUN_DOC_LIMIT);
-  const premiumDocs = PREMIUM_DOC_LIMIT * (docsPerRun / RUN_DOC_LIMIT);
+  const pagesPerRun = Math.max(inputs.pagesPerRun, 0);
+  const extraPerRun = extraPages(pagesPerRun, RUN_PAGE_LIMIT) * EXTRA_PAGE_PRICE;
+  // Pages an average Premium customer has read each month: the plan limit times how much of it
+  // they use. At 100% every Premium customer reads their whole limit; above 100% the extra
+  // pages are charged ₱2 each.
+  const premiumLimit = Math.max(inputs.premiumPageLimit, 0);
+  const premiumPages = premiumLimit * (clamp(inputs.premiumUsagePct, 0, 200) / 100);
+  const premiumExtra = extraPages(premiumPages, premiumLimit) * EXTRA_PAGE_PRICE;
   const premiumShare = clamp(inputs.premiumSharePct, 0, 100) / 100;
   const partnerRunPrice = Math.round(inputs.runPrice * (1 - PARTNER_DISCOUNT));
 
@@ -236,9 +302,9 @@ export function runModel(inputs: ModelInputs): ModelResult {
       const accounts = customers + partners;
 
       const parser =
-        regular * runsPerMonth * inputs.runPrice +
-        premium * inputs.premiumPrice +
-        partners * runsPerMonth * partnerRunPrice;
+        regular * runsPerMonth * (inputs.runPrice + extraPerRun) +
+        premium * (inputs.premiumPrice + premiumExtra) +
+        partners * runsPerMonth * (partnerRunPrice + extraPerRun);
       const storage = storageAddOns * inputs.storagePrice;
 
       const adsOn = inputs.includeAds && month >= ADS_START_MONTH;
@@ -261,21 +327,28 @@ export function runModel(inputs: ModelInputs): ModelResult {
 
       const revenue = parser + storage + ads + subscriptions;
 
-      const documents =
-        (regular + partners) * runsPerMonth * docsPerRun +
-        premium * premiumDocs +
-        signups * TRIAL_DOCS;
+      const runs = (regular + partners) * runsPerMonth + premium * runsPerMonth + signups;
+      const pages =
+        (regular + partners) * runsPerMonth * pagesPerRun +
+        premium * premiumPages +
+        signups * TRIAL_PAGES;
+      // Trigger.dev bills its plan fee or the usage, whichever is higher.
+      const jobs = Math.max(
+        pages * jobsPerPage + runs * JOBS_COST_PER_RUN,
+        TRIGGER.planUsdMonthly * PESOS_PER_USD,
+      );
       const gigabytes = (regular + partners) * 0.3 + premium * 15 + storageAddOns * 5;
 
       result.customers = customers;
       result.partners = Math.round(partners);
-      result.documents += documents;
+      result.pages += pages;
       result.revenue.parser += parser;
       result.revenue.storage += storage;
       result.revenue.ads += ads;
       result.revenue.subscriptions += subscriptions;
       result.revenue.total += revenue;
-      result.costs.ai += documents * costPerDoc;
+      result.costs.ai += pages * costPerPage;
+      result.costs.jobs += jobs;
       result.costs.cloud +=
         cloudMonthly(accounts, gigabytes) + (subscriptionsOn ? RESEARCH_HOSTING_MONTHLY : 0);
       result.costs.fees += PAYMENT_FEE * (revenue - lenderAds); // ads are invoiced by bank transfer
@@ -285,12 +358,14 @@ export function runModel(inputs: ModelInputs): ModelResult {
     }
 
     const { costs, revenue } = result;
-    costs.total = costs.ai + costs.cloud + costs.fees + costs.marketing + costs.team + costs.fixed;
+    costs.total =
+      costs.ai + costs.jobs + costs.cloud + costs.fees + costs.marketing + costs.team + costs.fixed;
 
     // Business tax: 3% percentage tax up to ₱3M of yearly revenue, VAT above it. Input VAT is
     // claimed on AI, cloud, fees, marketing and the non-salary half of team costs.
     if (revenue.total > VAT_THRESHOLD) {
-      const vatable = costs.ai + costs.cloud + costs.fees + costs.marketing + costs.team / 2;
+      const vatable =
+        costs.ai + costs.jobs + costs.cloud + costs.fees + costs.marketing + costs.team / 2;
       result.businessTaxKind = "VAT";
       result.businessTax = Math.max(((revenue.total - vatable) * 12) / 112, 0);
     } else {
@@ -321,7 +396,8 @@ export function runModel(inputs: ModelInputs): ModelResult {
   }
 
   return {
-    aiCostPerDoc: costPerDoc,
+    aiCostPerPage: costPerPage,
+    jobsCostPerPage: jobsPerPage,
     years,
     totals: {
       customers: years.at(-1)?.customers ?? 0,
@@ -332,4 +408,111 @@ export function runModel(inputs: ModelInputs): ModelResult {
       margin: revenue.total > 0 ? netProfit / revenue.total : 0,
     },
   };
+}
+
+/** One Premium customer's month: what their pages cost us and what we keep. */
+export interface PremiumMonth {
+  /** Pages read in the month: the limit times the share of it used. */
+  pages: number;
+  /** ₱2 for each page over the limit. */
+  extraRevenue: number;
+  aiCost: number;
+  jobsCost: number;
+  paymentFee: number;
+  /** Price and extras less the payment fee, AI and Trigger.dev. Cloud, team and marketing come
+   *  out of this. */
+  kept: number;
+  /** `kept` as a share of what the customer paid. */
+  keptShare: number;
+  /** Pages a month at which costs eat the whole Premium price (before any ₱2 extras). */
+  breakEvenPages: number;
+}
+
+export function premiumMonth(inputs: ModelInputs): PremiumMonth {
+  const perPage = aiCostPerPage(inputs.reader, inputs.recheckSharePct) + jobsCostPerPage(inputs);
+  const price = Math.max(inputs.premiumPrice, 0);
+  const limit = Math.max(inputs.premiumPageLimit, 0);
+  const pages = limit * (clamp(inputs.premiumUsagePct, 0, 200) / 100);
+  const extraRevenue = extraPages(pages, limit) * EXTRA_PAGE_PRICE;
+  const paid = price + extraRevenue;
+  const aiCost = pages * aiCostPerPage(inputs.reader, inputs.recheckSharePct);
+  const jobsCost = pages * jobsCostPerPage(inputs) + JOBS_COST_PER_RUN;
+  const paymentFee = PAYMENT_FEE * paid;
+  const kept = paid - paymentFee - aiCost - jobsCost;
+  return {
+    pages,
+    extraRevenue,
+    aiCost,
+    jobsCost,
+    paymentFee,
+    kept,
+    keptShare: paid > 0 ? kept / paid : 0,
+    breakEvenPages: perPage > 0 ? (price * (1 - PAYMENT_FEE)) / perPage : Infinity,
+  };
+}
+
+/** One regular (or partner) run: what the customer pays and what is left after its costs. */
+export interface RunEconomics {
+  pages: number;
+  basePrice: number;
+  /** ₱2 for each page over 250. */
+  extraRevenue: number;
+  aiCost: number;
+  jobsCost: number;
+  paymentFee: number;
+  kept: number;
+  keptShare: number;
+}
+
+export function runEconomics(inputs: ModelInputs, partner = false): RunEconomics {
+  const pages = Math.max(inputs.pagesPerRun, 0);
+  const basePrice = partner
+    ? Math.round(inputs.runPrice * (1 - PARTNER_DISCOUNT))
+    : inputs.runPrice;
+  const extraRevenue = extraPages(pages, RUN_PAGE_LIMIT) * EXTRA_PAGE_PRICE;
+  const paid = basePrice + extraRevenue;
+  const aiCost = pages * aiCostPerPage(inputs.reader, inputs.recheckSharePct);
+  const jobsCost = pages * jobsCostPerPage(inputs) + JOBS_COST_PER_RUN;
+  const paymentFee = PAYMENT_FEE * paid;
+  const kept = paid - paymentFee - aiCost - jobsCost;
+  return {
+    pages,
+    basePrice,
+    extraRevenue,
+    aiCost,
+    jobsCost,
+    paymentFee,
+    kept,
+    keptShare: paid > 0 ? kept / paid : 0,
+  };
+}
+
+/** One row of the Premium limit comparison. */
+export interface LimitComparison {
+  limit: number;
+  month: PremiumMonth;
+  /** AI cost over the whole plan. */
+  planAiCost: number;
+  /** Net profit over the whole plan at the chosen usage. */
+  planNetProfit: number;
+  /** Net profit over the whole plan if every Premium customer uses their full limit. */
+  planNetProfitFullUse: number;
+}
+
+/**
+ * Runs the plan once per Premium limit, with every other input unchanged, so limits can be
+ * compared side by side (for example 300 against 1,000 pages a month).
+ */
+export function compareLimits(inputs: ModelInputs, limits: number[]): LimitComparison[] {
+  return limits.map((limit) => {
+    const atUsage = runModel({ ...inputs, premiumPageLimit: limit });
+    const fullUse = runModel({ ...inputs, premiumPageLimit: limit, premiumUsagePct: 100 });
+    return {
+      limit,
+      month: premiumMonth({ ...inputs, premiumPageLimit: limit }),
+      planAiCost: atUsage.years.reduce((sum, year) => sum + year.costs.ai, 0),
+      planNetProfit: atUsage.totals.netProfit,
+      planNetProfitFullUse: fullUse.totals.netProfit,
+    };
+  });
 }

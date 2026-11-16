@@ -144,14 +144,14 @@ export const SOURCES: Source[] = [
     id: 19,
     publisher: "Google",
     title: "Gemini API pricing",
-    note: "Token prices behind the Flash and Pro cost per document.",
+    note: "Token prices behind the Flash and Pro cost per page.",
     url: "https://ai.google.dev/gemini-api/docs/pricing",
   },
   {
     id: 20,
     publisher: "Anthropic",
     title: "API pricing",
-    note: "Token prices behind the Haiku cost per document.",
+    note: "Token prices behind the Haiku cost per page.",
     url: "https://www.anthropic.com/pricing",
   },
   {
@@ -164,7 +164,7 @@ export const SOURCES: Source[] = [
     id: 22,
     publisher: "OpenRouter",
     title: "Models and pricing",
-    note: "One API for the Gemini and Claude models the reader uses, called from a Supabase Edge Function.",
+    note: "One API for the Gemini and Claude models the reader uses, called from Trigger.dev background jobs.",
     url: "https://openrouter.ai/models",
   },
   {
@@ -173,5 +173,12 @@ export const SOURCES: Source[] = [
     title: "R2 pricing",
     note: "Object storage for uploaded documents, with no fees for downloads.",
     url: "https://developers.cloudflare.com/r2/pricing/",
+  },
+  {
+    id: 24,
+    publisher: "Trigger.dev",
+    title: "Pricing",
+    note: "Background jobs that read each page: $0.0000338 a second of compute on the default machine, $0.000025 a job, and the $50 Pro plan with $50 of usage included.",
+    url: "https://trigger.dev/pricing",
   },
 ];

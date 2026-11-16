@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const title = "Pricing | Takatax";
 const description =
-  "Pay only when you run: ₱199 for up to 250 documents. Premium is ₱800 a month. Your first 10 documents are free.";
+  "Pay only when you run: ₱199 for up to 250 pages. Premium is ₱800 a month for 1,000 pages. Bookkeepers, CPAs and tax lawyers get 25% off. Your first 10 pages are free.";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -36,7 +36,7 @@ const PLANS: Plan[] = [
     price: "₱0",
     unit: "once per TIN",
     summary: "See your real figures before you pay.",
-    features: ["Your first 10 documents", "Full results, nothing hidden", "No card needed"],
+    features: ["Your first 10 pages", "Full results, nothing hidden", "No card needed"],
   },
   {
     name: "Parse run",
@@ -44,10 +44,10 @@ const PLANS: Plan[] = [
     unit: "per run",
     summary: "Pay only when you have documents to read.",
     features: [
-      "Up to 250 documents in a run",
+      "Up to 250 pages in a run (a photo is one page; a PDF counts each page)",
       "Every return computed from them is free",
-      "₱2 for each extra document",
-      "No subscription",
+      "₱2 for each page over 250",
+      "No subscription needed",
     ],
     highlight: true,
   },
@@ -57,9 +57,21 @@ const PLANS: Plan[] = [
     unit: "per month",
     summary: "For businesses that upload every month.",
     features: [
-      "300 documents read each month",
+      "1,000 pages read each month, then ₱2 a page",
       "15 GB of document storage",
       "Paid month by month, no auto-renewal",
+    ],
+  },
+  {
+    name: "For bookkeepers, CPAs and tax lawyers",
+    price: "₱149",
+    unit: "per client run",
+    summary: "25% off every run you do for a client.",
+    features: [
+      "Up to 250 pages in a run (a photo is one page; a PDF counts each page)",
+      "All your clients in one dashboard",
+      "A verified public profile with reviews",
+      "No platform fee: you bill clients directly",
     ],
   },
 ];
@@ -71,15 +83,15 @@ const EXTRAS: { name: string; text: string }[] = [
     text: "The tax tracker, deadline reminders and the 8% vs OSD calculator.",
   },
   {
-    name: "Bookkeepers and CPAs",
-    text: "Free to join. Runs for your clients cost ₱149, and you keep all of your own fees.",
+    name: "No platform fee",
+    text: "We never take a cut of what you pay a bookkeeper, and we never handle that payment.",
   },
 ];
 
 function PricingPage() {
   return (
     <SiteShell>
-      <section className="mx-auto max-w-[1080px] px-4 pt-14 pb-16 sm:px-6 sm:pt-20">
+      <section className="mx-auto max-w-[1180px] px-4 pt-14 pb-16 sm:px-6 sm:pt-20">
         <div className="mx-auto max-w-[640px] text-center">
           <h1 className="text-[36px]/[42px] font-bold tracking-tight text-balance sm:text-[48px]/[54px]">
             Pay only when you run.
@@ -90,7 +102,7 @@ function PricingPage() {
           </p>
         </div>
 
-        <ul className="mt-12 grid gap-5 lg:grid-cols-3">
+        <ul className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {PLANS.map((plan) => (
             <li
               key={plan.name}

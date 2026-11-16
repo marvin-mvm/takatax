@@ -14,7 +14,26 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as DeckRouteImport } from './routes/deck'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppAccessRouteImport } from './routes/app/access'
+import { Route as AppAdminRouteImport } from './routes/app/admin'
+import { Route as AppCorRouteImport } from './routes/app/cor'
+import { Route as AppPlanRouteImport } from './routes/app/plan'
+import { Route as AppProfileRouteImport } from './routes/app/profile'
+import { Route as AppUploadRouteImport } from './routes/app/upload'
+import { Route as BookkeepersIndexRouteImport } from './routes/bookkeepers/index'
+import { Route as BookkeepersPartnerIdRouteImport } from './routes/bookkeepers/$partnerId'
+import { Route as CommunityIndexRouteImport } from './routes/community/index'
+import { Route as CommunityPostIdRouteImport } from './routes/community/$postId'
+import { Route as CommunityNewRouteImport } from './routes/community/new'
+import { Route as AppClientsAccountIdRouteImport } from './routes/app/clients/$accountId'
+import { Route as AppDocumentsIndexRouteImport } from './routes/app/documents/index'
+import { Route as AppDocumentsDocumentIdRouteImport } from './routes/app/documents/$documentId'
+import { Route as AppMessagesIndexRouteImport } from './routes/app/messages/index'
+import { Route as AppMessagesConversationIdRouteImport } from './routes/app/messages/$conversationId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -41,52 +60,286 @@ const PricingRoute = PricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAccessRoute = AppAccessRouteImport.update({
+  id: '/access',
+  path: '/access',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCorRoute = AppCorRouteImport.update({
+  id: '/cor',
+  path: '/cor',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPlanRoute = AppPlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUploadRoute = AppUploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => AppRoute,
+} as any)
+const BookkeepersIndexRoute = BookkeepersIndexRouteImport.update({
+  id: '/bookkeepers/',
+  path: '/bookkeepers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BookkeepersPartnerIdRoute = BookkeepersPartnerIdRouteImport.update({
+  id: '/bookkeepers/$partnerId',
+  path: '/bookkeepers/$partnerId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunityIndexRoute = CommunityIndexRouteImport.update({
+  id: '/community/',
+  path: '/community/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunityPostIdRoute = CommunityPostIdRouteImport.update({
+  id: '/community/$postId',
+  path: '/community/$postId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunityNewRoute = CommunityNewRouteImport.update({
+  id: '/community/new',
+  path: '/community/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppClientsAccountIdRoute = AppClientsAccountIdRouteImport.update({
+  id: '/clients/$accountId',
+  path: '/clients/$accountId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDocumentsIndexRoute = AppDocumentsIndexRouteImport.update({
+  id: '/documents/',
+  path: '/documents/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDocumentsDocumentIdRoute = AppDocumentsDocumentIdRouteImport.update({
+  id: '/documents/$documentId',
+  path: '/documents/$documentId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMessagesIndexRoute = AppMessagesIndexRouteImport.update({
+  id: '/messages/',
+  path: '/messages/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMessagesConversationIdRoute =
+  AppMessagesConversationIdRouteImport.update({
+    id: '/messages/$conversationId',
+    path: '/messages/$conversationId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/app': typeof AppRoute
+  '/app': typeof AppRouteWithChildren
   '/deck': typeof DeckRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/app/access': typeof AppAccessRoute
+  '/app/admin': typeof AppAdminRoute
+  '/app/cor': typeof AppCorRoute
+  '/app/plan': typeof AppPlanRoute
+  '/app/profile': typeof AppProfileRoute
+  '/app/upload': typeof AppUploadRoute
+  '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
+  '/community/$postId': typeof CommunityPostIdRoute
+  '/community/new': typeof CommunityNewRoute
+  '/app/': typeof AppIndexRoute
+  '/bookkeepers/': typeof BookkeepersIndexRoute
+  '/community/': typeof CommunityIndexRoute
+  '/app/clients/$accountId': typeof AppClientsAccountIdRoute
+  '/app/documents/$documentId': typeof AppDocumentsDocumentIdRoute
+  '/app/messages/$conversationId': typeof AppMessagesConversationIdRoute
+  '/app/documents/': typeof AppDocumentsIndexRoute
+  '/app/messages/': typeof AppMessagesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/app': typeof AppRoute
   '/deck': typeof DeckRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/app/access': typeof AppAccessRoute
+  '/app/admin': typeof AppAdminRoute
+  '/app/cor': typeof AppCorRoute
+  '/app/plan': typeof AppPlanRoute
+  '/app/profile': typeof AppProfileRoute
+  '/app/upload': typeof AppUploadRoute
+  '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
+  '/community/$postId': typeof CommunityPostIdRoute
+  '/community/new': typeof CommunityNewRoute
+  '/app': typeof AppIndexRoute
+  '/bookkeepers': typeof BookkeepersIndexRoute
+  '/community': typeof CommunityIndexRoute
+  '/app/clients/$accountId': typeof AppClientsAccountIdRoute
+  '/app/documents/$documentId': typeof AppDocumentsDocumentIdRoute
+  '/app/messages/$conversationId': typeof AppMessagesConversationIdRoute
+  '/app/documents': typeof AppDocumentsIndexRoute
+  '/app/messages': typeof AppMessagesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/app': typeof AppRoute
+  '/app': typeof AppRouteWithChildren
   '/deck': typeof DeckRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/signup': typeof SignupRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/app/access': typeof AppAccessRoute
+  '/app/admin': typeof AppAdminRoute
+  '/app/cor': typeof AppCorRoute
+  '/app/plan': typeof AppPlanRoute
+  '/app/profile': typeof AppProfileRoute
+  '/app/upload': typeof AppUploadRoute
+  '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
+  '/community/$postId': typeof CommunityPostIdRoute
+  '/community/new': typeof CommunityNewRoute
+  '/app/': typeof AppIndexRoute
+  '/bookkeepers/': typeof BookkeepersIndexRoute
+  '/community/': typeof CommunityIndexRoute
+  '/app/clients/$accountId': typeof AppClientsAccountIdRoute
+  '/app/documents/$documentId': typeof AppDocumentsDocumentIdRoute
+  '/app/messages/$conversationId': typeof AppMessagesConversationIdRoute
+  '/app/documents/': typeof AppDocumentsIndexRoute
+  '/app/messages/': typeof AppMessagesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/app' | '/deck' | '/login' | '/pricing' | '/signup'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/deck'
+    | '/login'
+    | '/pricing'
+    | '/robots.txt'
+    | '/signup'
+    | '/sitemap.xml'
+    | '/app/access'
+    | '/app/admin'
+    | '/app/cor'
+    | '/app/plan'
+    | '/app/profile'
+    | '/app/upload'
+    | '/bookkeepers/$partnerId'
+    | '/community/$postId'
+    | '/community/new'
+    | '/app/'
+    | '/bookkeepers/'
+    | '/community/'
+    | '/app/clients/$accountId'
+    | '/app/documents/$documentId'
+    | '/app/messages/$conversationId'
+    | '/app/documents/'
+    | '/app/messages/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/app' | '/deck' | '/login' | '/pricing' | '/signup'
-  id: '__root__' | '/' | '/app' | '/deck' | '/login' | '/pricing' | '/signup'
+  to:
+    | '/'
+    | '/deck'
+    | '/login'
+    | '/pricing'
+    | '/robots.txt'
+    | '/signup'
+    | '/sitemap.xml'
+    | '/app/access'
+    | '/app/admin'
+    | '/app/cor'
+    | '/app/plan'
+    | '/app/profile'
+    | '/app/upload'
+    | '/bookkeepers/$partnerId'
+    | '/community/$postId'
+    | '/community/new'
+    | '/app'
+    | '/bookkeepers'
+    | '/community'
+    | '/app/clients/$accountId'
+    | '/app/documents/$documentId'
+    | '/app/messages/$conversationId'
+    | '/app/documents'
+    | '/app/messages'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/deck'
+    | '/login'
+    | '/pricing'
+    | '/robots.txt'
+    | '/signup'
+    | '/sitemap.xml'
+    | '/app/access'
+    | '/app/admin'
+    | '/app/cor'
+    | '/app/plan'
+    | '/app/profile'
+    | '/app/upload'
+    | '/bookkeepers/$partnerId'
+    | '/community/$postId'
+    | '/community/new'
+    | '/app/'
+    | '/bookkeepers/'
+    | '/community/'
+    | '/app/clients/$accountId'
+    | '/app/documents/$documentId'
+    | '/app/messages/$conversationId'
+    | '/app/documents/'
+    | '/app/messages/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AppRoute: typeof AppRoute
+  AppRoute: typeof AppRouteWithChildren
   DeckRoute: typeof DeckRoute
   LoginRoute: typeof LoginRoute
   PricingRoute: typeof PricingRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   SignupRoute: typeof SignupRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  BookkeepersPartnerIdRoute: typeof BookkeepersPartnerIdRoute
+  CommunityPostIdRoute: typeof CommunityPostIdRoute
+  CommunityNewRoute: typeof CommunityNewRoute
+  BookkeepersIndexRoute: typeof BookkeepersIndexRoute
+  CommunityIndexRoute: typeof CommunityIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -126,6 +379,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -133,16 +393,181 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/access': {
+      id: '/app/access'
+      path: '/access'
+      fullPath: '/app/access'
+      preLoaderRoute: typeof AppAccessRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/admin': {
+      id: '/app/admin'
+      path: '/admin'
+      fullPath: '/app/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/cor': {
+      id: '/app/cor'
+      path: '/cor'
+      fullPath: '/app/cor'
+      preLoaderRoute: typeof AppCorRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/plan': {
+      id: '/app/plan'
+      path: '/plan'
+      fullPath: '/app/plan'
+      preLoaderRoute: typeof AppPlanRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/profile': {
+      id: '/app/profile'
+      path: '/profile'
+      fullPath: '/app/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/upload': {
+      id: '/app/upload'
+      path: '/upload'
+      fullPath: '/app/upload'
+      preLoaderRoute: typeof AppUploadRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/bookkeepers/': {
+      id: '/bookkeepers/'
+      path: '/bookkeepers'
+      fullPath: '/bookkeepers/'
+      preLoaderRoute: typeof BookkeepersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bookkeepers/$partnerId': {
+      id: '/bookkeepers/$partnerId'
+      path: '/bookkeepers/$partnerId'
+      fullPath: '/bookkeepers/$partnerId'
+      preLoaderRoute: typeof BookkeepersPartnerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/community/': {
+      id: '/community/'
+      path: '/community'
+      fullPath: '/community/'
+      preLoaderRoute: typeof CommunityIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/community/$postId': {
+      id: '/community/$postId'
+      path: '/community/$postId'
+      fullPath: '/community/$postId'
+      preLoaderRoute: typeof CommunityPostIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/community/new': {
+      id: '/community/new'
+      path: '/community/new'
+      fullPath: '/community/new'
+      preLoaderRoute: typeof CommunityNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/clients/$accountId': {
+      id: '/app/clients/$accountId'
+      path: '/clients/$accountId'
+      fullPath: '/app/clients/$accountId'
+      preLoaderRoute: typeof AppClientsAccountIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/documents/': {
+      id: '/app/documents/'
+      path: '/documents'
+      fullPath: '/app/documents/'
+      preLoaderRoute: typeof AppDocumentsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/documents/$documentId': {
+      id: '/app/documents/$documentId'
+      path: '/documents/$documentId'
+      fullPath: '/app/documents/$documentId'
+      preLoaderRoute: typeof AppDocumentsDocumentIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/messages/': {
+      id: '/app/messages/'
+      path: '/messages'
+      fullPath: '/app/messages/'
+      preLoaderRoute: typeof AppMessagesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/messages/$conversationId': {
+      id: '/app/messages/$conversationId'
+      path: '/messages/$conversationId'
+      fullPath: '/app/messages/$conversationId'
+      preLoaderRoute: typeof AppMessagesConversationIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppAccessRoute: typeof AppAccessRoute
+  AppAdminRoute: typeof AppAdminRoute
+  AppCorRoute: typeof AppCorRoute
+  AppPlanRoute: typeof AppPlanRoute
+  AppProfileRoute: typeof AppProfileRoute
+  AppUploadRoute: typeof AppUploadRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppClientsAccountIdRoute: typeof AppClientsAccountIdRoute
+  AppDocumentsDocumentIdRoute: typeof AppDocumentsDocumentIdRoute
+  AppMessagesConversationIdRoute: typeof AppMessagesConversationIdRoute
+  AppDocumentsIndexRoute: typeof AppDocumentsIndexRoute
+  AppMessagesIndexRoute: typeof AppMessagesIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAccessRoute: AppAccessRoute,
+  AppAdminRoute: AppAdminRoute,
+  AppCorRoute: AppCorRoute,
+  AppPlanRoute: AppPlanRoute,
+  AppProfileRoute: AppProfileRoute,
+  AppUploadRoute: AppUploadRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppClientsAccountIdRoute: AppClientsAccountIdRoute,
+  AppDocumentsDocumentIdRoute: AppDocumentsDocumentIdRoute,
+  AppMessagesConversationIdRoute: AppMessagesConversationIdRoute,
+  AppDocumentsIndexRoute: AppDocumentsIndexRoute,
+  AppMessagesIndexRoute: AppMessagesIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AppRoute: AppRoute,
+  AppRoute: AppRouteWithChildren,
   DeckRoute: DeckRoute,
   LoginRoute: LoginRoute,
   PricingRoute: PricingRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   SignupRoute: SignupRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  BookkeepersPartnerIdRoute: BookkeepersPartnerIdRoute,
+  CommunityPostIdRoute: CommunityPostIdRoute,
+  CommunityNewRoute: CommunityNewRoute,
+  BookkeepersIndexRoute: BookkeepersIndexRoute,
+  CommunityIndexRoute: CommunityIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

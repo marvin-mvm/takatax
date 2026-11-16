@@ -15,12 +15,35 @@ describe("App routing", () => {
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
 
-  it.each(["/pricing", "/signup", "/login", "/app"])("matches a page for %s", (path) => {
+  it.each([
+    ["/pricing", "/pricing"],
+    ["/signup", "/signup"],
+    ["/login", "/login"],
+    ["/app", "/app/"],
+    ["/app/upload", "/app/upload"],
+    ["/app/documents", "/app/documents/"],
+    ["/app/documents/doc-1", "/app/documents/$documentId"],
+    ["/app/cor", "/app/cor"],
+    ["/app/clients/acct-1", "/app/clients/$accountId"],
+    ["/app/messages", "/app/messages/"],
+    ["/app/messages/chat-1", "/app/messages/$conversationId"],
+    ["/app/access", "/app/access"],
+    ["/app/plan", "/app/plan"],
+    ["/app/profile", "/app/profile"],
+    ["/app/admin", "/app/admin"],
+    ["/sitemap.xml", "/sitemap.xml"],
+    ["/robots.txt", "/robots.txt"],
+    ["/community", "/community/"],
+    ["/community/new", "/community/new"],
+    ["/community/post-1", "/community/$postId"],
+    ["/bookkeepers", "/bookkeepers/"],
+    ["/bookkeepers/partner-1", "/bookkeepers/$partnerId"],
+  ])("matches a page for %s", (path, routeId) => {
     const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
 
     const matches = router.matchRoutes(path);
 
-    expect(matches.at(-1)?.routeId).toBe(path);
+    expect(matches.at(-1)?.routeId).toBe(routeId);
   });
 
   it("matches the pitch deck at /deck", () => {

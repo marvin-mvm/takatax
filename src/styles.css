@@ -238,21 +238,28 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
+    /* Brand green from the top left, orange-gold from the right, on a light base. */
     background-image:
       radial-gradient(
-        70rem 42rem at 0% 0%,
-        color-mix(in oklch, var(--tk-brand-soft) 95%, transparent) 0%,
-        transparent 65%
+        64rem 40rem at 0% 0%,
+        color-mix(in oklch, var(--tk-brand) 22%, transparent) 0%,
+        transparent 62%
       ),
       radial-gradient(
-        56rem 36rem at 100% 0%,
-        color-mix(in oklch, var(--tk-accent) 12%, transparent) 0%,
-        transparent 70%
+        56rem 40rem at 100% 8%,
+        color-mix(in oklch, var(--tk-accent) 34%, transparent) 0%,
+        transparent 64%
+      ),
+      radial-gradient(
+        60rem 36rem at 70% 110%,
+        color-mix(in oklch, var(--tk-accent) 20%, transparent) 0%,
+        transparent 65%
       ),
       linear-gradient(
-        180deg,
-        var(--tk-bg) 0%,
-        color-mix(in oklch, var(--tk-brand-soft) 70%, var(--tk-bg)) 100%
+        160deg,
+        color-mix(in oklch, var(--tk-brand-soft) 90%, var(--tk-bg)) 0%,
+        var(--tk-bg) 50%,
+        color-mix(in oklch, var(--tk-accent) 10%, var(--tk-bg)) 100%
       );
   }
 
