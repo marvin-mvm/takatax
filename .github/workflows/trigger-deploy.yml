@@ -1,22 +1,16 @@
 name: Deploy Trigger.dev tasks
 
-# Deploys the reader (trigger/read-run.ts) and the ping task to Trigger.dev Production whenever
-# code reaches main, and on demand from the Actions tab ("Run workflow").
+# Deploys the reader (trigger/read-run.ts) and the ping task to Trigger.dev Production on every
+# push to main, and on demand from the Actions tab ("Run workflow"). Follows Trigger.dev's
+# CI / GitHub Actions guide (trigger.dev/docs/github-actions).
 #
-# Needs one repository secret: TRIGGER_ACCESS_TOKEN, a Production API key from the Trigger.dev
-# dashboard (Production -> API keys; a "Deploy only" key if you can create one). Without the
-# secret the job skips itself, so it never fails a merge.
+# Needs one repository secret: TRIGGER_ACCESS_TOKEN, a Production API key with "Deploy only"
+# access (Trigger.dev dashboard -> Production -> API keys -> New API key). Without the secret the
+# job skips itself, so it never fails a merge.
 
 on:
   push:
     branches: [main]
-    paths:
-      - "trigger/**"
-      - "trigger.config.ts"
-      - "supabase/functions/_shared/**"
-      - "package.json"
-      - "bun.lock"
-      - ".github/workflows/trigger-deploy.yml"
   workflow_dispatch:
 
 concurrency:
@@ -55,8 +49,13 @@ jobs:
         if: env.TRIGGER_ACCESS_TOKEN != ''
         run: bun install --frozen-lockfile
 
-      # The CLI version matches @trigger.dev/sdk in package.json. The build runs on
-      # Trigger.dev's servers.
+      # The CLI must match @trigger.dev/sdk exactly (the deploy fails on a mismatch), so its
+      # version is read from package.json. --external-id tags the deployment with this commit;
+      # re-running the workflow for an already deployed commit reports that version instead of
+      # building again.
       - name: Deploy
         if: env.TRIGGER_ACCESS_TOKEN != ''
-        run: npx -y trigger.dev@4.8.5 deploy --env prod
+        run: |
+          version=$(node -p "require('./package.json').dependencies['@trigger.dev/sdk']")
+          echo "Trigger.dev CLI and SDK version: $version"
+          npx -y "trigger.dev@$version" deploy --env prod --external-id "${{ github.sha }}"
