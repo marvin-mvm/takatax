@@ -180,24 +180,24 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
 
 ## 4. Live state (2026-11-16) and how to check it
 
-GitHub: `main` contains all of `v0.002` up to PR #24. The owner backfills `v0.001` from `main`
+GitHub: `main` contains all of `v0.002` up to PR #25. The owner backfills `v0.001` from `main`
 after each merge. Netlify serves `main`. Every row below was checked against the live project on
 2026-11-16.
 
-| Item                                                  | State                                                                                                                                                                                                                                                                      |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Migration 1 `20261115120000_takatax_core.sql`         | Applied                                                                                                                                                                                                                                                                    |
-| Migration 2 `20261115140000_chat_access_payments.sql` | Applied                                                                                                                                                                                                                                                                    |
-| Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                                                                    |
-| Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                                                                 |
-| Edge functions                                        | All eight are deployed, and matched `main` file by file after PR #24: `create-upload-urls`, `confirm-upload`, `document-link`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`. Two need a redeploy for the model names (section 5) |
-| Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                                                                 |
-| Trigger.dev deploys                                   | **Blocked**: "Deployments are not available for this organization". Only Trigger.dev support can enable them (project `proj_afhlvwluvvvtblfsplyn`). Trusted publishing is set up and the workflow is ready                                                                 |
-| `READER` secret                                       | `supabase`                                                                                                                                                                                                                                                                 |
-| AI models                                             | Set by the `OPENROUTER_MODEL_*` secrets: `google/gemini-3-flash-preview`, `anthropic/claude-haiku-5.5`, `google/gemini-3.1-pro-preview`. All three exist on OpenRouter, and the defaults in `models.ts` are now the same names                                             |
-| Auth                                                  | 1 user (the owner). Email confirmation off. Site URL `https://takatax.netlify.app`, also in the redirect URLs                                                                                                                                                              |
-| Staff                                                 | Nobody yet: `public.admins` is empty (section 5)                                                                                                                                                                                                                           |
-| Migration history table                               | None: migrations were applied by hand (see the repair line in `docs/MISSING_PIECES.md`)                                                                                                                                                                                    |
+| Item                                                  | State                                                                                                                                                                                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Migration 1 `20261115120000_takatax_core.sql`         | Applied                                                                                                                                                                                                                        |
+| Migration 2 `20261115140000_chat_access_payments.sql` | Applied                                                                                                                                                                                                                        |
+| Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                        |
+| Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                     |
+| Edge functions                                        | All eight are deployed and match `main` file by file (checked after PR #25): `create-upload-urls`, `confirm-upload`, `document-link`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`   |
+| Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                     |
+| Trigger.dev deploys                                   | **Blocked**: "Deployments are not available for this organization". Only Trigger.dev support can enable them (project `proj_afhlvwluvvvtblfsplyn`). Trusted publishing is set up and the workflow is ready                     |
+| `READER` secret                                       | `supabase`                                                                                                                                                                                                                     |
+| AI models                                             | Set by the `OPENROUTER_MODEL_*` secrets: `google/gemini-3-flash-preview`, `anthropic/claude-haiku-5.5`, `google/gemini-3.1-pro-preview`. All three exist on OpenRouter, and the defaults in `models.ts` are now the same names |
+| Auth                                                  | 1 user (the owner). Email confirmation off. Site URL `https://takatax.netlify.app`, also in the redirect URLs                                                                                                                  |
+| Staff                                                 | Nobody yet: `public.admins` is empty (section 5)                                                                                                                                                                               |
+| Migration history table                               | None: migrations were applied by hand (see the repair line in `docs/MISSING_PIECES.md`)                                                                                                                                        |
 
 Checking with the Supabase access token (Management API; the session's network must allow
 `api.supabase.com`). Never print the token.
@@ -230,28 +230,24 @@ Deploy functions with
 
 ## 5. Next things to do, in order
 
-The live steps of PR #18 are done: migration 4 is applied and every function was deployed from
+The live steps of PR #18 and PR #25 are done: migration 4 is applied, the default model names in
+`supabase/functions/_shared/parser/models.ts` are corrected, and every function is deployed from
 `main`.
 
-1. **Redeploy `read-step` and `assistant-chat` from `main`** (owner's go-ahead): they carry the
-   corrected default model names in `supabase/functions/_shared/parser/models.ts`. Nothing
-   changes for users, because the `OPENROUTER_MODEL_*` secrets already set the same names; after
-   it, the app no longer depends on those secrets.
-2. **Deadlines from the confirmed COR forms** (`accounts.cor_tax_types`), not only from the
+1. **Deadlines from the confirmed COR forms** (`accounts.cor_tax_types`), not only from the
    profile flags. Reported by the "connect Supabase" session and still to confirm against
    `supabase/functions/_shared/domain/deadlines.ts` and `tax-profile.ts`: a COR that lists 1701
    gets 1701A when the option is OSD, 1604-E is missing from the deadline list, and 0605 should
    never appear.
-3. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
+2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff
-   tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); delete the
-   unused `TRIGGER_ACCESS_TOKEN` repository secret; an SMTP provider, then turn email confirmation
-   back on; Google Search Console.
-4. **First full end-to-end run** on the Supabase reader. So far one COR and two receipts have been
+   tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); an SMTP
+   provider, then turn email confirmation back on; Google Search Console.
+3. **First full end-to-end run** on the Supabase reader. So far one COR and two receipts have been
    read. Upload photos and a 10 to 20 page PDF, watch `runs`, `documents` and the logs, confirm
    that OpenRouter returns `usage.cost`, and tune `CONFIDENCE_THRESHOLD` in
    `supabase/functions/_shared/parser/checks.ts`.
-5. **Database hardening before launch**, from Supabase's advisors (Database → Advisors, read on
+4. **Database hardening before launch**, from Supabase's advisors (Database → Advisors, read on
    2026-11-16), as one new migration with the usual dry run:
    - take `execute` away from `anon` on the functions a visitor never needs. The advisor flags 25
      `security definer` functions as callable without a login. The ones that can really be called
@@ -263,14 +259,14 @@ The live steps of PR #18 are done: migration 4 is applied and every function was
 
    In Supabase → Authentication, also turn on leaked-password protection.
 
-6. **Trigger.dev**: when support enables deploys, run the "Deploy Trigger.dev tasks" workflow,
+5. **Trigger.dev**: when support enables deploys, run the "Deploy Trigger.dev tasks" workflow,
    set Supabase's `TRIGGER_SECRET_KEY` to the Production secret key, and switch `READER` to
    `trigger` if the owner wants it.
-7. **Payments** when the owner decides: Xendit keys and webhook, test mode, then
+6. **Payments** when the owner decides: Xendit keys and webhook, test mode, then
    `PAYMENTS_LIVE = true` (steps in `docs/MISSING_PIECES.md`, section 4).
-8. **Before launch, not code**: privacy notice and terms (Data Privacy Act), community and
+7. **Before launch, not code**: privacy notice and terms (Data Privacy Act), community and
    partner terms, a CPA review of the tax rules in `supabase/functions/_shared/domain/`.
-9. **Later product ideas** on the landing page ("After launch", "After year 1": taxpayer
+8. **Later product ideas** on the landing page ("After launch", "After year 1": taxpayer
    profile, lender sharing, investor newsletter): each needs its own design, consent flow and
    legal review before building.
 
