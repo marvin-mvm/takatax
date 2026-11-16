@@ -53,3 +53,13 @@ export async function getObject(key: string): Promise<Uint8Array> {
   if (!response.ok) throw new Error(`R2 ${response.status} for ${key}`);
   return new Uint8Array(await response.arrayBuffer());
 }
+
+/** Deletes an object. One that is already gone is not an error, so a delete can be retried. */
+export async function deleteObject(key: string): Promise<void> {
+  const { client, base } = r2();
+  const path = key.split("/").map(encodeURIComponent).join("/");
+  const response = await client.fetch(`${base}/${path}`, { method: "DELETE" });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`R2 ${response.status} deleting ${key}`);
+  }
+}

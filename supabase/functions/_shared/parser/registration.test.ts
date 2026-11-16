@@ -71,7 +71,7 @@ describe("parseRegistration", () => {
   it("tidies a COR reading", () => {
     const cor = parseRegistration({
       isCor: true,
-      tin: "435-361-750",
+      tin: "912-345-678",
       branchCode: "00000",
       registeredName: "JUAN  DELA CRUZ",
       tradeName: "JDC Design Studio",

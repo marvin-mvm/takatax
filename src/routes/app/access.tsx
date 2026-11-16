@@ -35,7 +35,7 @@ export const Route = createFileRoute("/app/access")({
  * Who can see my account. The taxpayer invites a professional, who accepts or declines; the
  * taxpayer can cancel an invitation or remove access at any time. The activity log below lists
  * every invitation step and what each professional opened or changed. Professionals never see
- * this page, the plan or payments.
+ * this page or the payments; their features follow the taxpayer's plan.
  */
 function AccessPage() {
   const { user } = useAppUser();
@@ -80,7 +80,7 @@ function AccessPage() {
     <div className="flex flex-col gap-8">
       <PageHeader
         title="Who can see my account"
-        subtitle="Invite a bookkeeper, CPA or tax lawyer. Once they accept, they can see your receipts, sales, Forms 2307 and COR. They never see your plan, your payments or this page."
+        subtitle="Invite a bookkeeper, CPA or tax lawyer. Once they accept, they can see your receipts, sales, Forms 2307 and COR, and work with the features of your plan. They never see your payments or this page."
         action={
           <Link to="/bookkeepers" className={buttonPrimary}>
             <UserPlus aria-hidden className="size-5" /> Invite a professional

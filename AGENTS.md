@@ -107,12 +107,23 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
   `cancel_partner_invite()` and `revoke_partner_access()`; the professional can `leave_client()`.
   `partner_access.status` is pending, active, declined, cancelled, revoked or left, and every
   policy checks access through `has_account_access()` (active only). Professionals see the
-  client's documents, ledger, tracker and COR; never the plan, payments, access page or the
-  billing columns of `accounts` (the owner reads those through `my_plan()`, so select account
-  columns by name, never `*`).
+  client's documents, ledger, tracker and COR; never the payments, access page or the billing
+  columns of `accounts` (the owner reads those through `my_plan()`, so select account columns by
+  name, never `*`).
+- Tiers: a professional working on a client's account gets that client's tier. On a Standard
+  account they get the Standard features; on a Premium account, the client's Premium features.
+  `account_tier()` tells them which (Standard or Premium) and nothing else about the billing. A
+  professional's own runs stay Standard with the partner discount. Premium is not on sale yet
+  (`PAYMENTS_LIVE`), but its features are built behind that switch.
 - Activity log: `access_events` is owner-only and cannot be edited. Triggers log invitation
   steps and what a professional changes (records, uploads, runs, COR); `log_access_event()`
   logs what they open (the app, `document-link` and `assistant-chat` call it).
+- Deleting documents: on a Standard account, deleting a file also deletes the records read from
+  it. On a Premium account the file goes but its records stay until they are deleted as a
+  second step. The account's tier decides, for its owner and for a professional alike. The
+  `delete-document` function removes the file from R2 and then calls `delete_document()`; a
+  professional's deletion is in the activity log. The screens' rules and wording are in
+  `src/lib/documents/delete.ts`.
 - Database changes go in a new file in `supabase/migrations/`; check them with
   `supabase/tests/run.sh` (local Postgres) before applying them to the project.
 

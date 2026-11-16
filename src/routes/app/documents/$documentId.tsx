@@ -258,7 +258,8 @@ function DocumentPage() {
             accountId={workspace.account.id}
             documentId={doc.id}
             fileName={doc.fileName}
-            enabled={source === "live" && doc.status !== "waiting_for_storage"}
+            enabled={source === "live" && doc.status !== "waiting_for_storage" && !doc.fileDeleted}
+            deleted={doc.fileDeleted}
           />
         </Card>
       </div>
@@ -272,11 +273,14 @@ function DocumentPreview({
   documentId,
   fileName,
   enabled,
+  deleted,
 }: {
   accountId: string;
   documentId: string;
   fileName: string;
   enabled: boolean;
+  /** The file was deleted and only its records were kept. */
+  deleted: boolean;
 }) {
   const link = useQuery({
     queryKey: ["document-link", documentId],
@@ -319,9 +323,11 @@ function DocumentPreview({
     <div className="mt-3 flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-tk-line bg-tk-surface-2 p-6 text-center text-tk-muted">
       <ImageOff aria-hidden className="size-8" />
       <p>
-        {enabled && link.isPending
-          ? "Loading the file…"
-          : "The photo appears here once file storage is connected."}
+        {deleted
+          ? "This file was deleted. Its records are kept."
+          : enabled && link.isPending
+            ? "Loading the file…"
+            : "The photo appears here once file storage is connected."}
       </p>
     </div>
   );
