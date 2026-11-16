@@ -27,9 +27,25 @@ Read in this order: this file, then `AGENTS.md` (rules and architecture), then
   `.github/workflows/trigger-deploy.yml`) carry no AI credit and use no AI assistant's action or
   app. Do not add one (no AI coding-assistant workflow, no AI review bot) and do not name an AI
   assistant in workflow names, steps or comments.
-- Commit signing: earlier commits were signed with an SSH key that existed only in that cloud
-  session. A new session may sign with its own key only if the owner adds that public key to
-  their GitHub account as a **Signing Key**; otherwise commits stay unsigned, which is fine.
+- Commit signing (so GitHub shows "Verified"): the new session makes its own SSH signing key,
+  and the owner adds the public half on GitHub. In the session:
+
+  ```bash
+  ssh-keygen -t ed25519 -C "takatax signing (marvin-mvm)" -f ~/.ssh/takatax_signing -N ""
+  git config gpg.format ssh
+  git config user.signingkey ~/.ssh/takatax_signing.pub
+  git config commit.gpgsign true
+  echo "marvinmata19@gmail.com $(cat ~/.ssh/takatax_signing.pub)" > ~/.ssh/allowed_signers
+  git config gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+  cat ~/.ssh/takatax_signing.pub   # give this one line to the owner
+  ```
+
+  The owner adds it on GitHub: Settings → SSH and GPG keys → New SSH key → Key type
+  **Signing Key** → paste → Add. GitHub verifies only commits whose email
+  (`marvinmata19@gmail.com`) is a verified email on the account. Check with
+  `git log -1 --show-signature` (it should say "Good signature"). Only the public key is shared;
+  the private key never leaves the session. A cloud session loses the key when its container is
+  replaced: make a new one and add it again (old keys can be deleted on the same GitHub page).
 
 ### Branches and releases
 
