@@ -72,14 +72,15 @@ Environment variables (Trigger.dev dashboard → Environment variables; set them
 | `SUPABASE_SERVICE_ROLE_KEY`                                              | Supabase → Project settings → API keys → the **service role** (secret) key. It lets the job write results; keep it only here. |
 
 Deploying the tasks to Production (no computer needed): GitHub Actions does it
-(`.github/workflows/trigger-deploy.yml`, following Trigger.dev's CI guide) on every push to `main`,
-and on demand from the Actions tab ("Deploy Trigger.dev tasks" → Run workflow). The CLI version is
-read from `package.json`, so it always matches the SDK.
+(`.github/workflows/trigger-deploy.yml`) on every push to `main`, and on demand from the Actions
+tab ("Deploy Trigger.dev tasks" → Run workflow). It uses Trigger.dev **trusted publishing**
+(GitHub OIDC), so no key is stored in GitHub. The CLI version is read from `package.json`, so it
+always matches the SDK (4.8.4 or later is needed for trusted publishing).
 
-1. Trigger.dev dashboard → switch to **Production** → API keys. Create a key with **Deploy only**
-   access if you can; otherwise use the Production secret key (`tr_prod_…`).
-2. GitHub → the takatax repository → Settings → Secrets and variables → Actions → New repository
-   secret: name `TRIGGER_ACCESS_TOKEN`, value that key. Without it the workflow skips itself.
+1. Trigger.dev dashboard → switch to **Production** → GitHub → Trusted publishing: add the
+   `marvin-mvm/takatax` repository (done).
+2. Do not set a `TRIGGER_ACCESS_TOKEN` repository secret: the workflow does not read one, and
+   the CLI would use a key instead of trusted publishing if one were set.
 3. Merge to `main` (or run the workflow from the Actions tab once it is on `main`). The dashboard's
    Production environment then lists `read-run` and `ping`; run `ping` from its Test page.
 4. Set Supabase's `TRIGGER_SECRET_KEY` to the regular Production secret key (`tr_prod_…`). A
