@@ -32,3 +32,26 @@ export async function authorize(request: Request, accountId: string) {
   if (!allowed) throw new HttpError(403, "forbidden", "You do not have access to this account");
   return { userId: auth.user.id, client };
 }
+
+/**
+ * Adds "a professional opened this" to the account owner's activity log. The database ignores
+ * the owner's own visits and repeats within ten minutes. Never fails the request: the log must
+ * not stop someone from working.
+ */
+export async function logAccess(
+  client: SupabaseClient,
+  accountId: string,
+  activity: "opened_document" | "asked_assistant",
+  target?: string,
+): Promise<void> {
+  try {
+    const { error } = await client.rpc("log_access_event", {
+      account: accountId,
+      activity,
+      target: target ?? null,
+    });
+    if (error) console.warn(`Activity log: ${error.message}`);
+  } catch (error) {
+    console.warn(`Activity log: ${String(error)}`);
+  }
+}
