@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useState, type ComponentType } from "react";
 
+import { BrandMark } from "@/components/site/BrandMark";
 import { cn } from "@/lib/utils";
 
 import { SlideMetaContext } from "./slide-meta";
@@ -126,12 +127,7 @@ export function Deck() {
       <header className="deck-chrome sticky top-0 z-20 border-b border-tk-line bg-tk-surface">
         <div className="mx-auto flex h-14 max-w-[1120px] items-center gap-4 px-4 sm:px-6">
           <a href="#cover" className="flex items-center gap-2 font-bold tracking-tight">
-            <span
-              aria-hidden
-              className="flex size-7 items-center justify-center rounded-[8px] bg-tk-brand font-tk-mono text-sm font-medium text-tk-surface"
-            >
-              ₱
-            </span>
+            <BrandMark className="size-7" />
             Takatax
           </a>
           <nav aria-label="Sections" className="ml-2 hidden min-w-0 flex-1 md:block">

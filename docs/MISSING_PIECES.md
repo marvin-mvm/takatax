@@ -11,18 +11,15 @@ committed, so never put a secret there).
 
 ## 0. Supabase project `thiznrxojzrxkjwqhtjt`
 
-- [x] **Database**: both migrations in `supabase/migrations/` were applied on 2026-11-16, after a
-      rolled-back dry run with every behaviour check passing on the live project. 15 tables,
-      all with row-level security; Realtime on `messages`. Re-run the checks any time with
+- [x] **Database**: all three migrations in `supabase/migrations/` were applied on 2026-11-16,
+      each after a rolled-back dry run with every behaviour check passing on the live project
+      (the invitations and activity log migration, `20261116120000`, after its own dry run with
+      `supabase/tests/20_behaviour_api.sql` and `30_invitations.sql`). 16 tables, all with
+      row-level security; Realtime on `messages`. Re-run the checks any time with
       `supabase/tests/run.sh` against a local Postgres.
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
-      `supabase migration repair --status applied 20261115120000 20261115140000`.
-- [ ] **Invitations and the activity log**: `20261116120000_invitations_activity.sql` is not
-      applied yet. Apply it when this change is merged and the site is deployed (with no users
-      yet, the few minutes between the two do not matter): a rolled-back dry run first with
-      `supabase/tests/20_behaviour_api.sql` and `30_invitations.sql`, then the migration. Then
-      redeploy `document-link` and `assistant-chat`, which now log what a professional opens.
+      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000`.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
       `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and `payments-webhook` are
       deployed (`payments-webhook` and `read-step` skip the login check; `read-step` accepts only
@@ -166,8 +163,12 @@ To switch payments on (Xendit: GCash, Maya, cards):
 ## 6. One-time settings (no keys)
 
 - [ ] **Supabase → Authentication → URL configuration**: set the Site URL to the live Netlify
-      address (today it is `http://localhost:3000`, so confirmation emails link there) and add
-      `https://<your-netlify-address>/**` to the redirect URLs.
+      address (today it is `http://localhost:3000`, so password-reset and other emails link
+      there) and add `https://<your-netlify-address>/**` to the redirect URLs.
+- [ ] **Email confirmation is off** (turned off on 2026-11-16, so sign-ups need no email). Anyone
+      can then sign up with an address they do not own. Turn "Confirm email" back on in Supabase →
+      Authentication → Sign In / Providers → Email once an SMTP provider is set up (section 5).
+      Partner access is unaffected: professionals still need staff verification.
 - [ ] **Make yourself Takatax staff**, so the Staff tab appears and you can verify partners.
       After signing up, run in the Supabase SQL editor:
       `insert into public.admins (user_id) select id from auth.users where email = '<your email>';`
