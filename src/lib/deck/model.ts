@@ -29,7 +29,17 @@ const STORAGE_ADDON_SHARE = 50 / 900; // of regular customers
 const PARTNER_DISCOUNT = 0.25;
 const PARTNERS_TARGET = 1_608; // 20% of BIR-accredited tax agents, plus CPAs at half that
 const PARTNERS_TARGET_MONTH = 36;
-const PAYMENT_FEE = 0.025;
+/**
+ * Payment fees: a share of each payment plus a fixed amount per payment. Two presets: Xendit, the
+ * Philippine gateway Takatax will use (2.3% for GCash, the most common way to pay; Maya is 1.8%
+ * and cards 3.2% + ₱10), and a merchant of record for comparison (Dodo Payments' published rate:
+ * 4% + $0.40, plus 1.5% for cards outside the US). Sources: xendit.co/en-ph/pricing,
+ * dodopayments.com/pricing.
+ */
+export const PAYMENT_PRESETS = {
+  xendit: { label: "Xendit", pct: 2.3, fixedUsd: 0 },
+  mor: { label: "Merchant of record", pct: 5.5, fixedUsd: 0.4 },
+} as const;
 
 // Background jobs on Trigger.dev, which read the pages so long PDFs never hit Supabase's
 // 150 to 400 second limit. Billed per second of compute (the default small-1x machine, which
@@ -90,6 +100,10 @@ export interface ModelInputs {
   /** How much of that limit an average Premium customer uses each month, in percent. Over 100%
    *  the extra pages are charged ₱2 each. */
   premiumUsagePct: number;
+  /** Payment fee: a share of each payment, in percent. */
+  paymentFeePct: number;
+  /** Payment fee: a fixed amount per payment, in US dollars. */
+  paymentFeeFixedUsd: number;
   /** Which models read the documents. */
   reader: ReaderMode;
   /** Share of pages that need a second read (three-step reader only), in percent. */
@@ -119,6 +133,8 @@ export const DEFAULT_INPUTS: ModelInputs = {
   storagePrice: 250,
   runsPerYear: 6,
   pagesPerRun: 100,
+  paymentFeePct: PAYMENT_PRESETS.xendit.pct,
+  paymentFeeFixedUsd: PAYMENT_PRESETS.xendit.fixedUsd,
   premiumSharePct: 10,
   premiumPageLimit: 1_000,
   premiumUsagePct: 40,
@@ -218,6 +234,18 @@ export function jobsCostPerPage(
 /** Trigger.dev cost of the parent job that starts each run, in pesos. */
 export const JOBS_COST_PER_RUN =
   (TRIGGER.parentSecondsPerRun * TRIGGER.usdPerSecond + TRIGGER.usdPerRun) * PESOS_PER_USD;
+
+/** The payment fee on one payment of `amount` pesos. */
+export function paymentFee(
+  inputs: Pick<ModelInputs, "paymentFeePct" | "paymentFeeFixedUsd">,
+  amount: number,
+): number {
+  if (amount <= 0) return 0;
+  return (
+    (Math.max(inputs.paymentFeePct, 0) / 100) * amount +
+    Math.max(inputs.paymentFeeFixedUsd, 0) * PESOS_PER_USD
+  );
+}
 
 /** The ₱2-a-page charge for pages over a limit. */
 const extraPages = (pages: number, limit: number) => Math.max(pages - limit, 0);
@@ -351,7 +379,17 @@ export function runModel(inputs: ModelInputs): ModelResult {
       result.costs.jobs += jobs;
       result.costs.cloud +=
         cloudMonthly(accounts, gigabytes) + (subscriptionsOn ? RESEARCH_HOSTING_MONTHLY : 0);
-      result.costs.fees += PAYMENT_FEE * (revenue - lenderAds); // ads are invoiced by bank transfer
+      // Every payment pays the share; each one also pays the fixed fee. Ads are invoiced by bank
+      // transfer, so they pay neither.
+      const payments =
+        (regular + partners) * runsPerMonth +
+        premium +
+        storageAddOns +
+        (adsOn ? (partners * BOOST_UPTAKE * 52) / 12 : 0) +
+        (subscriptionsOn ? researchSubscribers + accounts * NEWSLETTER_UPTAKE : 0);
+      result.costs.fees +=
+        (Math.max(inputs.paymentFeePct, 0) / 100) * (revenue - lenderAds) +
+        payments * Math.max(inputs.paymentFeeFixedUsd, 0) * PESOS_PER_USD;
       result.costs.marketing += (Math.max(inputs.marketingPct, 0) / 100) * revenue;
       result.costs.team += (Math.max(inputs.teamPct, 0) / 100) * revenue;
       result.costs.fixed += Math.max(inputs.fixedMonthly, 0);
@@ -437,17 +475,17 @@ export function premiumMonth(inputs: ModelInputs): PremiumMonth {
   const paid = price + extraRevenue;
   const aiCost = pages * aiCostPerPage(inputs.reader, inputs.recheckSharePct);
   const jobsCost = pages * jobsCostPerPage(inputs) + JOBS_COST_PER_RUN;
-  const paymentFee = PAYMENT_FEE * paid;
-  const kept = paid - paymentFee - aiCost - jobsCost;
+  const fee = paymentFee(inputs, paid);
+  const kept = paid - fee - aiCost - jobsCost;
   return {
     pages,
     extraRevenue,
     aiCost,
     jobsCost,
-    paymentFee,
+    paymentFee: fee,
     kept,
     keptShare: paid > 0 ? kept / paid : 0,
-    breakEvenPages: perPage > 0 ? (price * (1 - PAYMENT_FEE)) / perPage : Infinity,
+    breakEvenPages: perPage > 0 ? (price - paymentFee(inputs, price)) / perPage : Infinity,
   };
 }
 
@@ -473,15 +511,15 @@ export function runEconomics(inputs: ModelInputs, partner = false): RunEconomics
   const paid = basePrice + extraRevenue;
   const aiCost = pages * aiCostPerPage(inputs.reader, inputs.recheckSharePct);
   const jobsCost = pages * jobsCostPerPage(inputs) + JOBS_COST_PER_RUN;
-  const paymentFee = PAYMENT_FEE * paid;
-  const kept = paid - paymentFee - aiCost - jobsCost;
+  const fee = paymentFee(inputs, paid);
+  const kept = paid - fee - aiCost - jobsCost;
   return {
     pages,
     basePrice,
     extraRevenue,
     aiCost,
     jobsCost,
-    paymentFee,
+    paymentFee: fee,
     kept,
     keptShare: paid > 0 ? kept / paid : 0,
   };

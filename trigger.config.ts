@@ -1,15 +1,16 @@
 /**
- * Trigger.dev: the background jobs that read documents (see trigger/read-run.ts).
+ * Trigger.dev: the background jobs that read documents (see trigger/read-run.ts) and a `ping`
+ * task to check the connection.
  *
- * Deploy with `npx trigger.dev@4.8.3 deploy` after `npx trigger.dev@4.8.3 login`.
- * MISSING: set TRIGGER_PROJECT_REF to your project ref (Trigger.dev dashboard -> Project
- * settings, for example "proj_abc123"), or write it in place of the fallback below.
+ * Local test: `npx trigger.dev@4.8.3 login`, then `npx trigger.dev@4.8.3 dev`.
+ * Production: `npx trigger.dev@4.8.3 deploy`.
+ * The CLI version matches the SDK in package.json (4.8.3).
  */
 
 import { defineConfig } from "@trigger.dev/sdk";
 
 export default defineConfig({
-  project: process.env["TRIGGER_PROJECT_REF"] ?? "proj_replace_with_your_project_ref",
+  project: process.env["TRIGGER_PROJECT_REF"] ?? "proj_afhlvwluvvvtblfsplyn",
   runtime: "node",
   dirs: ["./trigger"],
   // The default small machine (0.5 vCPU, 0.5 GB) is enough: the job mostly waits for the

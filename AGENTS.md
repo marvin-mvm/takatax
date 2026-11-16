@@ -81,11 +81,12 @@ where they differ.
   `create-checkout`.
 - File storage: Cloudflare R2 (private buckets, signed upload links), not Supabase Storage.
   R2 keys live in Supabase Edge Function secrets.
-- Payments: PayMongo checkout sessions (GCash, Maya, cards, QR Ph) created by the
-  `create-checkout` edge function, which also works out the price on the server. The
-  `paymongo-webhook` function (JWT check off in `supabase/config.toml`; it checks PayMongo's
-  signature instead) marks runs and Premium months paid. Takatax never handles payments between
-  taxpayers and their bookkeepers.
+- Payments: Xendit, switched off for launch by `PAYMENTS_LIVE` in
+  `supabase/functions/_shared/uploads/rules.ts` (Standard runs up to 250 pages are free; extra
+  pages and Premium are "coming soon" on the screens and in `create-checkout`). The provider code
+  is in `supabase/functions/_lib/payments.ts`; `payments-webhook` (JWT check off in
+  `supabase/config.toml`; it checks Xendit's callback token) marks runs and Premium months paid.
+  Takatax never handles payments between taxpayers and their bookkeepers.
 - Chat between taxpayers and partners: `conversations` and `messages`. Messages are a permanent
   record: clients have no update or delete rights and a trigger refuses any change.
 - Access: taxpayers grant and remove a verified partner's access with

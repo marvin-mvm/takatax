@@ -9,6 +9,7 @@ import {
   DEFAULT_INPUTS,
   EXTRA_PAGE_PRICE,
   MICRO_ENTERPRISES,
+  PAYMENT_PRESETS,
   RUN_PAGE_LIMIT,
   TRIGGER,
   compareLimits,
@@ -257,7 +258,11 @@ function RunEconomicsPanel({
     },
     { label: "AI (OpenRouter)", value: (run) => run.aiCost, minus: true },
     { label: "Background jobs (Trigger.dev)", value: (run) => run.jobsCost, minus: true },
-    { label: "Payment fee, 2.5%", value: (run) => run.paymentFee, minus: true },
+    {
+      label: `Payment fee, ${inputs.paymentFeePct}%${inputs.paymentFeeFixedUsd > 0 ? ` + $${inputs.paymentFeeFixedUsd.toFixed(2)}` : ""}`,
+      value: (run) => run.paymentFee,
+      minus: true,
+    },
   ];
   const usd = (pesos: number) => `$${(pesos / 63).toFixed(2)}`;
 
@@ -444,9 +449,8 @@ function PremiumLimitCheck({
         </table>
       </div>
       <p className="mt-2 text-[13px]/[18px] text-tk-muted text-pretty">
-        “Kept” is what the customer paid less the 2.5% payment fee, AI and Trigger.dev, before
-        cloud, team and marketing. Try the reader and the share of the limit used to see the worst
-        cases.
+        “Kept” is what the customer paid less the payment fee, AI and Trigger.dev, before cloud,
+        team and marketing. Try the reader and the share of the limit used to see the worst cases.
       </p>
     </section>
   );
@@ -670,6 +674,61 @@ export function WhatIfModel() {
               </p>
             </ControlGroup>
             <ControlGroup
+              value="payments"
+              title="Payments"
+              summary={`${inputs.paymentFeePct}%${inputs.paymentFeeFixedUsd > 0 ? ` + $${inputs.paymentFeeFixedUsd.toFixed(2)}` : ""} a payment`}
+            >
+              <Segmented
+                label="Who takes the payments"
+                value={
+                  inputs.paymentFeePct === PAYMENT_PRESETS.mor.pct &&
+                  inputs.paymentFeeFixedUsd === PAYMENT_PRESETS.mor.fixedUsd
+                    ? "mor"
+                    : inputs.paymentFeePct === PAYMENT_PRESETS.xendit.pct &&
+                        inputs.paymentFeeFixedUsd === PAYMENT_PRESETS.xendit.fixedUsd
+                      ? "xendit"
+                      : "custom"
+                }
+                options={[
+                  { value: "xendit", label: PAYMENT_PRESETS.xendit.label },
+                  { value: "mor", label: PAYMENT_PRESETS.mor.label },
+                  { value: "custom", label: "Custom" },
+                ]}
+                onChange={(value) => {
+                  if (value === "custom") return;
+                  const preset = PAYMENT_PRESETS[value];
+                  setInputs((current) => ({
+                    ...current,
+                    paymentFeePct: preset.pct,
+                    paymentFeeFixedUsd: preset.fixedUsd,
+                  }));
+                }}
+              />
+              <SliderRow
+                label="Share of each payment"
+                display={`${inputs.paymentFeePct}%`}
+                value={inputs.paymentFeePct}
+                min={0}
+                max={10}
+                step={0.5}
+                onChange={(value) => set("paymentFeePct", value)}
+              />
+              <SliderRow
+                label="Fixed fee per payment"
+                display={`$${inputs.paymentFeeFixedUsd.toFixed(2)} · ${formatPesos(inputs.paymentFeeFixedUsd * 63)}`}
+                value={inputs.paymentFeeFixedUsd}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(value) => set("paymentFeeFixedUsd", value)}
+              />
+              <p className="text-[13px]/[18px] text-tk-muted">
+                Xendit: 2.3% for GCash, 1.8% for Maya, 3.2% + ₱10 for cards. A merchant of record
+                (for example Dodo Payments: 4% + $0.40, plus 1.5% for cards outside the US) also
+                handles tax and refunds, but its fixed fee weighs heavily on a ₱199 run.
+              </p>
+            </ControlGroup>
+            <ControlGroup
               value="costs"
               title="Operating costs"
               summary={`${inputs.marketingPct}% marketing, ${inputs.teamPct}% team, ${formatPesosCompact(inputs.fixedMonthly)} fixed a month`}
@@ -826,11 +885,12 @@ export function WhatIfModel() {
       <p className="text-[13px]/[18px] text-tk-muted text-pretty">
         Fixed assumptions: {formatNumber(MICRO_ENTERPRISES)} micro enterprises{" "}
         <Cite source="DTI" refs={[1, 2]} />; 2% monthly churn; partners grow to 1,608 by month 36
-        with one client each; 1 in 18 regular customers buys storage; 2.5% payment fees; ₱2 for each
-        page over a run's or Premium's limit; Trigger.dev Pro at $50 a month including $50 of usage;
-        3% percentage tax up to ₱3M of yearly revenue, VAT above it; income tax of 20% or 25%. Unit
-        costs from <Cite source="Takatax" refs={[21]} />, <Cite source="Google" refs={[19]} />,{" "}
-        <Cite source="Anthropic" refs={[20]} /> and <Cite source="Trigger.dev" refs={[24]} />. A
+        with one client each; 1 in 18 regular customers buys storage; ₱2 for each page over a run's
+        or Premium's limit; Trigger.dev Pro at $50 a month including $50 of usage; 3% percentage tax
+        up to ₱3M of yearly revenue, VAT above it; income tax of 20% or 25%. Unit costs from{" "}
+        <Cite source="Takatax" refs={[21]} />, <Cite source="Google" refs={[19]} />,{" "}
+        <Cite source="Anthropic" refs={[20]} />, <Cite source="Trigger.dev" refs={[24]} />,{" "}
+        <Cite source="Xendit" refs={[26]} /> and <Cite source="Dodo Payments" refs={[25]} />. A
         projection, not a forecast.
       </p>
     </div>

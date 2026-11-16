@@ -383,7 +383,8 @@ alter table public.accounts
   add column premium_started_at timestamptz,
   add column premium_until timestamptz;
 
--- One checkout with the payment provider (PayMongo), for a run or a Premium month. Written by
+-- One checkout with the payment provider (a merchant of record, still to be chosen), for a run
+-- or a Premium month.
 -- edge functions only; the payer can read their own.
 create table public.payments (
   id uuid primary key default gen_random_uuid(),
@@ -392,7 +393,7 @@ create table public.payments (
   purpose text not null check (purpose in ('run', 'premium_month')),
   run_id uuid references public.runs (id) on delete set null,
   amount_centavos integer not null check (amount_centavos > 0),
-  provider text not null default 'paymongo',
+  provider text not null, -- the payment provider (merchant of record), see _lib/payments.ts
   provider_checkout_id text unique,
   provider_payment_id text,
   status text not null default 'pending' check (status in ('pending', 'paid', 'failed', 'expired')),

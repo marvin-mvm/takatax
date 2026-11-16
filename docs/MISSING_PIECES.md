@@ -1,48 +1,36 @@
 # What is left: keys and one-time settings
 
-The product is built end to end: database, row-level security, edge functions and screens.
-What remains is **keys** (secrets only the owner can create) and a few **one-time settings**.
-Until a key is set, the screen that needs it says plainly that it is "not connected yet"; nothing
-crashes. Search the code for `MISSING:` to find each spot.
+The product is built end to end: database, row-level security, edge functions, the Trigger.dev
+reader and the screens. What remains is **keys** and a few **one-time settings**. Until a key is
+set, the screen that needs it says plainly that it is "not connected yet"; nothing crashes.
+Search the code for `MISSING:` to find each spot.
 
-Status of the Supabase project `thiznrxojzrxkjwqhtjt`:
+Never paste a full key into a chat, an issue or a commit. Set keys only in the Supabase and
+Trigger.dev dashboards, or in `.env.local` on your own computer (git ignores it; `.env` is
+committed, so never put a secret there).
 
-- [ ] Database: apply both migrations in `supabase/migrations/` (tables, row-level security,
-      chat, access, payments, AI spend log), after a dry run that is rolled back:
-      `begin;` + both migrations + `supabase/tests/20_behaviour_api.sql` + `rollback;`.
-      Re-run the behaviour checks any time with `supabase/tests/run.sh` against a local Postgres.
-- [ ] Edge functions: deploy `create-upload-urls`, `confirm-upload`, `document-link`,
-      `read-documents`, `assistant-chat`, `create-checkout` and `paymongo-webhook`
-      (`supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`). Supabase gives
-      them `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
-- [ ] Trigger.dev: the reader job in `trigger/read-run.ts`. Create a project at trigger.dev,
-      put its ref in `trigger.config.ts` (or `TRIGGER_PROJECT_REF`), set its environment
-      variables (below), then from the repo: `npx trigger.dev@4.8.3 login` and
-      `npx trigger.dev@4.8.3 deploy`.
+## 0. Supabase project `thiznrxojzrxkjwqhtjt` (done)
 
-## 1. Keys
+- [x] **Database**: both migrations in `supabase/migrations/` were applied on 2026-11-16, after a
+      rolled-back dry run with every behaviour check passing on the live project. 15 tables,
+      all with row-level security; Realtime on `messages`. Re-run the checks any time with
+      `supabase/tests/run.sh` against a local Postgres.
+      They were applied by hand, so Supabase's migration history is empty. If you start using
+      `supabase db push`, first mark them as applied:
+      `supabase migration repair --status applied 20261115120000 20261115140000`.
+- [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
+      `read-documents`, `assistant-chat`, `create-checkout` and `payments-webhook` are deployed
+      (only `payments-webhook` skips the login check). Each answers "not configured" until its
+      keys are set. Redeploy after changes with
+      `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
 
-**Supabase → Project settings → Edge Functions → Secrets** (never in the repo or in Netlify):
+## 1. Cloudflare R2 (file storage)
 
-| Secret                                                                   | Turns on                                   | Where to get it                                                                                                                                                                                      |
-| ------------------------------------------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Upload links, upload checks, file previews | Cloudflare → R2: the Account ID, a token with **Object Read & Write** on the bucket, and the bucket name (for example `takatax-documents`, private)                                                  |
-| `TRIGGER_SECRET_KEY`                                                     | Starting the reader                        | Trigger.dev → Project → API keys: the **production** secret key (`tr_prod_…`)                                                                                                                        |
-| `OPENROUTER_API_KEY`                                                     | The records assistant chat                 | openrouter.ai → Keys                                                                                                                                                                                 |
-| `PAYMONGO_SECRET_KEY`                                                    | Paid runs and Premium                      | PayMongo → Developers → API keys (`sk_test_…` first, then `sk_live_…`)                                                                                                                               |
-| `PAYMONGO_WEBHOOK_SECRET`                                                | Marking payments paid                      | PayMongo → Developers → Webhooks: create one for `checkout_session.payment.paid` pointing to `https://thiznrxojzrxkjwqhtjt.supabase.co/functions/v1/paymongo-webhook`, then copy its `whsk_…` secret |
-
-**Trigger.dev → Project → Environment variables** (Production), for the reader job:
-
-| Variable                                                                 | Where to get it                                                                                                             |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `OPENROUTER_API_KEY`                                                     | openrouter.ai → Keys (the same key, or a separate one to track the reader's spend)                                          |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Cloudflare → R2; a **read-only** token on the bucket is enough here                                                         |
-| `SUPABASE_URL`                                                           | `https://thiznrxojzrxkjwqhtjt.supabase.co`                                                                                  |
-| `SUPABASE_SERVICE_ROLE_KEY`                                              | Supabase → Project settings → API keys: the service role (secret) key. It lets the job write results, so keep it only here. |
-
-The R2 bucket also needs a CORS rule so browsers can upload straight to it (Cloudflare → R2 →
-the bucket → Settings → CORS policy):
+- [ ] Create a **private** bucket, for example `takatax-documents`.
+- [ ] The R2 API token behind your S3 credentials needs **Object Read & Write** on that bucket.
+      (The `cfat_…` Cloudflare API token is not used by Takatax.)
+- [ ] Add this CORS rule to the bucket (R2 → the bucket → Settings → CORS policy), so browsers
+      can upload straight to it:
 
 ```json
 [
@@ -55,23 +43,92 @@ the bucket → Settings → CORS policy):
 ]
 ```
 
-Email: Supabase's built-in mailer sends only about 2 emails an hour. Add an SMTP provider
-(Resend, Postmark, SendGrid…) in **Supabase → Authentication → Emails → SMTP settings** before
-real sign-ups.
+## 2. Supabase Edge Function secrets
 
-Optional settings (sensible defaults already apply):
+Supabase → Project settings → Edge Functions → Secrets:
 
-- `AI_DAILY_CAP_USD` (both places): the most the AI may spend in one Manila day (default 20).
-- `READER_CONCURRENCY` (Trigger.dev): page groups read at the same time per document
-  (default 4).
+| Secret                 | Value                                                                                                                | Turns on                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `R2_ACCOUNT_ID`        | `65e30ada3290b44e4e38e2e07ef915b2` (your Cloudflare account ID)                                                      | Upload links, upload checks, file previews |
+| `R2_ACCESS_KEY_ID`     | The R2 S3 **Access Key ID**                                                                                          | Same                                       |
+| `R2_SECRET_ACCESS_KEY` | The R2 S3 **Secret Access Key**                                                                                      | Same                                       |
+| `R2_BUCKET`            | The bucket name, for example `takatax-documents`                                                                     | Same                                       |
+| `OPENROUTER_API_KEY`   | Your `sk-or-v1-…` key                                                                                                | The records assistant chat                 |
+| `TRIGGER_SECRET_KEY`   | Trigger.dev **secret key**: `tr_dev_…` while testing with `trigger.dev dev`, then `tr_prod_…` after the first deploy | Starting the reader                        |
+
+## 3. Trigger.dev (the reader)
+
+The project is `proj_afhlvwluvvvtblfsplyn` (already in `trigger.config.ts`). The SDK and CLI are
+pinned to version 4.8.3; use that version in every command so they match.
+
+Environment variables (Trigger.dev dashboard → Environment variables; set them for
+**Development** and **Production**):
+
+| Variable                                                                 | Value                                                                                                                         |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                                                     | Your `sk-or-v1-…` key (or a second key, to see the reader's spend apart)                                                      |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | The same four as in Supabase (a separate read-only token is safer, if you make one)                                           |
+| `SUPABASE_URL`                                                           | `https://thiznrxojzrxkjwqhtjt.supabase.co`                                                                                    |
+| `SUPABASE_SERVICE_ROLE_KEY`                                              | Supabase → Project settings → API keys → the **service role** (secret) key. It lets the job write results; keep it only here. |
+
+Deploying the tasks to Production (no computer needed): GitHub Actions does it
+(`.github/workflows/trigger-deploy.yml`) every time code reaches `main`, and on demand from the
+Actions tab ("Deploy Trigger.dev tasks" → Run workflow).
+
+1. Trigger.dev dashboard → switch to **Production** → API keys. Create a key with **Deploy only**
+   access if you can; otherwise use the Production secret key (`tr_prod_…`).
+2. GitHub → the takatax repository → Settings → Secrets and variables → Actions → New repository
+   secret: name `TRIGGER_ACCESS_TOKEN`, value that key. Without it the workflow skips itself.
+3. Merge to `main` (or run the workflow from the Actions tab once it is on `main`). The dashboard's
+   Production environment then lists `read-run` and `ping`; run `ping` from its Test page.
+4. Set Supabase's `TRIGGER_SECRET_KEY` to the regular Production secret key (`tr_prod_…`). A
+   "Deploy only" key cannot start reading jobs.
+
+To test on a computer instead (needs a recent macOS for Bun): `bun install`,
+`npx trigger.dev@4.8.3 login`, then `npx trigger.dev@4.8.3 dev` (Development environment, using
+the `tr_dev_…` key).
+
+## 4. Payments: Xendit, "coming soon"
+
+Payments are switched off for launch with one constant, `PAYMENTS_LIVE = false` in
+`supabase/functions/_shared/uploads/rules.ts`. While it is off:
+
+- every **Standard run of up to 250 pages is free**, for taxpayers and partners, as often as
+  they like;
+- **pages over 250 (₱2 each)** and **Premium (₱800 a month)** show "coming soon" and cannot be
+  bought, on the screens and on the server (`create-checkout` answers `coming_soon`).
+
+To switch payments on (Xendit: GCash, Maya, cards):
+
+- [ ] Xendit dashboard → Settings → API keys: a secret key with Money-in write access. Supabase
+      secret `XENDIT_SECRET_KEY`.
+- [ ] Xendit dashboard → Settings → Webhooks: set the Invoices "paid" webhook to
+      `https://thiznrxojzrxkjwqhtjt.supabase.co/functions/v1/payments-webhook` and copy the
+      verification token. Supabase secret `XENDIT_CALLBACK_TOKEN`.
+- [ ] Test one paid run and one Premium month in Xendit's test mode. The provider code is ready in
+      `supabase/functions/_lib/payments.ts`; confirm its request and webhook fields against
+      Xendit's current docs.
+- [ ] Set `PAYMENTS_LIVE = true`, then redeploy the site (merge to `main`) and the edge functions.
+      The full pricing (free trial, ₱199 runs, 25% partner price, ₱2 extra pages, Premium) then
+      applies.
+
+## 5. Optional settings (sensible defaults already apply)
+
+- `AI_DAILY_CAP_USD` (Supabase and Trigger.dev): the most the AI may spend in one Manila day
+  (default 20).
+- `READER_CONCURRENCY` (Trigger.dev): page groups read at the same time per document (default 4).
 - `OPENROUTER_MODEL_FAST`, `OPENROUTER_MODEL_RECHECK`, `OPENROUTER_MODEL_SETTLE` (Trigger.dev)
   and `OPENROUTER_MODEL_ASSISTANT` (Supabase): override the models in
   `supabase/functions/_shared/parser/models.ts`.
-- `PAYMONGO_METHODS`: payment methods offered at checkout (default `gcash,paymaya,card,qrph`).
-- `SITE_URL`: fallback address for PayMongo's return links (the caller's address is used first).
-- `ALLOW_UNPAID_RUNS=true`: lets unpaid runs be read, for testing only. Do not set it in production.
+- `SITE_URL` (Supabase): fallback address for the payment page's return links (the caller's
+  address is used first).
+- `ALLOW_UNPAID_RUNS=true` (Supabase): lets unpaid runs be read, for testing only. Do not set it
+  in production.
+- Email: Supabase's built-in mailer sends only about 2 emails an hour. Add an SMTP provider
+  (Resend, Postmark, SendGrid…) in Supabase → Authentication → Emails → SMTP settings before real
+  sign-ups.
 
-## 2. One-time settings (no keys)
+## 6. One-time settings (no keys)
 
 - [ ] **Supabase → Authentication → URL configuration**: set the Site URL to the live Netlify
       address (today it is `http://localhost:3000`, so confirmation emails link there) and add
@@ -87,14 +144,15 @@ Optional settings (sensible defaults already apply):
 - [ ] Netlify: set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` only if Lovable's
       `.env` is not used in the build (both values are public).
 
-## 3. Checks before launch (not code)
+## 7. Checks before launch (not code)
 
 - [ ] Confirm the model slugs in `supabase/functions/_shared/parser/models.ts` on
-      openrouter.ai/models, run a test batch of real receipts, and tune `CONFIDENCE_THRESHOLD`
-      in `supabase/functions/_shared/parser/checks.ts`.
+      openrouter.ai/models, run a test batch of real receipts and PDFs, and tune
+      `CONFIDENCE_THRESHOLD` in `supabase/functions/_shared/parser/checks.ts`.
 - [ ] Confirm that OpenRouter returns `usage.cost` (US dollars) so the AI spend log and daily cap
       count real money.
-- [ ] Pay for one run and one Premium month in PayMongo **test mode**, then switch to live keys.
+- [ ] Pay for one run and one Premium month in the payment provider's test mode, then switch to
+      live keys.
 - [ ] Privacy notice and terms (Data Privacy Act), community rules and partner terms, reviewed
       by a Philippine lawyer.
 - [ ] A CPA review of the tax rules in `supabase/functions/_shared/domain/` against real filed

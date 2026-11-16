@@ -10,7 +10,7 @@ interface UploadSearch {
   kind?: DocumentKind;
   /** A client's account, when a partner uploads for them. */
   account?: string;
-  /** The run PayMongo sends the browser back with after a payment. */
+  /** The run the payment page sends the browser back with after paying. */
   run?: string;
 }
 

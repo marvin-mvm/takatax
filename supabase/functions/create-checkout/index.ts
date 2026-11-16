@@ -7,14 +7,19 @@
 // counted in pages (a photo is one page, a PDF every page): the free trial (first 10 pages,
 // once), Premium's pages left this month, ₱199 for up to 250 pages, ₱2 for each page over a
 // limit, and the 25% partner price when a bookkeeper, CPA or tax lawyer runs a client's pages.
-// Free runs are marked paid at once. Paid ones get a PayMongo checkout; the paymongo-webhook
-// function marks them paid.
+// Free runs are marked paid at once. Paid ones get a Xendit checkout (_lib/payments.ts);
+// payments-webhook marks them paid.
 //
-// Answers 503 { code: "not_configured" } for paid checkouts until the PayMongo keys are set.
+// LAUNCH ("coming soon"): while PAYMENTS_LIVE is false, Standard runs of up to 250 pages are
+// free for everyone and marked paid at once; Premium and runs over 250 pages answer
+// 409 { code: "coming_soon" }.
+//
+// With payments live, answers 503 { code: "not_configured" } for paid checkouts until Xendit's
+// key is set.
 import { adminClient, authorize } from "../_lib/clients.ts";
-import { HttpError, json, requireEnv, serve } from "../_lib/http.ts";
-import { createCheckoutSession } from "../_lib/paymongo.ts";
-import { PRICING, quoteRun } from "../_shared/uploads/rules.ts";
+import { HttpError, json, serve } from "../_lib/http.ts";
+import { PROVIDER, assertPaymentsConfigured, createCheckoutSession } from "../_lib/payments.ts";
+import { PAYMENTS_LIVE, PRICING, quoteRun } from "../_shared/uploads/rules.ts";
 
 const DAY = 86_400_000;
 
@@ -30,7 +35,7 @@ serve(async (request) => {
   }
   const { userId } = await authorize(request, body.accountId);
   const admin = adminClient();
-  // Where PayMongo sends the browser back: the site that called us.
+  // Where the payment provider sends the browser back: the site that called us.
   const origin = request.headers.get("origin") ?? Deno.env.get("SITE_URL") ?? "";
 
   const { data: account, error: accountError } = await admin
@@ -48,10 +53,11 @@ serve(async (request) => {
 
   // ---- Premium month -------------------------------------------------------------------------
   if (body.purpose === "premium_month") {
+    if (!PAYMENTS_LIVE) throw new HttpError(409, "coming_soon", "Premium is coming soon");
     if (account.owner_user_id !== userId) {
       throw new HttpError(403, "forbidden", "Only the account owner can buy Premium");
     }
-    requireEnv("PAYMONGO_SECRET_KEY");
+    assertPaymentsConfigured();
     const amount = PRICING.premiumMonthly * 100;
     const { data: payment, error } = await admin
       .from("payments")
@@ -60,6 +66,7 @@ serve(async (request) => {
         payer_user_id: userId,
         purpose: "premium_month",
         amount_centavos: amount,
+        provider: PROVIDER,
       })
       .select("id")
       .single();
@@ -144,12 +151,20 @@ serve(async (request) => {
       trialAvailable: !partner && !account.trial_used,
       ...(premiumRemaining !== undefined ? { premiumRemaining } : {}),
     });
+    if (quote.blocked) {
+      throw new HttpError(
+        409,
+        "coming_soon",
+        `Runs over ${PRICING.runPages} pages are coming soon; remove ${quote.extra} pages for now`,
+      );
+    }
     total = quote.total;
     summary = quote.summary;
     // Check the keys before creating anything, so a missing key leaves no unpaid run behind.
-    if (total > 0) requireEnv("PAYMONGO_SECRET_KEY");
+    if (total > 0) assertPaymentsConfigured();
 
     const kind = {
+      free: partner ? "partner" : "regular",
       trial: "trial",
       premium: "premium_month",
       partner: "partner",
@@ -194,6 +209,7 @@ serve(async (request) => {
       purpose: "run",
       run_id: runId,
       amount_centavos: amount,
+      provider: PROVIDER,
     })
     .select("id")
     .single();

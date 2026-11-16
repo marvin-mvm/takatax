@@ -1,52 +1,35 @@
-// POST from PayMongo (not from browsers): checkout_session.payment.paid
+// POST from the payment provider (Xendit, not from browsers) when a checkout is paid.
 //
-// Checks the Paymongo-Signature header, then marks the payment paid and either the run paid
-// (so read-documents will read it) or the account's Premium window extended by 30 days.
-// Safe to receive twice: a payment that is already paid is left alone.
+// readPaymentWebhook (_lib/payments.ts) checks the signature and says which checkout was paid;
+// this function then marks the payment paid and either the run paid (so read-documents will
+// read it) or the account's Premium window extended by 30 days. Safe to receive twice: a payment
+// that is already paid is left alone.
 //
-// Deployed without JWT verification (supabase/config.toml), since PayMongo has no Supabase
-// login; the signature is the check. MISSING: PAYMONGO_WEBHOOK_SECRET, and register this
-// function's URL as a webhook for checkout_session.payment.paid in the PayMongo dashboard.
+// Deployed without JWT verification (supabase/config.toml), since the provider has no Supabase
+// login; the provider's token is the check. Answers 503 { code: "not_configured" } while
+// payments are "coming soon" (see _lib/payments.ts).
 import { adminClient } from "../_lib/clients.ts";
 import { HttpError, json, serve } from "../_lib/http.ts";
-import { verifyWebhookSignature } from "../_lib/paymongo.ts";
+import { readPaymentWebhook } from "../_lib/payments.ts";
 
 const DAY = 86_400_000;
 
 serve(async (request) => {
   const raw = await request.text();
-  const event = JSON.parse(raw) as {
-    data?: {
-      attributes?: {
-        type?: string;
-        livemode?: boolean;
-        data?: { id?: string; attributes?: { payments?: { id?: string }[] } };
-      };
-    };
-  };
-  const attributes = event.data?.attributes;
-  const valid = await verifyWebhookSignature(
-    request.headers.get("Paymongo-Signature"),
-    raw,
-    attributes?.livemode === true,
-  );
-  if (!valid) throw new HttpError(401, "bad_signature", "Signature does not match");
-  if (attributes?.type !== "checkout_session.payment.paid")
-    return json({ ignored: attributes?.type });
+  const event = await readPaymentWebhook(request, raw).catch((error: unknown) => {
+    if (error instanceof Error && /token does not match/.test(error.message)) {
+      throw new HttpError(401, "bad_signature", "Webhook token does not match");
+    }
+    throw error;
+  });
+  if (event.kind !== "paid") return json({ ignored: event.type });
 
-  const checkoutId = attributes.data?.id;
-  if (!checkoutId) throw new HttpError(400, "bad_event", "No checkout session in the event");
   const admin = adminClient();
   const now = new Date();
-
   const { data: payment, error } = await admin
     .from("payments")
-    .update({
-      status: "paid",
-      paid_at: now.toISOString(),
-      provider_payment_id: attributes.data?.attributes?.payments?.[0]?.id ?? null,
-    })
-    .eq("provider_checkout_id", checkoutId)
+    .update({ status: "paid", paid_at: now.toISOString(), provider_payment_id: event.paymentId })
+    .eq("provider_checkout_id", event.checkoutId)
     .eq("status", "pending")
     .select("id, purpose, run_id, account_id")
     .maybeSingle();

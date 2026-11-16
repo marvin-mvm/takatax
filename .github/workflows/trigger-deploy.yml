@@ -1,0 +1,62 @@
+name: Deploy Trigger.dev tasks
+
+# Deploys the reader (trigger/read-run.ts) and the ping task to Trigger.dev Production whenever
+# code reaches main, and on demand from the Actions tab ("Run workflow").
+#
+# Needs one repository secret: TRIGGER_ACCESS_TOKEN, a Production API key from the Trigger.dev
+# dashboard (Production -> API keys; a "Deploy only" key if you can create one). Without the
+# secret the job skips itself, so it never fails a merge.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "trigger/**"
+      - "trigger.config.ts"
+      - "supabase/functions/_shared/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/trigger-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: trigger-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Trigger.dev Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+    steps:
+      - name: Skip when the key is not set
+        if: env.TRIGGER_ACCESS_TOKEN == ''
+        run: echo "::notice::TRIGGER_ACCESS_TOKEN is not set in the repository secrets; skipping the Trigger.dev deploy."
+
+      - name: Check out code
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Set up Node
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+        run: bun install --frozen-lockfile
+
+      # The CLI version matches @trigger.dev/sdk in package.json. The build runs on
+      # Trigger.dev's servers.
+      - name: Deploy
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+        run: npx -y trigger.dev@4.8.3 deploy --env prod

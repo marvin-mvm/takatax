@@ -148,7 +148,7 @@ create table public.ledger_records (
 create index ledger_records_account_date_idx on public.ledger_records (account_id, record_date);
 
 -- A paid (or free) batch of documents to read. create-checkout creates it; free runs (trial,
--- Premium) start paid, and the paymongo-webhook function marks paid ones.
+-- Premium) start paid, and the payments-webhook function marks paid ones.
 create table public.runs (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references public.accounts (id) on delete cascade,

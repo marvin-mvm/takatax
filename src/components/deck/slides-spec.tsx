@@ -124,7 +124,7 @@ export function ArchitectureSlide() {
         </Point>
         <Point title="No secrets in the repo or the browser.">
           Each key lives where it is used: the OpenRouter key and a read-only R2 key in Trigger.dev;
-          the upload-link R2 key, PayMongo and the Trigger.dev key in Supabase.
+          the upload-link R2 key, the payment provider and the Trigger.dev key in Supabase.
         </Point>
       </Points>
     </Slide>
