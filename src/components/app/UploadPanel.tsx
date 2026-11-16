@@ -13,7 +13,15 @@
 
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Camera, FileText, FolderOpen, Loader2, Trash2, TriangleAlert } from "lucide-react";
+import {
+  ArrowRight,
+  Camera,
+  FileText,
+  FolderOpen,
+  Loader2,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { DOCUMENT_KIND_LABEL, type DocumentKind } from "@shared/parser/schema.ts";
@@ -99,6 +107,9 @@ export function UploadPanel({
   const [dragging, setDragging] = useState(false);
   const pickerRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  // The run summary's Proceed button. The small Proceed on each file card presses this one, so
+  // both follow the same rules and show the same progress.
+  const proceedRef = useRef<HTMLButtonElement>(null);
   const hintId = useId();
   const mounted = useRef(true);
   useEffect(() => {
@@ -360,6 +371,14 @@ export function UploadPanel({
     if (checkout.data.runId) await readRun(checkout.data.runId, uploaded);
   };
 
+  const cannotProceed = busy || counting || tooBig || quote.blocked || ready.length === 0;
+  /** The small Proceed on a file card: shows the run summary (below the list on a phone) and
+   * presses its Proceed button. */
+  const proceedFromCard = () => {
+    proceedRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    proceedRef.current?.click();
+  };
+
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-5">
@@ -488,7 +507,7 @@ export function UploadPanel({
                           ),
                         )
                       }
-                      className="rounded-[6px] bg-transparent font-medium text-tk-ink"
+                      className="max-w-full rounded-[6px] bg-transparent font-medium text-tk-ink"
                     >
                       {KIND_CHOICES.map((choice) => (
                         <option key={choice.kind} value={choice.kind}>
@@ -513,6 +532,29 @@ export function UploadPanel({
                   ) : (
                     <p className="mt-1 text-sm text-tk-brand">Looks good</p>
                   )}
+                  {!item.problem && !item.checking ? (
+                    <button
+                      type="button"
+                      onClick={proceedFromCard}
+                      disabled={cannotProceed}
+                      title={
+                        ready.length > 1
+                          ? `Proceed with all ${ready.length} files, like the Proceed button in This run`
+                          : "Same as the Proceed button in This run"
+                      }
+                      aria-label={
+                        ready.length > 1 ? `Proceed with all ${ready.length} files` : "Proceed"
+                      }
+                      className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-[9px] bg-tk-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-tk-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {busy ? (
+                        <Loader2 aria-hidden className="size-4 animate-spin" />
+                      ) : (
+                        <ArrowRight aria-hidden className="size-4" />
+                      )}
+                      Proceed
+                    </button>
+                  ) : null}
                 </div>
                 <button
                   type="button"
@@ -575,10 +617,11 @@ export function UploadPanel({
             ) : null}
           </div>
           <button
+            ref={proceedRef}
             type="button"
             onClick={() => void proceed()}
-            disabled={busy || counting || tooBig || quote.blocked || ready.length === 0}
-            className={`${buttonPrimary} mt-4 w-full`}
+            disabled={cannotProceed}
+            className={`${buttonPrimary} mt-4 w-full scroll-mt-24`}
           >
             {stage.step === "working" ? (
               <>
