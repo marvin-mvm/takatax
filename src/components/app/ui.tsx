@@ -37,13 +37,17 @@ export function Card({
   children,
   className,
   as: Tag = "section",
+  "aria-labelledby": labelledBy,
 }: {
   children: ReactNode;
   className?: string;
   as?: "section" | "div" | "article" | "li";
+  /** The id of the card's heading, so the section is announced by its name. */
+  "aria-labelledby"?: string;
 }) {
   return (
     <Tag
+      aria-labelledby={labelledBy}
       className={cn(
         "rounded-[18px] border border-tk-line bg-tk-surface p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_4px_16px_rgb(0_0_0/0.04)] sm:p-6",
         className,

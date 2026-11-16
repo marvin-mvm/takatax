@@ -159,6 +159,15 @@ The price list is `PRICING` in the same file: a Standard run is ₱149 for up to
 partners pay 25% less for a client's run. The site, the app and the deck read their figures from
 it, so change a price there and redeploy the site and the edge functions.
 
+Two things the screens show that the server does not enforce yet, for the owner to decide
+before payments go live (`docs/HANDOVER.md`, section 5):
+
+- **Storage.** The usage meter shows 300 MB (Standard) or 15 GB (Premium), from `PRICING`, but
+  `create-upload-urls` does not refuse an upload that goes over it, and the storage add-on
+  (₱250 for 5 GB a month) has no checkout.
+- **A Standard run's unused pages.** Every upload is its own run, so pages left over from a run
+  of up to 80 are not kept for the next upload.
+
 To switch payments on (Xendit: GCash, Maya, cards):
 
 - [ ] Xendit dashboard → Settings → API keys: a secret key with Money-in write access. Supabase

@@ -1,4 +1,5 @@
 import { Link, Outlet, createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
+import { CircleUserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AppUserContext } from "@/components/app/app-user";
@@ -7,7 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useConversations, useIsAdmin } from "@/lib/data/queries";
 import { isPartner, roleOf } from "@/lib/data/repository";
 import type { AccountRole } from "@/lib/data/types";
-import { useAuth } from "@/lib/auth/use-auth";
+import { firstName, useAuth } from "@/lib/auth/use-auth";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -82,9 +84,6 @@ function AppNav({ role, userId }: { role: AccountRole; userId: string }) {
             <Link to="/app/access" className={tab}>
               Access
             </Link>
-            <Link to="/app/plan" className={tab}>
-              Plan
-            </Link>
             <Link to="/bookkeepers" className={tab}>
               Find a bookkeeper
             </Link>
@@ -103,7 +102,10 @@ function AppNav({ role, userId }: { role: AccountRole; userId: string }) {
   );
 }
 
-/** Every /app screen: signed-in users only, with the section tabs and Log out. */
+/**
+ * Every /app screen: signed-in users only, with the section tabs and "Hi [first name]", which
+ * opens the account settings page (the plan, usage, transactions and Log out).
+ */
 function AppLayout() {
   const navigate = useNavigate();
   const auth = useAuth();
@@ -138,19 +140,23 @@ function AppLayout() {
   }
 
   const role = roleOf(auth.user);
+  const name = firstName(auth.user);
   return (
-    <AppUserContext.Provider value={{ user: auth.user, role }}>
+    <AppUserContext.Provider
+      value={{ user: auth.user, role, signOut: () => void signOut(), signingOut }}
+    >
       <SiteShell
         subnav={<AppNav role={role} userId={auth.user.id} />}
         headerAction={
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            disabled={signingOut}
-            className={headerButton}
+          // A long name is cut short with "…" on a narrow phone, so the header never wraps.
+          <Link
+            to="/app/settings"
+            title="Account settings"
+            className={cn(headerButton, "max-w-full min-w-0 px-3 sm:px-4")}
           >
-            {signingOut ? "Logging out…" : "Log out"}
-          </button>
+            <CircleUserRound aria-hidden className="hidden size-[18px] shrink-0 sm:block" />
+            <span className="truncate">Hi {name}</span>
+          </Link>
         }
       >
         <div className="mx-auto max-w-[1120px] px-4 pt-8 pb-24 sm:px-6">

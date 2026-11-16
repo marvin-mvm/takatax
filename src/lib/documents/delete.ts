@@ -12,6 +12,7 @@
  *   step, once the file is gone.
  */
 
+import { tierOf } from "@shared/uploads/usage.ts";
 import type { StoredDocument } from "@/lib/data/types";
 
 export type DeletePlan = "standard" | "premium";
@@ -25,8 +26,7 @@ export function deletePlan(
   premiumUntil: string | null | undefined,
   now: number = Date.now(),
 ): DeletePlan {
-  if (!premiumUntil) return "standard";
-  return Date.parse(premiumUntil) > now ? "premium" : "standard";
+  return tierOf(premiumUntil, now);
 }
 
 /** A file can be deleted once, and not while it is being read. */

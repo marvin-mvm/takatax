@@ -3,6 +3,7 @@ import { Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { DocumentTable } from "@/components/app/DocumentTable";
+import { UsageMeters } from "@/components/app/UsageMeters";
 import { useAppUser } from "@/components/app/app-user";
 import { EmptyState, LoadingBlock, PageHeader, SampleDataNotice } from "@/components/app/ui";
 import { buttonPrimary } from "@/components/site/styles";
@@ -27,7 +28,10 @@ const FILTERS: { value: Filter; label: string; matches: (status: DocumentStatus)
   { value: "accepted", label: "Read", matches: (s) => s === "accepted" },
 ];
 
-/** Every uploaded document, newest first, with its reading status. */
+/**
+ * Every uploaded document, newest first, with its reading status, under the two usage meters
+ * (pages read and storage).
+ */
 function DocumentsPage() {
   const { user } = useAppUser();
   const query = useMyWorkspace(user.id);
@@ -55,6 +59,7 @@ function DocumentsPage() {
         }
       />
       <SampleDataNotice source={query.data.source} />
+      <UsageMeters userId={user.id} settingsLink />
       <div role="radiogroup" aria-label="Show" className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <button

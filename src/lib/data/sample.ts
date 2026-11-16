@@ -14,6 +14,7 @@ import type { CheckFlag } from "@shared/parser/checks.ts";
 import type { DocumentKind } from "@shared/parser/schema.ts";
 
 import type {
+  AccountUsage,
   AccessEvent,
   AccessGrant,
   AccessStatus,
@@ -378,6 +379,25 @@ export function sampleWorkspace(today: string, accountId = "sample-dela-cruz"): 
   const business = BUSINESSES.find((b) => b.accountId === accountId) ?? BUSINESSES[0];
   if (!business) throw new Error("No sample business");
   return buildWorkspace(business, today);
+}
+
+/** The example business's usage, from its example documents: a Standard account. */
+export function sampleUsage(today: string): AccountUsage {
+  const { documents } = sampleWorkspace(today);
+  const read = documents.filter((d) => d.pagesRead > 0);
+  // The latest run: what was uploaded on the most recent day.
+  const latestDay = read[0]?.uploadedAt.slice(0, 10);
+  return {
+    accountId: "",
+    tier: "standard",
+    premiumUntil: null,
+    pagesUsed: read
+      .filter((d) => d.uploadedAt.slice(0, 10) === latestDay)
+      .reduce((sum, d) => sum + d.pageCount, 0),
+    pagesReadInAll: read.reduce((sum, d) => sum + d.pagesRead, 0),
+    storageBytes: documents.reduce((sum, d) => sum + d.bytes, 0),
+    files: documents.length,
+  };
 }
 
 export function samplePartnerClients(today: string): PartnerClientSummary[] {

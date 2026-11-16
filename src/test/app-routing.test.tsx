@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { createRouter, rootRouteId } from "@tanstack/react-router";
+import { createMemoryHistory, createRouter, rootRouteId } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 
 import { routeTree } from "@/routeTree.gen";
@@ -28,6 +28,8 @@ describe("App routing", () => {
     ["/app/messages", "/app/messages/"],
     ["/app/messages/chat-1", "/app/messages/$conversationId"],
     ["/app/access", "/app/access"],
+    ["/app/settings", "/app/settings"],
+    // The old address of the plan: it sends the browser on to the account settings.
     ["/app/plan", "/app/plan"],
     ["/app/profile", "/app/profile"],
     ["/app/admin", "/app/admin"],
@@ -44,6 +46,19 @@ describe("App routing", () => {
     const matches = router.matchRoutes(path);
 
     expect(matches.at(-1)?.routeId).toBe(routeId);
+  });
+
+  it("sends the old plan address on to the account settings, with what the payment page sent", async () => {
+    const router = createRouter({
+      routeTree,
+      context: { queryClient: new QueryClient() },
+      history: createMemoryHistory({ initialEntries: ["/app/plan?paid=premium"] }),
+    });
+
+    await router.load();
+
+    expect(router.state.location.pathname).toBe("/app/settings");
+    expect(router.state.location.search).toEqual({ paid: "premium" });
   });
 
   it("matches the pitch deck at /deck", () => {

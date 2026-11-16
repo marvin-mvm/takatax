@@ -274,6 +274,7 @@ export function UploadPanel({
           });
           void queryClient.invalidateQueries({ queryKey: ["workspace"] });
           void queryClient.invalidateQueries({ queryKey: ["plan"] });
+          void queryClient.invalidateQueries({ queryKey: ["usage"] });
           return;
         }
         setStage({

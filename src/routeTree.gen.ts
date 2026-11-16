@@ -23,6 +23,7 @@ import { Route as AppAdminRouteImport } from './routes/app/admin'
 import { Route as AppCorRouteImport } from './routes/app/cor'
 import { Route as AppPlanRouteImport } from './routes/app/plan'
 import { Route as AppProfileRouteImport } from './routes/app/profile'
+import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppUploadRouteImport } from './routes/app/upload'
 import { Route as BookkeepersIndexRouteImport } from './routes/bookkeepers/index'
 import { Route as BookkeepersPartnerIdRouteImport } from './routes/bookkeepers/$partnerId'
@@ -105,6 +106,11 @@ const AppProfileRoute = AppProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppUploadRoute = AppUploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/app/cor': typeof AppCorRoute
   '/app/plan': typeof AppPlanRoute
   '/app/profile': typeof AppProfileRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
   '/community/$postId': typeof CommunityPostIdRoute
@@ -202,6 +209,7 @@ export interface FileRoutesByTo {
   '/app/cor': typeof AppCorRoute
   '/app/plan': typeof AppPlanRoute
   '/app/profile': typeof AppProfileRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
   '/community/$postId': typeof CommunityPostIdRoute
@@ -230,6 +238,7 @@ export interface FileRoutesById {
   '/app/cor': typeof AppCorRoute
   '/app/plan': typeof AppPlanRoute
   '/app/profile': typeof AppProfileRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/upload': typeof AppUploadRoute
   '/bookkeepers/$partnerId': typeof BookkeepersPartnerIdRoute
   '/community/$postId': typeof CommunityPostIdRoute
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/app/cor'
     | '/app/plan'
     | '/app/profile'
+    | '/app/settings'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
     | '/community/$postId'
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/app/cor'
     | '/app/plan'
     | '/app/profile'
+    | '/app/settings'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
     | '/community/$postId'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/app/cor'
     | '/app/plan'
     | '/app/profile'
+    | '/app/settings'
     | '/app/upload'
     | '/bookkeepers/$partnerId'
     | '/community/$postId'
@@ -442,6 +454,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/upload': {
       id: '/app/upload'
       path: '/upload'
@@ -528,6 +547,7 @@ interface AppRouteChildren {
   AppCorRoute: typeof AppCorRoute
   AppPlanRoute: typeof AppPlanRoute
   AppProfileRoute: typeof AppProfileRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppUploadRoute: typeof AppUploadRoute
   AppIndexRoute: typeof AppIndexRoute
   AppClientsAccountIdRoute: typeof AppClientsAccountIdRoute
@@ -543,6 +563,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCorRoute: AppCorRoute,
   AppPlanRoute: AppPlanRoute,
   AppProfileRoute: AppProfileRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppUploadRoute: AppUploadRoute,
   AppIndexRoute: AppIndexRoute,
   AppClientsAccountIdRoute: AppClientsAccountIdRoute,
