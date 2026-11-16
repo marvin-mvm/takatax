@@ -124,23 +124,21 @@ refuses the deploy for the organization itself, after the sign-in and the upload
 key, workflow or CLI version changes it (checked on 2026-11-16: trusted publishing signs in, the
 files upload, and 4.8.5 is the latest CLI).
 
-Since early November 2026, Trigger.dev Cloud asks an organization on the **Free** plan to verify
-a payment card before it may deploy to the cloud (their changes of 5 to 10 November 2026, read in
-their public source). Nothing is charged; the bank may show a $1 hold that is released. Without a
-verified card only the Development environment works. So, in this order:
+**Why (Trigger.dev support, 2026-11-16):** deployments for the organization are blocked by
+Trigger.dev's "risk-based automated account restrictions", tightened as a precaution after a
+security incident on their side. Working in the Development environment still works. They said
+they will tell the owner when deployments are available for the organization. Until then:
 
-1. Trigger.dev dashboard → the organization → **Billing** → **Verify card** (there may also be a
-   banner, "Add a card to unlock your Free tier credits"; the page is
-   `https://cloud.trigger.dev/orgs/<organization>/select-plan/card`). It ends with "Card
-   verified. You can deploy and run tasks on Trigger.dev Cloud." A paid plan (Hobby) counts too.
-2. Run the workflow again: Actions → "Deploy Trigger.dev tasks" → Run workflow.
-3. If it is still refused, or the dashboard offers no card step, Trigger.dev has restricted the
-   organization: ask their support (the chat in the dashboard, or Discord) to enable deployments
-   for the organization that owns `proj_afhlvwluvvvtblfsplyn`, and quote the message.
-
-Step 1 is the likely fix, not a certain one: the message comes from an access check on
-Trigger.dev's side whose rules are not public. Other projects on the Free plan have met the same
-message since 5 November 2026.
+- Nothing can be done in this repository. The Supabase reader (`READER=supabase`) reads every
+  document meanwhile, and the "Deploy Trigger.dev tasks" workflow fails on each merge to `main`;
+  that failure is expected and breaks nothing.
+- It is worth asking support whether verifying a card or moving to a paid plan lifts the
+  restriction sooner. Since early November 2026 Trigger.dev Cloud also asks an organization on
+  the **Free** plan to verify a card before it may deploy (Billing → **Verify card**; nothing is
+  charged), and their access check looks at whether the organization pays. Support has not said
+  that either one is enough.
+- When Trigger.dev says deployments are available: Actions → "Deploy Trigger.dev tasks" → Run
+  workflow, then the steps above (run `ping`, set `TRIGGER_SECRET_KEY`, switch `READER`).
 
 To test on a computer instead (needs a recent macOS for Bun): `bun install`,
 `npx trigger.dev@4.8.5 login`, then `npx trigger.dev@4.8.5 dev` (Development environment, using
