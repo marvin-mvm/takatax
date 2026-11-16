@@ -90,8 +90,12 @@ bun run build           # also regenerates src/routeTree.gen.ts when routes chan
   Supabase's auth, every migration, then `10_behaviour.sql`, `30_invitations.sql` and
   `40_cor_tax_types.sql`). Example:
   `PGHOST=/path/to/socket PGPORT=5432 PGUSER=postgres supabase/tests/run.sh`.
-- Screens: check changed pages in Playwright at desktop and phone sizes, with Supabase mocked
-  through `context.route` (no real data), and look for sideways scrolling and console errors.
+- Screens: in a cloud session, check changed pages in Playwright at desktop and phone sizes, with
+  Supabase mocked through `context.route` (no real data), and look for sideways scrolling and
+  console errors. Delete any screenshots afterwards.
+- **Never on the owner's own computer**: no local preview, no dev server, no browser window, and
+  never open a GitHub link there. The owner checks the site on Netlify. Say plainly when a
+  screen was not looked at.
 
 ### Secrets and other limits
 
@@ -232,22 +236,23 @@ Deploy functions with
 
 The live steps of PR #18 and PR #25 are done: migration 4 is applied, the default model names in
 `supabase/functions/_shared/parser/models.ts` are corrected, and every function is deployed from
-`main`. The deadline list now follows the forms confirmed from the COR
-(`supabase/functions/_shared/domain/deadlines.ts`): it adds the annual withholding return 1604-E,
-shows the annual income tax form the COR names, never shows the retired 0605, and no longer skips
-January's returns late in the year.
+`main`. The deadline list follows whatever a COR lists: every BIR return is in one table
+(`supabase/functions/_shared/domain/bir-forms.ts`, checked against the BIR's forms list and 2026
+tax calendar on 2026-11-16), and each repeating return a COR names is put on the calendar. Old
+form numbers on old CORs are swapped for today's forms, and retired ones such as 0605 never
+show.
 
-1. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
+1. **Redeploy `read-step` from `main`** (owner's go-ahead) once the table of BIR forms is merged:
+   the COR reader spells form numbers with it (for example 1702-RT, 1604-C). Until then the live
+   reader still knows only the older, shorter list.
+2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff
    tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); an SMTP
    provider, then turn email confirmation back on; Google Search Console.
-2. **First full end-to-end run** on the Supabase reader. So far one COR and two receipts have been
+3. **First full end-to-end run** on the Supabase reader. So far one COR and two receipts have been
    read. Upload photos and a 10 to 20 page PDF, watch `runs`, `documents` and the logs, confirm
    that OpenRouter returns `usage.cost`, and tune `CONFIDENCE_THRESHOLD` in
    `supabase/functions/_shared/parser/checks.ts`.
-3. **Deadlines for the other forms a COR can list**: 1601-C and 1604-C (tax withheld on
-   salaries), 0619-F and 1601-FQ (final withholding tax). They show under "Your tax types" on My
-   COR but are not on the calendar yet.
 4. **Database hardening before launch**, from Supabase's advisors (Database → Advisors, read on
    2026-11-16), as one new migration with the usual dry run:
    - take `execute` away from `anon` on the functions a visitor never needs. The advisor flags 25
@@ -266,11 +271,11 @@ January's returns late in the year.
 6. **Payments** when the owner decides: Xendit keys and webhook, test mode, then
    `PAYMENTS_LIVE = true` (steps in `docs/MISSING_PIECES.md`, section 4).
 7. **Before launch, not code**: privacy notice and terms (Data Privacy Act), community and
-   partner terms, a CPA review of the tax rules in `supabase/functions/_shared/domain/`. One point
-   for that review: the annual income tax form. The app shows the one confirmed from the COR (1701
-   or 1701A), except that itemized deductions or a salary always mean 1701. CORs usually print
-   1701, while the BIR gives 1701A to business-only filers on the standard deduction or the 8%
-   rate.
+   partner terms, a CPA review of the tax rules in `supabase/functions/_shared/domain/`, the table
+   of BIR forms and due dates included. One point for that review: the annual income tax form.
+   The app shows the one confirmed from the COR (1701 or 1701A), except that itemized deductions
+   or a salary always mean 1701. The BIR lets micro and small taxpayers use 1701, 1701A or the
+   optional 1701-MS whatever the COR prints (RMC 20-2026).
 8. **Later product ideas** on the landing page ("After launch", "After year 1": taxpayer
    profile, lender sharing, investor newsletter): each needs its own design, consent flow and
    legal review before building.
@@ -281,8 +286,9 @@ January's returns late in the year.
 
 - Rules and architecture: `AGENTS.md`. Keys and settings: `docs/MISSING_PIECES.md`.
 - Shared logic used by the app and the edge functions (with tests):
-  `supabase/functions/_shared/` (tax rules and deadlines in `domain/`, the reader's prompts,
-  schema, checks and plan in `parser/`, upload and pricing rules in `uploads/rules.ts`).
+  `supabase/functions/_shared/` (tax rules, the table of BIR forms and deadlines in `domain/`,
+  the reader's prompts, schema, checks and plan in `parser/`, upload and pricing rules in
+  `uploads/rules.ts`).
 - Data layer: `src/lib/data/repository.ts` (all Supabase reads and writes; falls back to sample
   data when a table is missing), `queries.ts` (React Query hooks), `types.ts`, `sample.ts`.
 - Screens: `src/routes/` (file routes; `src/routeTree.gen.ts` is generated by the build),
