@@ -246,6 +246,7 @@ function buildWorkspace(business: SampleBusiness, today: string): Workspace {
       flags,
       previewUrl: null,
       fileDeleted: false,
+      readings: [],
     });
     return id;
   };

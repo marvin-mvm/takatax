@@ -273,7 +273,7 @@ export function StackSlide() {
               },
               {
                 task: "spec.md",
-                status: "Drafted",
+                status: "Done",
                 note: "Written as a PRD and an MVP spec with acceptance criteria.",
               },
               {
@@ -281,7 +281,7 @@ export function StackSlide() {
                 status: "Done",
                 note: "Project rules for AI coding tools, in the repo.",
               },
-              { task: ".cursorrules", status: "Next", note: "The same rules for Cursor." },
+              { task: "CLAUDE.md", status: "Done", note: "The same rules for Claude Code." },
               {
                 task: "Spec revised after review",
                 status: "Done",
@@ -485,7 +485,7 @@ export function BuildSlide() {
       id="build"
       eyebrow="Phase 3 · Build"
       title="Build plan, and where we are."
-      lead="The foundation is live. The AI reader is next."
+      lead="The foundation and the AI reader are live."
     >
       <div className="grid gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Block title="Phase 3 tasks">
@@ -498,8 +498,8 @@ export function BuildSlide() {
               },
               {
                 task: "Implement the core AI feature",
-                status: "In progress",
-                note: "The three-step reader and its checks are built and tested; the OpenRouter key is next.",
+                status: "Done",
+                note: "The three-step reader and its checks read photos and PDFs on the live site.",
               },
               {
                 task: "At least 5 meaningful commits",
@@ -513,8 +513,8 @@ export function BuildSlide() {
               },
               {
                 task: "Check secrets and input validation",
-                status: "In progress",
-                note: "No secrets in the repo. Zod checks the sign-up and login forms; edge functions will check every input.",
+                status: "Done",
+                note: "No secrets in the repo. Zod checks the sign-up and login forms; every edge function checks who is calling and what it was sent.",
               },
             ]}
           />

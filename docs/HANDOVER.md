@@ -87,8 +87,8 @@ bun run build           # also regenerates src/routeTree.gen.ts when routes chan
 - Edge functions: `deno check */index.ts` from `supabase/functions` (Deno 2), then delete the
   `deno.lock` it writes.
 - Database: `supabase/tests/run.sh` against a throwaway local Postgres 16 (it loads a stub of
-  Supabase's auth, every migration, then `10_behaviour.sql`, `30_invitations.sql` and
-  `40_cor_tax_types.sql`). Example:
+  Supabase's auth, every migration, then `10_behaviour.sql`, `30_invitations.sql`,
+  `40_cor_tax_types.sql`, `50_document_delete.sql` and `60_document_review.sql`). Example:
   `PGHOST=/path/to/socket PGPORT=5432 PGUSER=postgres supabase/tests/run.sh`.
 - Screens: in a cloud session, check changed pages in Playwright at desktop and phone sizes, with
   Supabase mocked through `context.route` (no real data), and look for sideways scrolling and
@@ -153,6 +153,14 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
   bookkeepers, CPAs and tax lawyers pay 25% less for a client's run (₱112). The site, the app
   and the deck take their figures from `PRICING` (through `src/lib/pricing-copy.ts`), so a price
   changes in one place.
+- Checking a document by hand. A document the reader was not sure of ("Please check") opens on
+  the "Check what was read" form: the date, the other party, the TIN, the total, the VAT and the
+  category as the AI read them, the unsure ones pointed out, each one editable. Saving puts the
+  corrected figures in the tracker and marks the document read; a file that is not a tax
+  document is saved as "Not counted". Before this, the page showed only saved records, so a
+  photo the AI could not date showed nothing to check. Code:
+  `supabase/functions/_shared/parser/review.ts`, `src/components/app/ReadingReview.tsx`,
+  `review_document()` in migration 6.
 - Usage and account settings. The Documents tab shows two meters, "AI doc parsing" and "Doc
   storage", as used / limit ("75 / 80 pages", "240 MB / 300 MB"). Standard counts the latest
   run's pages out of 80, because every upload starts a new run; Premium counts the pages of its
@@ -215,7 +223,7 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
 
 ## 4. Live state (2026-11-16) and how to check it
 
-GitHub: `main` contains all of `v0.002` up to PR #32. The owner backfills `v0.001` from `main`
+GitHub: `main` contains all of `v0.002` up to PR #34. The owner backfills `v0.001` from `main`
 after each merge. Netlify serves `main`. Every row below was checked against the live project on
 2026-11-16.
 
@@ -226,6 +234,7 @@ after each merge. Netlify serves `main`. Every row below was checked against the
 | Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Migration 5 `20261117090000_document_delete.sql`      | Applied on 2026-11-16, after its rolled-back dry run: `documents.file_deleted_at`, the `deleted_document` log entry, `delete_document()` and `account_tier()`                                                                                                                                                                                                                                                                                                                                                                                            |
+| Migration 6 `20261117150000_document_review.sql`      | Applied on 2026-11-16, after its rolled-back dry run: `review_document()` (signed-in users may call it, visitors may not) and the `checked_document` log entry. Existing rows untouched                                                                                                                                                                                                                                                                                                                                                                  |
 | Edge functions                                        | All nine are deployed and match `main` file by file (checked after PR #32): `create-upload-urls`, `confirm-upload`, `document-link`, `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`                                                                                                                                                                                                                                                                                                           |
 | Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                                                                                                                                                                                                                                                                                                                                               |
 | Trigger.dev deploys                                   | **Blocked by Trigger.dev**: "Deployments are not available for this organization", after the sign-in and the upload work (all 16 runs of the workflow up to 2026-11-16). Their support said on 2026-11-16 that deployments for the organization are blocked by their risk-based automated account restrictions, tightened after a security incident, and that they will tell the owner when deployments are available. Nothing to change in the repository (`docs/MISSING_PIECES.md`, section 3). Trusted publishing is set up and the workflow is ready |
@@ -256,8 +265,9 @@ curl -s "https://api.supabase.com/v1/projects/thiznrxojzrxkjwqhtjt/functions/rea
 
 Applying a migration (only with the owner's go-ahead): first a dry run that sends, as one query,
 `begin;` + the migration + `supabase/tests/20_behaviour_api.sql` + `30_invitations.sql` +
-`40_cor_tax_types.sql` + `rollback;` and must print every "PASSED" line; then the migration
-alone. The test files only look at their own test users, so they are safe on the live project.
+`40_cor_tax_types.sql` + `50_document_delete.sql` + `60_document_review.sql` + `rollback;` and
+must run without an error (each file ends with a "PASSED" line); then the migration alone. Give
+each check file its own test emails: the dry run loads them all in one transaction. The test files only look at their own test users, so they are safe on the live project.
 Deploy functions with
 `supabase functions deploy <name> --project-ref thiznrxojzrxkjwqhtjt --use-api`
 (`payments-webhook` and `read-step` keep `verify_jwt = false`, from `supabase/config.toml`).

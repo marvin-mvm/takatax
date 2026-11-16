@@ -37,10 +37,12 @@ export const useMyWorkspace = (userId: string) =>
     refetchInterval: whileReading,
   });
 
+/** A client's workspace, for a professional. Asks nothing until there is a client to ask for. */
 export const useClientWorkspace = (accountId: string) =>
   useQuery({
     queryKey: ["workspace", "client", accountId],
     queryFn: () => loadClientWorkspace(accountId),
+    enabled: Boolean(accountId),
     refetchInterval: whileReading,
   });
 
