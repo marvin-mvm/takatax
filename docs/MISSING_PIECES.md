@@ -19,7 +19,7 @@ committed, so never put a secret there).
       `supabase/tests/run.sh` against a local Postgres.
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
-      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000 20261117090000`.
+      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000 20261117090000 20261117150000`.
 - [x] **COR tax types** (`20261116150000_cor_tax_types.sql`): keeps the tax types and forms
       printed on the COR (0619-E, 1601-EQ, 2551Q…) on the account. Applied on 2026-11-16 after its
       rolled-back dry run with `supabase/tests/40_cor_tax_types.sql`; it is in the repair line
@@ -28,12 +28,10 @@ committed, so never put a secret there).
       or without its records, logs what a professional deletes, and tells a professional the
       client's tier. Applied on 2026-11-16 after its rolled-back dry run with every check file;
       it is in the repair line above, and the `delete-document` function is deployed.
-- [ ] **Checking a document by hand** (`20261117150000_document_review.sql`): adds
+- [x] **Checking a document by hand** (`20261117150000_document_review.sql`): adds
       `review_document()`, which saves the "Check what was read" form, and the
-      `checked_document` entry of the activity log. Its rolled-back dry run with every check
-      file passed on 2026-11-16; it waits for the owner's go-ahead to be applied. Until then the
-      form says that saving is not connected yet. Once applied, add `20261117150000` to the
-      repair line above.
+      `checked_document` entry of the activity log. Applied on 2026-11-16 after its rolled-back
+      dry run with every check file; it is in the repair line above.
 - A dry run sends, as one query, `begin;` + the migration + `20_behaviour_api.sql`,
   `30_invitations.sql`, `40_cor_tax_types.sql`, `50_document_delete.sql` and
   `60_document_review.sql` + `rollback;`. The check files look only at their own test users,
