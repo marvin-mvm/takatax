@@ -88,21 +88,29 @@ To test on a computer instead (needs a recent macOS for Bun): `bun install`,
 `npx trigger.dev@4.8.3 login`, then `npx trigger.dev@4.8.3 dev` (Development environment, using
 the `tr_dev_…` key).
 
-## 4. Payments (placeholder)
+## 4. Payments: Xendit, "coming soon"
 
-No payment provider is chosen yet; the plan is a **merchant of record** such as Dodo Payments.
-Until then, free runs (the first 10 pages, and Premium pages) work, and paid runs say "payments
-are not connected yet".
+Payments are switched off for launch with one constant, `PAYMENTS_LIVE = false` in
+`supabase/functions/_shared/uploads/rules.ts`. While it is off:
 
-- [ ] Choose the provider, then implement the two functions in
-      `supabase/functions/_lib/payments.ts` (`createCheckoutSession` and `readPaymentWebhook`)
-      and set `PROVIDER` there. The rest (pricing, runs, Premium, the webhook's bookkeeping) is
-      done.
-- [ ] Set its keys as Supabase secrets (for example `PAYMENTS_API_KEY` and
-      `PAYMENTS_WEBHOOK_SECRET`), and point its webhook at
-      `https://thiznrxojzrxkjwqhtjt.supabase.co/functions/v1/payments-webhook`.
-- [ ] Check the fees in the `/deck` what-if model (Payments): a merchant of record's fixed fee
-      per payment weighs heavily on a ₱199 run.
+- every **Standard run of up to 250 pages is free**, for taxpayers and partners, as often as
+  they like;
+- **pages over 250 (₱2 each)** and **Premium (₱800 a month)** show "coming soon" and cannot be
+  bought, on the screens and on the server (`create-checkout` answers `coming_soon`).
+
+To switch payments on (Xendit: GCash, Maya, cards):
+
+- [ ] Xendit dashboard → Settings → API keys: a secret key with Money-in write access. Supabase
+      secret `XENDIT_SECRET_KEY`.
+- [ ] Xendit dashboard → Settings → Webhooks: set the Invoices "paid" webhook to
+      `https://thiznrxojzrxkjwqhtjt.supabase.co/functions/v1/payments-webhook` and copy the
+      verification token. Supabase secret `XENDIT_CALLBACK_TOKEN`.
+- [ ] Test one paid run and one Premium month in Xendit's test mode. The provider code is ready in
+      `supabase/functions/_lib/payments.ts`; confirm its request and webhook fields against
+      Xendit's current docs.
+- [ ] Set `PAYMENTS_LIVE = true`, then redeploy the site (merge to `main`) and the edge functions.
+      The full pricing (free trial, ₱199 runs, 25% partner price, ₱2 extra pages, Premium) then
+      applies.
 
 ## 5. Optional settings (sensible defaults already apply)
 
