@@ -72,8 +72,9 @@ Environment variables (Trigger.dev dashboard → Environment variables; set them
 | `SUPABASE_SERVICE_ROLE_KEY`                                              | Supabase → Project settings → API keys → the **service role** (secret) key. It lets the job write results; keep it only here. |
 
 Deploying the tasks to Production (no computer needed): GitHub Actions does it
-(`.github/workflows/trigger-deploy.yml`) every time code reaches `main`, and on demand from the
-Actions tab ("Deploy Trigger.dev tasks" → Run workflow).
+(`.github/workflows/trigger-deploy.yml`, following Trigger.dev's CI guide) on every push to `main`,
+and on demand from the Actions tab ("Deploy Trigger.dev tasks" → Run workflow). The CLI version is
+read from `package.json`, so it always matches the SDK.
 
 1. Trigger.dev dashboard → switch to **Production** → API keys. Create a key with **Deploy only**
    access if you can; otherwise use the Production secret key (`tr_prod_…`).
