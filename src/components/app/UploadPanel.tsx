@@ -5,7 +5,7 @@
  * uploads to Cloudflare R2, pays (or uses the free trial or Premium) and starts the reader.
  *
  * Steps after Proceed: ensure the account -> signed upload links -> PUT each file to R2 ->
- * confirm-upload -> create-checkout (free: read now; paid: PayMongo, then back here with ?run=)
+ * confirm-upload -> create-checkout (free: read now; paid: the payment provider, then back here with ?run=)
  * -> read-documents, which starts a Trigger.dev job -> progress from the run's row.
  * Each step that needs a key says so plainly when it is missing. See docs/MISSING_PIECES.md.
  */
@@ -84,7 +84,7 @@ export function UploadPanel({
   initialKind: DocumentKind;
   /** Set when a partner uploads for a client: their account, at the partner price. */
   clientAccountId?: string | undefined;
-  /** Set when PayMongo sends the browser back after paying for this run. */
+  /** Set when the payment provider sends the browser back after paying for this run. */
   returningRunId?: string | undefined;
 }) {
   const { user } = useAppUser();
@@ -211,7 +211,7 @@ export function UploadPanel({
   const busy = stage.step === "working" || stage.step === "reading";
 
   // ---- Reading: start the Trigger.dev job, then follow its progress -------------------------
-  /** Starts reading a run, waiting a little for PayMongo's confirmation if it is not in yet. */
+  /** Starts reading a run, waiting a little for the payment confirmation if it is not in yet. */
   const readRun = async (runId: string, uploaded: number) => {
     for (let attempt = 0; attempt < 10; attempt++) {
       setStage({
@@ -232,7 +232,7 @@ export function UploadPanel({
         setStage({
           step: "error",
           message:
-            "We have not received the payment confirmation yet. If you paid, reading starts once PayMongo confirms; check Documents in a few minutes.",
+            "We have not received the payment confirmation yet. If you paid, reading starts once the payment is confirmed; check Documents in a few minutes.",
         });
         return;
       }
@@ -256,7 +256,7 @@ export function UploadPanel({
     }
   };
 
-  // Back from PayMongo: read the run that was just paid for.
+  // Back from the payment page: read the run that was just paid for.
   const resumed = useRef(false);
   useEffect(() => {
     if (!returningRunId || resumed.current) return;
@@ -594,8 +594,7 @@ export function UploadPanel({
             {clientAccountId
               ? `Your partner price: ₱${Math.round(PRICING.runPrice * (1 - PRICING.partnerDiscount))} for up to ${PRICING.runPages} pages for this client, then ₱${PRICING.extraPage} a page.`
               : `Your first ${PRICING.trialPages} pages are free. Then ₱${PRICING.runPrice} reads up to ${PRICING.runPages} pages (Premium: ${PRICING.premiumPages.toLocaleString("en-PH")} a month), then ₱${PRICING.extraPage} a page.`}{" "}
-            Payment is by GCash, Maya or card through PayMongo; the final price is confirmed at
-            checkout.
+            Payment goes through our payment partner; the final price is confirmed at checkout.
           </p>
         </section>
 
@@ -627,8 +626,8 @@ export function UploadPanel({
         {stage.step === "payments_not_connected" ? (
           <NotConnectedNotice title="Payments are not connected yet">
             {stage.uploaded} file{stage.uploaded === 1 ? " was" : "s were"} uploaded. They will be
-            read once you pay, after Takatax adds its PayMongo keys. Free-trial and Premium pages
-            are read without paying.
+            read once you pay, after Takatax connects payments. Free-trial and Premium pages are
+            read without paying.
           </NotConnectedNotice>
         ) : null}
         {stage.step === "reader_not_connected" ? (

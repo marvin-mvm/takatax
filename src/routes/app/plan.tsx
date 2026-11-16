@@ -21,7 +21,7 @@ import { checkoutPremiumMonth, checkoutUnpaidRun } from "@/lib/services/payments
 import { longDay } from "@/lib/time";
 
 export const Route = createFileRoute("/app/plan")({
-  // `paid` is set when PayMongo sends the browser back after a payment.
+  // `paid` is set when the payment page sends the browser back after a payment.
   validateSearch: (search: Record<string, unknown>): { paid?: string } =>
     typeof search["paid"] === "string" ? { paid: search["paid"] } : {},
   component: PlanPage,
@@ -140,7 +140,7 @@ function PlanPage() {
           </button>
           {state === "not_connected" ? (
             <NotConnectedNotice title="Payments are not connected yet">
-              Premium can be bought once Takatax adds its PayMongo keys.
+              Premium can be bought once Takatax connects payments.
             </NotConnectedNotice>
           ) : null}
           {state === "error" ? (
@@ -213,8 +213,8 @@ function PlanPage() {
           </div>
         )}
         <p className="text-[13px] text-tk-muted">
-          Payments go through PayMongo (GCash, Maya and cards). Takatax never sees your card
-          details. Payments to your bookkeeper are between you and them.
+          Payments go through our payment partner, which handles your card details; Takatax never
+          sees them. Payments to your bookkeeper are between you and them.
         </p>
       </section>
     </div>

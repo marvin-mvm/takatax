@@ -7,13 +7,13 @@
 // counted in pages (a photo is one page, a PDF every page): the free trial (first 10 pages,
 // once), Premium's pages left this month, ₱199 for up to 250 pages, ₱2 for each page over a
 // limit, and the 25% partner price when a bookkeeper, CPA or tax lawyer runs a client's pages.
-// Free runs are marked paid at once. Paid ones get a PayMongo checkout; the paymongo-webhook
-// function marks them paid.
+// Free runs are marked paid at once. Paid ones get a checkout with the payment provider (a
+// merchant of record, still to be chosen: see _lib/payments.ts); payments-webhook marks them paid.
 //
-// Answers 503 { code: "not_configured" } for paid checkouts until the PayMongo keys are set.
+// Answers 503 { code: "not_configured" } for paid checkouts until a payment provider is set up.
 import { adminClient, authorize } from "../_lib/clients.ts";
-import { HttpError, json, requireEnv, serve } from "../_lib/http.ts";
-import { createCheckoutSession } from "../_lib/paymongo.ts";
+import { HttpError, json, serve } from "../_lib/http.ts";
+import { PROVIDER, assertPaymentsConfigured, createCheckoutSession } from "../_lib/payments.ts";
 import { PRICING, quoteRun } from "../_shared/uploads/rules.ts";
 
 const DAY = 86_400_000;
@@ -30,7 +30,7 @@ serve(async (request) => {
   }
   const { userId } = await authorize(request, body.accountId);
   const admin = adminClient();
-  // Where PayMongo sends the browser back: the site that called us.
+  // Where the payment provider sends the browser back: the site that called us.
   const origin = request.headers.get("origin") ?? Deno.env.get("SITE_URL") ?? "";
 
   const { data: account, error: accountError } = await admin
@@ -51,7 +51,7 @@ serve(async (request) => {
     if (account.owner_user_id !== userId) {
       throw new HttpError(403, "forbidden", "Only the account owner can buy Premium");
     }
-    requireEnv("PAYMONGO_SECRET_KEY");
+    assertPaymentsConfigured();
     const amount = PRICING.premiumMonthly * 100;
     const { data: payment, error } = await admin
       .from("payments")
@@ -60,6 +60,7 @@ serve(async (request) => {
         payer_user_id: userId,
         purpose: "premium_month",
         amount_centavos: amount,
+        provider: PROVIDER,
       })
       .select("id")
       .single();
@@ -147,7 +148,7 @@ serve(async (request) => {
     total = quote.total;
     summary = quote.summary;
     // Check the keys before creating anything, so a missing key leaves no unpaid run behind.
-    if (total > 0) requireEnv("PAYMONGO_SECRET_KEY");
+    if (total > 0) assertPaymentsConfigured();
 
     const kind = {
       trial: "trial",
@@ -194,6 +195,7 @@ serve(async (request) => {
       purpose: "run",
       run_id: runId,
       amount_centavos: amount,
+      provider: PROVIDER,
     })
     .select("id")
     .single();
