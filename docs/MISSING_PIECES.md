@@ -194,8 +194,8 @@ To switch payments on (Xendit: GCash, Maya, cards):
 - [ ] Confirm the model slugs in `supabase/functions/_shared/parser/models.ts` on
       openrouter.ai/models, run a test batch of real receipts and PDFs, and tune
       `CONFIDENCE_THRESHOLD` in `supabase/functions/_shared/parser/checks.ts`. On 2026-11-16 the
-      three slugs set as Supabase secrets existed on OpenRouter; the defaults
-      `google/gemini-3-flash` and `google/gemini-3.1-pro` in `models.ts` did not and need fixing.
+      model names were confirmed on OpenRouter and the defaults in `models.ts` corrected to match
+      the Supabase secrets; the test batch and the threshold are still to do.
 - [ ] Confirm that OpenRouter returns `usage.cost` (US dollars) so the AI spend log and daily cap
       count real money.
 - [ ] Pay for one run and one Premium month in the payment provider's test mode, then switch to
