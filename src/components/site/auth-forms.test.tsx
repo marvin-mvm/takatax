@@ -53,9 +53,24 @@ describe("SignUpForm", () => {
       email: "maria@example.com",
       password: "correct horse",
       options: {
-        data: { full_name: "Maria Santos" },
+        data: { full_name: "Maria Santos", account_type: "taxpayer" },
         emailRedirectTo: `${window.location.origin}/app`,
       },
+    });
+  });
+
+  it("signs a bookkeeper up as a partner", async () => {
+    auth.signUp.mockResolvedValue({ data: { user: { id: "u1" }, session: {} }, error: null });
+    render(<SignUpForm onSignedIn={vi.fn()} onGoToLogin={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText("Bookkeeper"));
+    fillIn();
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() => expect(auth.signUp).toHaveBeenCalledOnce());
+    expect(auth.signUp.mock.calls[0]?.[0].options.data).toEqual({
+      full_name: "Maria Santos",
+      account_type: "bookkeeper",
     });
   });
 

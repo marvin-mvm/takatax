@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { supabase } from "@/integrations/supabase/client";
 import { NETWORK_MESSAGE, authErrorMessage } from "@/lib/auth/errors";
 import { signUpSchema, type SignUpValues } from "@/lib/auth/schemas";
+import { cn } from "@/lib/utils";
 
 import { Field, FormError } from "./form";
 import { buttonOutline, buttonPrimary } from "./styles";
@@ -17,17 +18,26 @@ interface SignUpFormProps {
   onGoToLogin: () => void;
 }
 
+const ACCOUNT_CHOICES: { value: SignUpValues["accountType"]; label: string }[] = [
+  { value: "taxpayer", label: "Taxpayer" },
+  { value: "bookkeeper", label: "Bookkeeper" },
+  { value: "cpa", label: "CPA" },
+  { value: "tax_lawyer", label: "Tax lawyer" },
+];
+
 export function SignUpForm({ onSignedIn, onGoToLogin }: SignUpFormProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [emailToConfirm, setEmailToConfirm] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { fullName: "", email: "", password: "" },
+    defaultValues: { accountType: "taxpayer", fullName: "", email: "", password: "" },
   });
+  const accountType = watch("accountType");
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
@@ -36,7 +46,7 @@ export function SignUpForm({ onSignedIn, onGoToLogin }: SignUpFormProps) {
         email: values.email,
         password: values.password,
         options: {
-          data: { full_name: values.fullName },
+          data: { full_name: values.fullName, account_type: values.accountType },
           emailRedirectTo: `${window.location.origin}/app`,
         },
       });
@@ -77,6 +87,36 @@ export function SignUpForm({ onSignedIn, onGoToLogin }: SignUpFormProps) {
   return (
     <form onSubmit={(event) => void onSubmit(event)} noValidate className="flex flex-col gap-4">
       {formError ? <FormError>{formError}</FormError> : null}
+      <fieldset>
+        <legend className="text-sm font-medium">I am a</legend>
+        <div className="mt-1.5 grid grid-cols-2 gap-2">
+          {ACCOUNT_CHOICES.map((choice) => (
+            <label
+              key={choice.value}
+              className={cn(
+                "flex min-h-11 cursor-pointer items-center justify-center rounded-[10px] border px-2 text-center text-[15px] font-medium has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-tk-brand",
+                accountType === choice.value
+                  ? "border-tk-brand bg-tk-brand-soft text-tk-brand"
+                  : "border-tk-line hover:border-tk-brand",
+              )}
+            >
+              <input
+                type="radio"
+                value={choice.value}
+                className="sr-only"
+                {...register("accountType")}
+              />
+              {choice.label}
+            </label>
+          ))}
+        </div>
+        {accountType !== "taxpayer" ? (
+          <p className="mt-2 text-sm text-tk-muted">
+            You get 25% off every client run and pay no platform fee. Your profile goes public once
+            we check your BIR accreditation or PRC licence.
+          </p>
+        ) : null}
+      </fieldset>
       <Field
         label="Your name"
         autoComplete="name"

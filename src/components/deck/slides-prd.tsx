@@ -49,7 +49,7 @@ export function PrdSlide() {
                 running micro businesses
               </>,
               "Also: freelancers, contractors and other MSMEs",
-              "Partners, free: bookkeepers, CPAs, tax lawyers",
+              "Partners at 25% off: bookkeepers, CPAs, tax lawyers",
             ]}
           />
         </PrdBlock>
@@ -83,7 +83,7 @@ export function PrdSlide() {
             items={[
               "Parsing accuracy: 98% exact match on amounts and TINs",
               "Under 5% of documents sent to user review",
-              "AI cost of ₱0.32 or less per document",
+              "AI cost of ₱0.32 or less per page",
               "User feedback: 4 of 5 or better after a run",
               "1 in 4 trial users buys a run",
               "1,127 paying customers by month 12",
@@ -125,9 +125,9 @@ const STREAMS: Stream[] = [
     name: "Parser",
     when: "From day one",
     prices: [
-      "₱199 per run, up to 250 documents",
-      "₱800 a month Premium, 300 documents",
-      "₱2 per extra document",
+      "₱199 per run, up to 250 pages",
+      "₱800 a month Premium, 1,000 pages",
+      "₱2 per extra page",
     ],
   },
   {
@@ -209,8 +209,9 @@ export function RevenueSlide() {
         <Point title="Always free:">
           every computed return, the tracker and the 8% vs OSD calculator. No parse, no fee.
         </Point>
-        <Point title="Free for partners:">
-          bookkeepers and CPAs pay nothing. They get client runs at 25% off.
+        <Point title="25% off for partners:">
+          bookkeepers, CPAs and tax lawyers pay ₱149 per client run. No platform fee: they keep
+          everything they charge.
         </Point>
         <Point title="Shares come from the base plan:">
           0.1% of micro enterprises in year 1, 1% by year 3 <Cite source="Takatax" refs={[21]} />.
