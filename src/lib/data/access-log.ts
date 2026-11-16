@@ -42,6 +42,7 @@ export const ACTION_GROUP: Record<AccessEventAction, "access" | "viewed" | "chan
   edited_record: "changed",
   confirmed_cor: "changed",
   deleted_document: "changed",
+  checked_document: "changed",
 };
 
 const FIELD_LABEL: Record<string, string> = {
@@ -182,6 +183,18 @@ export function describeAccessEvent(event: AccessEvent): { title: string; lines:
       return {
         title: `${who} deleted ${fileLabel(d)}`,
         lines: [[kind, outcome].filter(Boolean).join(", ")].filter(Boolean),
+      };
+    }
+    case "checked_document": {
+      // The professional corrected what the AI read, or said it is not a tax document.
+      const records = count(d["records"]);
+      const kind = records ? kindLabel(d) : "";
+      const outcome = records
+        ? `${plural(records, "record")} saved to your tracker`
+        : "marked as not a tax document, so nothing is counted";
+      return {
+        title: `${who} checked ${fileLabel(d)}`,
+        lines: [[kind, outcome].filter(Boolean).join(", ")],
       };
     }
   }

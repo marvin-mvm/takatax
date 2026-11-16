@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, ImageOff, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, ExternalLink, ImageOff, Loader2, PencilLine, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { formatIsoDate } from "@shared/domain/dates.ts";
@@ -9,6 +9,7 @@ import { CHECK_FLAG_TEXT } from "@shared/parser/checks.ts";
 import { DOCUMENT_KIND_LABEL } from "@shared/parser/schema.ts";
 import { CheckLink } from "@/components/app/DocumentTable";
 import { ReadingProgress } from "@/components/app/ReadingProgress";
+import { ReadingReview } from "@/components/app/ReadingReview";
 import { useAppUser } from "@/components/app/app-user";
 import {
   BackLink,
@@ -41,7 +42,11 @@ const READER_STEP_LABEL: Record<string, string> = {
   settle: "top model",
 };
 
-/** One document: what was read from it, the checks, and the ledger rows it created. */
+/**
+ * One document: what was read from it and the ledger rows it created. A document the reader was
+ * not sure of shows the "Check what was read" form, where the figures are corrected and saved;
+ * a document that is already read can be corrected the same way.
+ */
 function DocumentPage() {
   const { documentId } = Route.useParams();
   const { account } = Route.useSearch();
@@ -54,6 +59,9 @@ function DocumentPage() {
   // True from the click until the reader has taken the document: the button is locked, so a
   // second click can never start (or pay for) a second reading.
   const [starting, setStarting] = useState(false);
+  // Correcting a document that is already read, and what the last save did.
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState<"accepted" | "rejected" | null>(null);
   // A professional opening a client's document goes in the client's activity log.
   useEffect(() => {
     if (account) void logAccessEvent(account, "opened_document", documentId);
@@ -80,6 +88,10 @@ function DocumentPage() {
   // started; while it is being read the button is locked, and once it is read it is gone. The
   // read-documents function refuses the same cases, whatever the screen shows.
   const finished = READ_FINISHED.includes(doc.status);
+  // The reader was not sure: the person checks the figures. (A COR is checked on its own page.)
+  const toCheck = doc.status === "needs_review" && doc.kind !== "cor";
+  // A document that is already read (or was marked "not a tax document") can be corrected.
+  const canCorrect = doc.kind !== "cor" && (doc.status === "accepted" || doc.status === "rejected");
   const canRead = doc.status === "waiting_for_reader";
   const reading = doc.status === "reading";
 
@@ -176,15 +188,61 @@ function DocumentPage() {
               )
             }
           >
-            What we read
+            {toCheck ? "Check what was read" : "What we read"}
           </CardTitle>
-          {records.length === 0 ? (
+          {saved && !toCheck ? (
+            <p
+              role="status"
+              className="mt-3 flex items-start gap-2 rounded-[12px] bg-tk-brand-soft px-4 py-3 text-tk-brand"
+            >
+              <CheckCircle2 aria-hidden className="mt-0.5 size-5 shrink-0" />
+              {saved === "accepted"
+                ? "Saved. These figures are now counted in the tracker."
+                : "Saved as not a tax document. Nothing from it is counted."}
+            </p>
+          ) : null}
+          {doc.flags.length ? (
+            <div className="mt-4 rounded-[12px] bg-tk-warn-soft p-4">
+              <p className="font-semibold text-tk-warn">
+                {toCheck ? "Why it needs your check" : "Please check"}
+              </p>
+              <ul className="mt-1 list-disc pl-5 text-sm text-tk-ink">
+                {doc.flags.map((flag) => (
+                  <li key={flag}>{CHECK_FLAG_TEXT[flag]}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {toCheck || editing ? (
+            <div className="mt-4">
+              {toCheck ? (
+                <p className="mb-4 text-tk-muted text-pretty">
+                  Compare these figures with the document
+                  {doc.fileDeleted ? "" : " beside them"}, correct what is wrong and save.{" "}
+                  {records.length === 0
+                    ? "Until you save, nothing from this document is counted in the tracker."
+                    : "Until you save, the tracker counts what the AI read."}
+                </p>
+              ) : null}
+              <ReadingReview
+                key={`${doc.id}-${doc.status}`}
+                doc={doc}
+                onSaved={(status) => {
+                  setEditing(false);
+                  setSaved(status);
+                }}
+                {...(toCheck ? {} : { onCancel: () => setEditing(false) })}
+              />
+            </div>
+          ) : records.length === 0 ? (
             <p className="mt-3 text-tk-muted">
               {doc.kind === "cor"
                 ? "This is your COR. Its details are on the My COR page."
                 : doc.status.startsWith("waiting") || doc.status === "reading"
                   ? "This document has not been read yet."
-                  : "No records came from this document."}
+                  : doc.status === "rejected"
+                    ? "This file was marked as not a tax document, so nothing from it is counted."
+                    : "No records came from this document."}
             </p>
           ) : (
             <ul className="mt-3 flex flex-col gap-3">
@@ -234,15 +292,17 @@ function DocumentPage() {
               ))}
             </ul>
           )}
-          {doc.flags.length ? (
-            <div className="mt-4 rounded-[12px] bg-tk-warn-soft p-4">
-              <p className="font-semibold text-tk-warn">Please check</p>
-              <ul className="mt-1 list-disc pl-5 text-sm text-tk-ink">
-                {doc.flags.map((flag) => (
-                  <li key={flag}>{CHECK_FLAG_TEXT[flag]}</li>
-                ))}
-              </ul>
-            </div>
+          {canCorrect && !editing ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSaved(null);
+                setEditing(true);
+              }}
+              className={`${buttonOutline} mt-4`}
+            >
+              <PencilLine aria-hidden className="size-4" /> Correct what was read
+            </button>
           ) : null}
           {doc.readerPath.length ? (
             <p className="mt-4 text-sm text-tk-muted">

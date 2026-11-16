@@ -28,9 +28,16 @@ committed, so never put a secret there).
       or without its records, logs what a professional deletes, and tells a professional the
       client's tier. Applied on 2026-11-16 after its rolled-back dry run with every check file;
       it is in the repair line above, and the `delete-document` function is deployed.
+- [ ] **Checking a document by hand** (`20261117150000_document_review.sql`): adds
+      `review_document()`, which saves the "Check what was read" form, and the
+      `checked_document` entry of the activity log. Its rolled-back dry run with every check
+      file passed on 2026-11-16; it waits for the owner's go-ahead to be applied. Until then the
+      form says that saving is not connected yet. Once applied, add `20261117150000` to the
+      repair line above.
 - A dry run sends, as one query, `begin;` + the migration + `20_behaviour_api.sql`,
-  `30_invitations.sql`, `40_cor_tax_types.sql` and `50_document_delete.sql` + `rollback;`. The
-  check files look only at their own test users, so they are safe on a project with real users.
+  `30_invitations.sql`, `40_cor_tax_types.sql`, `50_document_delete.sql` and
+  `60_document_review.sql` + `rollback;`. The check files look only at their own test users,
+  so they are safe on a project with real users.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
       `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and
       `payments-webhook` are deployed (`payments-webhook` and `read-step` skip the login check;

@@ -21,7 +21,9 @@ import {
   parseRegistration,
   parseTaxTypes,
 } from "@shared/parser/registration.ts";
-import type { DocumentKind } from "@shared/parser/schema.ts";
+import type { LedgerRow } from "@shared/parser/ledger.ts";
+import { savedReadings } from "@shared/parser/review.ts";
+import type { DocumentKind, ExtractedDocument } from "@shared/parser/schema.ts";
 
 import {
   SAMPLE_PARTNERS,
@@ -179,6 +181,11 @@ function toDocument(row: Row): StoredDocument {
     flags: Array.isArray(row["flags"]) ? (row["flags"] as CheckFlag[]) : [],
     previewUrl: null,
     fileDeleted: Boolean(row["file_deleted_at"]),
+    // While a document is being read, `extracted` holds its progress, not a reading.
+    readings:
+      READ_FINISHED.includes(status) && text(row["kind"]) !== "cor"
+        ? savedReadings(row["extracted"])
+        : [],
   };
 }
 
@@ -1022,6 +1029,24 @@ export async function loadAccountTier(accountId: string): Promise<"standard" | "
   if (!accountId || accountId.startsWith("sample-")) return "standard";
   const { data, error } = await db.rpc("account_tier", { account: accountId });
   return !error && data === "premium" ? "premium" : "standard";
+}
+
+/**
+ * Saves a document as checked by the signed-in person: the corrected readings replace the AI's
+ * and their ledger rows replace the old ones (database function `review_document`). Answers
+ * "accepted", or "rejected" when nothing in the file is a tax document.
+ */
+export async function reviewDocument(
+  documentId: string,
+  readings: ExtractedDocument[],
+  rows: LedgerRow[],
+): Promise<"accepted" | "rejected"> {
+  const status = await rpc<string>(
+    "review_document",
+    { document: documentId, reading: readings, records: rows },
+    "Checking documents",
+  );
+  return status === "rejected" ? "rejected" : "accepted";
 }
 
 /** Saves the confirmed COR: this sets the account's tax types and deadlines. */

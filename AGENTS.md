@@ -124,6 +124,15 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
   `delete-document` function removes the file from R2 and then calls `delete_document()`; a
   professional's deletion is in the activity log. The screens' rules and wording are in
   `src/lib/documents/delete.ts`.
+- Checking a document: when the reader is not sure of a document it is "needs_review". Its page
+  shows the "Check what was read" form (`src/components/app/ReadingReview.tsx`): what the AI
+  read, box by box, with the unsure ones pointed out, to correct and save. The rules are in
+  `supabase/functions/_shared/parser/review.ts`; the database function `review_document()` saves
+  the corrected reading and its ledger rows together and marks the document read ("rejected",
+  shown as "Not counted", when nothing in the file is a tax document). The form is also behind
+  "Correct what was read" on a document that is already read. Amounts typed in the form are
+  pesos; a foreign amount is never offered as pesos. A professional's check goes in the
+  activity log (`checked_document`).
 - Usage meters: "AI doc parsing" and "Doc storage" as used / limit (`UsageMeters`, on the
   Documents tab and the account settings page). The limits come from `PRICING` through
   `supabase/functions/_shared/uploads/usage.ts`; `loadUsage()` counts and
