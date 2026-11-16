@@ -3,23 +3,14 @@ import type { ReactNode } from "react";
 
 import { useAuth } from "@/lib/auth/use-auth";
 
+import { BrandMark } from "./BrandMark";
+
 const headerLink =
   "rounded-[10px] px-3 py-2 text-[15px] font-medium text-white/85 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
 
 /** A light button for the solid green header. */
 export const headerButton =
   "inline-flex min-h-10 items-center justify-center gap-2 rounded-[10px] bg-white px-4 text-[15px] font-semibold text-tk-brand transition-colors hover:bg-tk-brand-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-70";
-
-function Logo() {
-  return (
-    <span
-      aria-hidden
-      className="flex size-8 items-center justify-center rounded-[9px] bg-white font-tk-mono text-base font-semibold text-tk-brand"
-    >
-      ₱
-    </span>
-  );
-}
 
 /**
  * The top bar, in solid brand green: the brand on the left; Community, Bookkeepers and Pricing;
@@ -32,7 +23,7 @@ function SiteHeader({ action }: { action?: ReactNode }) {
     <header className="sticky top-0 z-30 bg-tk-brand text-white shadow-[0_1px_0_rgb(0_0_0/0.08)]">
       <div className="mx-auto flex h-16 max-w-[1120px] items-center gap-2 px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-2 text-lg font-bold tracking-tight">
-          <Logo />
+          <BrandMark outlined className="size-8" />
           Takatax
         </Link>
         <nav aria-label="Main" className="ml-auto flex items-center gap-0.5 sm:gap-1">
