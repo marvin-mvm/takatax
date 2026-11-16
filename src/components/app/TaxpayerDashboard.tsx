@@ -23,7 +23,6 @@ import { peso } from "@/lib/money";
 import { displayName } from "@/lib/auth/use-auth";
 
 import { AssistantSheet } from "./AssistantSheet";
-import { CorConfirm } from "./CorConfirm";
 import { useAppUser } from "./app-user";
 import { TrackerPanel } from "./TrackerPanel";
 import { Card, LoadingBlock, PageHeader, SampleDataNotice } from "./ui";
@@ -145,7 +144,8 @@ export function TaxpayerDashboard() {
   const { account, records, documents } = workspace;
   const profile = account.profile;
   const upcoming = profile ? upcomingFilings(profile, today, 3) : [];
-  const toCheck = documents.filter((d) => d.status === "needs_review").length;
+  // The COR is checked on the My COR page, not here.
+  const toCheck = documents.filter((d) => d.status === "needs_review" && d.kind !== "cor").length;
 
   return (
     <div className="flex flex-col gap-8">
@@ -168,7 +168,6 @@ export function TaxpayerDashboard() {
       />
       <SampleDataNotice source={source} what={`an example business (${account.displayName})`} />
       <AccessSummary userId={user.id} />
-      <CorConfirm accountId={account.id} />
 
       {!profile ? (
         <Onboarding />

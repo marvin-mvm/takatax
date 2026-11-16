@@ -37,21 +37,8 @@ export interface ExtractedDocument {
 }
 
 /** What the AI reads off a Certificate of Registration (BIR Form 2303). */
-export interface ExtractedRegistration {
-  isCor: boolean;
-  tin: string | null;
-  registeredName: string | null;
-  tradeName: string | null;
-  rdoCode: string | null;
-  registeredAddress: string | null;
-  lineOfBusiness: string | null;
-  registrationDate: string | null;
-  /** Tax types as printed, for example "Income Tax", "Percentage Tax - Quarterly". */
-  taxTypes: string[];
-  vatRegistered: boolean;
-  /** Only true when the COR says 8% or "in lieu of" in so many words. */
-  eightPercentIndicated: boolean;
-}
+// What a COR reading holds is in registration.ts.
+export type { CorTaxType, ExtractedRegistration } from "./registration.ts";
 
 const nullable = (type: string) => ({ type: [type, "null"] });
 

@@ -15,6 +15,11 @@ import { redactPersonalInfo } from "@shared/community/redact.ts";
 import { PRICING } from "@shared/uploads/rules.ts";
 import type { RunProgress } from "@/lib/services/uploads";
 import type { CheckFlag } from "@shared/parser/checks.ts";
+import {
+  flagsFromTaxTypes,
+  parseRegistration,
+  parseTaxTypes,
+} from "@shared/parser/registration.ts";
 import type { DocumentKind } from "@shared/parser/schema.ts";
 
 import {
@@ -134,6 +139,7 @@ function toProfile(row: Row): TaxProfile | null {
       "graduated_osd") as TaxProfile["incomeTaxOption"],
     businessType: row["business_type"] === "goods" ? "goods" : "services",
     mixedIncome: row["mixed_income"] === true,
+    corTaxTypes: parseTaxTypes(row["cor_tax_types"]),
   };
 }
 
@@ -193,7 +199,7 @@ function toRecord(row: Row): LedgerRecord {
  * billing, which only the owner sees, through my_plan().
  */
 const ACCOUNT_COLUMNS =
-  "id, owner_user_id, tin, registered_name, trade_name, rdo_code, registered_address, line_of_business, registration_date, vat_registered, withholding_agent, income_tax_option, business_type, mixed_income, cor_document_id, created_at, updated_at";
+  "id, owner_user_id, tin, registered_name, trade_name, rdo_code, registered_address, line_of_business, registration_date, vat_registered, withholding_agent, income_tax_option, business_type, mixed_income, cor_document_id, cor_tax_types, created_at, updated_at";
 
 async function loadWorkspaceRows(accountRow: Row): Promise<Workspace> {
   const accountId = text(accountRow["id"]);
@@ -983,19 +989,22 @@ export async function loadCorToConfirm(
     .maybeSingle();
   if (error || !data) return null;
   const row = data as Row;
-  const read = (row["extracted"] ?? {}) as Row;
+  const read = parseRegistration(row["extracted"]);
+  const flags = flagsFromTaxTypes(read.taxTypes);
   return {
     documentId: text(row["id"]),
     read: {
-      tin: text(read["tin"]),
-      registeredName: text(read["registeredName"]),
-      tradeName: text(read["tradeName"]),
-      rdoCode: text(read["rdoCode"]),
-      registeredAddress: text(read["registeredAddress"]),
-      lineOfBusiness: text(read["lineOfBusiness"]),
-      registrationDate: text(read["registrationDate"]),
-      vatRegistered: read["vatRegistered"] === true,
-      incomeTaxOption: read["eightPercentIndicated"] === true ? "eight_percent" : "graduated_osd",
+      tin: read.tin ?? "",
+      registeredName: read.registeredName ?? "",
+      tradeName: read.tradeName ?? "",
+      rdoCode: read.rdoCode ?? "",
+      registeredAddress: read.registeredAddress ?? "",
+      lineOfBusiness: read.lineOfBusiness ?? "",
+      registrationDate: read.registrationDate ?? "",
+      vatRegistered: read.vatRegistered || flags.vatRegistered,
+      withholdingAgent: flags.withholdingAgent,
+      incomeTaxOption: read.eightPercentIndicated ? "eight_percent" : "graduated_osd",
+      taxTypes: read.taxTypes,
     },
   };
 }
