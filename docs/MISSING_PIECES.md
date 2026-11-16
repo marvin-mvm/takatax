@@ -15,20 +15,31 @@ Status of the Supabase project `thiznrxojzrxkjwqhtjt`:
       `read-documents`, `assistant-chat`, `create-checkout` and `paymongo-webhook`
       (`supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`). Supabase gives
       them `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
+- [ ] Trigger.dev: the reader job in `trigger/read-run.ts`. Create a project at trigger.dev,
+      put its ref in `trigger.config.ts` (or `TRIGGER_PROJECT_REF`), set its environment
+      variables (below), then from the repo: `npx trigger.dev@4.8.3 login` and
+      `npx trigger.dev@4.8.3 deploy`.
 
 ## 1. Keys
 
-Set these in **Supabase → Project settings → Edge Functions → Secrets** (never in the repo or
-in Netlify).
+**Supabase → Project settings → Edge Functions → Secrets** (never in the repo or in Netlify):
 
-| Secret | Turns on | Where to get it |
-| --- | --- | --- |
-| `R2_ACCOUNT_ID` | Uploads, previews, reading | Cloudflare dashboard, R2 overview (Account ID) |
-| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Same | R2 → Manage API tokens → token with **Object Read & Write** on the bucket |
-| `R2_BUCKET` | Same | The bucket name, for example `takatax-documents` (private) |
-| `OPENROUTER_API_KEY` | The AI reader and the records assistant | openrouter.ai → Keys |
-| `PAYMONGO_SECRET_KEY` | Paid runs and Premium | PayMongo dashboard → Developers → API keys (`sk_test_…` first, then `sk_live_…`) |
-| `PAYMONGO_WEBHOOK_SECRET` | Marking payments paid | PayMongo → Developers → Webhooks: create one for `checkout_session.payment.paid` pointing to `https://thiznrxojzrxkjwqhtjt.supabase.co/functions/v1/paymongo-webhook`, then copy its `whsk_…` secret |
+| Secret                                                                   | Turns on                                   | Where to get it                                                                                                                                                                                      |
+| ------------------------------------------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Upload links, upload checks, file previews | Cloudflare → R2: the Account ID, a token with **Object Read & Write** on the bucket, and the bucket name (for example `takatax-documents`, private)                                                  |
+| `TRIGGER_SECRET_KEY`                                                     | Starting the reader                        | Trigger.dev → Project → API keys: the **production** secret key (`tr_prod_…`)                                                                                                                        |
+| `OPENROUTER_API_KEY`                                                     | The records assistant chat                 | openrouter.ai → Keys                                                                                                                                                                                 |
+| `PAYMONGO_SECRET_KEY`                                                    | Paid runs and Premium                      | PayMongo → Developers → API keys (`sk_test_…` first, then `sk_live_…`)                                                                                                                               |
+| `PAYMONGO_WEBHOOK_SECRET`                                                | Marking payments paid                      | PayMongo → Developers → Webhooks: create one for `checkout_session.payment.paid` pointing to `https://thiznrxojzrxkjwqhtjt.supabase.co/functions/v1/paymongo-webhook`, then copy its `whsk_…` secret |
+
+**Trigger.dev → Project → Environment variables** (Production), for the reader job:
+
+| Variable                                                                 | Where to get it                                                                                                             |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                                                     | openrouter.ai → Keys (the same key, or a separate one to track the reader's spend)                                          |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Cloudflare → R2; a **read-only** token on the bucket is enough here                                                         |
+| `SUPABASE_URL`                                                           | `https://thiznrxojzrxkjwqhtjt.supabase.co`                                                                                  |
+| `SUPABASE_SERVICE_ROLE_KEY`                                              | Supabase → Project settings → API keys: the service role (secret) key. It lets the job write results, so keep it only here. |
 
 The R2 bucket also needs a CORS rule so browsers can upload straight to it (Cloudflare → R2 →
 the bucket → Settings → CORS policy):
@@ -48,11 +59,13 @@ Email: Supabase's built-in mailer sends only about 2 emails an hour. Add an SMTP
 (Resend, Postmark, SendGrid…) in **Supabase → Authentication → Emails → SMTP settings** before
 real sign-ups.
 
-Optional secrets (sensible defaults already apply):
+Optional settings (sensible defaults already apply):
 
-- `AI_DAILY_CAP_USD`: the most the AI may spend in one Manila day (default 20).
-- `OPENROUTER_MODEL_FAST`, `OPENROUTER_MODEL_RECHECK`, `OPENROUTER_MODEL_SETTLE`,
-  `OPENROUTER_MODEL_ASSISTANT`: override the models in
+- `AI_DAILY_CAP_USD` (both places): the most the AI may spend in one Manila day (default 20).
+- `READER_CONCURRENCY` (Trigger.dev): page groups read at the same time per document
+  (default 4).
+- `OPENROUTER_MODEL_FAST`, `OPENROUTER_MODEL_RECHECK`, `OPENROUTER_MODEL_SETTLE` (Trigger.dev)
+  and `OPENROUTER_MODEL_ASSISTANT` (Supabase): override the models in
   `supabase/functions/_shared/parser/models.ts`.
 - `PAYMONGO_METHODS`: payment methods offered at checkout (default `gcash,paymaya,card,qrph`).
 - `SITE_URL`: fallback address for PayMongo's return links (the caller's address is used first).

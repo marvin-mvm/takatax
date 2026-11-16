@@ -70,9 +70,15 @@ where they differ.
 
 ## Architecture
 
-- AI: document reading (images and PDFs) goes through OpenRouter, called only from Supabase
-  Edge Functions. The OpenRouter key lives in Supabase Edge Function secrets, never in the
-  repo or the browser. This replaces the Lovable AI gateway rule above.
+- AI: document reading runs in the Trigger.dev job `read-run` (`trigger/`), which sends every
+  page to the model through OpenRouter (PDFs natively, no OCR), a few pages per call, so long
+  runs never hit Supabase's edge function limits. Supabase Edge Functions only start it
+  (`read-documents`) and answer the short records-assistant chat. Keys live in Trigger.dev's
+  environment variables and Supabase Edge Function secrets, never in the repo or the browser.
+  This replaces the Lovable AI gateway rule above.
+- Pricing is per page (a photo is one page, a PDF every page): `quoteRun` in
+  `supabase/functions/_shared/uploads/rules.ts`, shared by the upload screen and
+  `create-checkout`.
 - File storage: Cloudflare R2 (private buckets, signed upload links), not Supabase Storage.
   R2 keys live in Supabase Edge Function secrets.
 - Payments: PayMongo checkout sessions (GCash, Maya, cards, QR Ph) created by the
