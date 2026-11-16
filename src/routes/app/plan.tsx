@@ -99,11 +99,11 @@ function PlanPage() {
           </p>
           {plan.trialUsed ? (
             <p className="text-tk-muted">
-              Used. Your first {PRICING.trialDocuments} documents were read free.
+              Used. Your first {PRICING.trialPages} pages were read free.
             </p>
           ) : (
             <p className="text-tk-muted">
-              Your first {PRICING.trialDocuments} documents are read free, with full results.
+              Your first {PRICING.trialPages} pages are read free, with full results.
             </p>
           )}
           <Tag tone={plan.trialUsed ? "neutral" : "brand"}>
@@ -117,8 +117,8 @@ function PlanPage() {
           </p>
           <p className="text-tk-muted">
             {peso(PRICING.premiumMonthly)} for 30 days: up to{" "}
-            {PRICING.premiumDocuments.toLocaleString()} documents read and{" "}
-            {PRICING.premiumStorageGb} GB of storage. It does not renew by itself.
+            {PRICING.premiumPages.toLocaleString()} pages read (then ₱{PRICING.extraPage} a page)
+            and {PRICING.premiumStorageGb} GB of storage. It does not renew by itself.
           </p>
           {premiumActive ? (
             <p className="flex items-center gap-2 font-medium text-tk-brand">

@@ -1,16 +1,17 @@
 /**
- * Asks the `read-documents` edge function to read uploaded documents with AI (through
- * OpenRouter). The function checks the run is paid, runs the three-step reader and writes the
- * ledger.
+ * Asks the `read-documents` edge function to start reading uploaded documents. It checks the
+ * run is paid, then starts the Trigger.dev job `read-run`, which reads every page with the AI
+ * (through OpenRouter) and writes the ledger. Progress is in the run's row.
  *
- * MISSING: deploy `read-documents` and set OPENROUTER_API_KEY (see docs/MISSING_PIECES.md).
+ * MISSING: the Trigger.dev keys and deploy (see docs/MISSING_PIECES.md).
  */
 
 import { callFunction, type FunctionResult } from "./functions";
 
-export interface ReadSummary {
-  read: number;
-  needsReview: number;
+export interface ReadStarted {
+  started: boolean;
+  /** Pages the reader will read. Progress is in the run's row (loadRunProgress). */
+  pages: number;
 }
 
 /**
@@ -19,6 +20,6 @@ export interface ReadSummary {
  */
 export function startReading(
   input: { runId: string } | { accountId: string; documentIds: string[] },
-): Promise<FunctionResult<ReadSummary>> {
+): Promise<FunctionResult<ReadStarted>> {
   return callFunction("read-documents", input);
 }

@@ -18,6 +18,8 @@ export interface UploadRequestFile {
   mimeType: string;
   bytes: number;
   kind: DocumentKind;
+  /** Pages counted in the browser: 1 for a photo, every page of a PDF. */
+  pages: number;
 }
 
 export interface UploadSlot {
@@ -65,4 +67,13 @@ export function getDocumentLink(
   documentId: string,
 ): Promise<FunctionResult<{ url: string; mimeType: string }>> {
   return callFunction("document-link", { accountId, documentId });
+}
+
+/** A run's reading progress, for the progress bar while the Trigger.dev job works. */
+export interface RunProgress {
+  status: "awaiting_payment" | "paid" | "reading" | "review" | "complete";
+  pages: number;
+  pagesRead: number;
+  read: number;
+  needsReview: number;
 }

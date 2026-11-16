@@ -3,10 +3,12 @@
 // POST { purpose: "premium_month", accountId }             -> 30 days of Premium
 //   -> { runId, free, checkoutUrl, total, summary }
 //
-// Works out the price on the server with the same rules the upload screen shows (quoteRun):
-// the free trial (first 10 documents, once), the Premium allowance, and the 25% partner price
-// when a bookkeeper, CPA or tax lawyer runs a client's documents. Free runs are marked paid at
-// once. Paid ones get a PayMongo checkout; the paymongo-webhook function marks them paid.
+// Works out the price on the server with the same rules the upload screen shows (quoteRun),
+// counted in pages (a photo is one page, a PDF every page): the free trial (first 10 pages,
+// once), Premium's pages left this month, ₱199 for up to 250 pages, ₱2 for each page over a
+// limit, and the 25% partner price when a bookkeeper, CPA or tax lawyer runs a client's pages.
+// Free runs are marked paid at once. Paid ones get a PayMongo checkout; the paymongo-webhook
+// function marks them paid.
 //
 // Answers 503 { code: "not_configured" } for paid checkouts until the PayMongo keys are set.
 import { adminClient, authorize } from "../_lib/clients.ts";
@@ -65,7 +67,7 @@ serve(async (request) => {
     const session = await createCheckoutSession({
       amountCentavos: amount,
       name: "Takatax Premium, 30 days",
-      description: `Up to ${PRICING.premiumDocuments.toLocaleString("en-PH")} documents read and ${PRICING.premiumStorageGb} GB of storage`,
+      description: `Up to ${PRICING.premiumPages.toLocaleString("en-PH")} pages read and ${PRICING.premiumStorageGb} GB of storage`,
       referenceNumber: payment.id,
       successUrl: `${origin}/app/plan?paid=premium`,
       cancelUrl: `${origin}/app/plan`,
@@ -105,7 +107,7 @@ serve(async (request) => {
     const ids = Array.isArray(body.documentIds) ? body.documentIds : [];
     const { data: documents, error } = await admin
       .from("documents")
-      .select("id")
+      .select("id, page_count")
       .eq("account_id", account.id)
       .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"])
       .eq("status", "waiting_for_reader")
@@ -115,7 +117,9 @@ serve(async (request) => {
       throw new HttpError(400, "nothing_to_read", "These documents are not waiting to be read");
     }
 
-    // Premium covers documents read inside the current 30-day window, up to the allowance.
+    const pages = documents.reduce((sum, d) => sum + (d.page_count ?? 1), 0);
+
+    // Premium covers pages read inside the current 30-day window, up to the allowance.
     let premiumRemaining: number | undefined;
     const now = Date.now();
     if (!partner && account.premium_until && Date.parse(account.premium_until) > now) {
@@ -127,15 +131,15 @@ serve(async (request) => {
       ).toISOString();
       const { data: used } = await admin
         .from("runs")
-        .select("document_count")
+        .select("page_count")
         .eq("account_id", account.id)
         .eq("kind", "premium_month")
         .gte("created_at", windowStart);
-      const usedCount = (used ?? []).reduce((sum, r) => sum + r.document_count, 0);
-      premiumRemaining = Math.max(PRICING.premiumDocuments - usedCount, 0);
+      const usedPages = (used ?? []).reduce((sum, r) => sum + r.page_count, 0);
+      premiumRemaining = Math.max(PRICING.premiumPages - usedPages, 0);
     }
 
-    const quote = quoteRun(documents.length, {
+    const quote = quoteRun(pages, {
       partner,
       trialAvailable: !partner && !account.trial_used,
       ...(premiumRemaining !== undefined ? { premiumRemaining } : {}),
@@ -145,20 +149,19 @@ serve(async (request) => {
     // Check the keys before creating anything, so a missing key leaves no unpaid run behind.
     if (total > 0) requireEnv("PAYMONGO_SECRET_KEY");
 
-    const kind =
-      total === 0
-        ? quote.summary === "Free trial"
-          ? "trial"
-          : "premium_month"
-        : partner
-          ? "partner"
-          : "regular";
+    const kind = {
+      trial: "trial",
+      premium: "premium_month",
+      partner: "partner",
+      standard: "regular",
+    }[quote.plan];
     const { data: run, error: runError } = await admin
       .from("runs")
       .insert({
         account_id: account.id,
         kind,
         document_count: documents.length,
+        page_count: pages,
         price_centavos: Math.round(total * 100),
         status: total === 0 ? "paid" : "awaiting_payment",
         paid_at: total === 0 ? new Date().toISOString() : null,

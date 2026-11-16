@@ -108,7 +108,10 @@ create table public.documents (
   kind public.document_kind not null default 'unknown',
   file_name text not null,
   mime_type text not null,
-  bytes integer not null check (bytes > 0 and bytes <= 10485760),
+  bytes integer not null check (bytes > 0 and bytes <= 209715200), -- 200 MB a file
+  -- Pages the AI will read: 1 for a photo, every page of a PDF (counted in the browser before
+  -- upload, checked again by the reader). Runs are priced by pages.
+  page_count integer not null default 1 check (page_count between 1 and 1000),
   storage_key text unique,
   status public.document_status not null default 'waiting_for_storage',
   reader_path text[] not null default '{}',

@@ -370,7 +370,13 @@ end $$;
 alter table public.documents add column run_id uuid references public.runs (id) on delete set null;
 create index documents_run_idx on public.documents (run_id);
 
-alter table public.runs add column paid_at timestamptz;
+alter table public.runs
+  add column paid_at timestamptz,
+  -- Pages in the run (the price is per page), and how many the reader has finished, for the
+  -- progress bar. The reading happens in a Trigger.dev job; its id is kept for support.
+  add column page_count integer not null default 0,
+  add column pages_read integer not null default 0,
+  add column trigger_run_id text;
 
 -- A Premium month: documents read inside the window are covered up to the monthly allowance.
 alter table public.accounts

@@ -221,6 +221,8 @@ export interface PlanStatus {
   accountId: string;
   trialUsed: boolean;
   premiumUntil: string | null;
+  /** Pages Premium still covers this month; null without an active Premium month. */
+  premiumPagesLeft: number | null;
   payments: {
     id: string;
     /** For a run that was never paid, so the payment can be tried again. */

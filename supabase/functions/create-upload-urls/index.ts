@@ -1,4 +1,4 @@
-// POST { accountId, files: [{ clientId, fileName, mimeType, bytes, kind }] }
+// POST { accountId, files: [{ clientId, fileName, mimeType, bytes, kind, pages }] }
 // -> { slots: [{ clientId, documentId, uploadUrl }] }
 //
 // Creates one `documents` row per file and a signed R2 upload link for each. The browser then
@@ -6,7 +6,12 @@
 import { adminClient, authorize } from "../_lib/clients.ts";
 import { HttpError, json, serve } from "../_lib/http.ts";
 import { assertStorageConfigured, signedUploadUrl } from "../_lib/r2.ts";
-import { checkFile, MAX_FILES_PER_UPLOAD } from "../_shared/uploads/rules.ts";
+import {
+  checkFile,
+  MAX_BATCH_BYTES,
+  MAX_FILES_PER_UPLOAD,
+  MAX_PDF_PAGES,
+} from "../_shared/uploads/rules.ts";
 
 interface RequestFile {
   clientId: string;
@@ -14,6 +19,8 @@ interface RequestFile {
   mimeType: string;
   bytes: number;
   kind: string;
+  /** Pages counted in the browser: 1 for a photo, every page of a PDF. */
+  pages: number;
 }
 
 const KINDS = new Set(["sales_invoice", "expense_receipt", "form_2307", "cor", "unknown"]);
@@ -37,6 +44,16 @@ serve(async (request) => {
     const problem = checkFile({ name: file.fileName, type: file.mimeType, size: file.bytes });
     if (problem) throw new HttpError(400, `file_${problem}`, `${file.fileName}: ${problem}`);
   }
+  const batchBytes = files.reduce((sum, file) => sum + Math.max(file.bytes, 0), 0);
+  if (batchBytes > MAX_BATCH_BYTES) {
+    throw new HttpError(400, "batch_too_big", "Upload up to 5 GB at a time");
+  }
+  // A photo is always one page. A PDF's count comes from the browser; the reader checks it
+  // again and reads only the pages paid for.
+  const pagesOf = (file: RequestFile) =>
+    file.mimeType === "application/pdf"
+      ? Math.min(Math.max(Math.floor(Number(file.pages) || 1), 1), MAX_PDF_PAGES)
+      : 1;
 
   const { userId } = await authorize(request, accountId);
   assertStorageConfigured();
@@ -55,6 +72,7 @@ serve(async (request) => {
         file_name: file.fileName,
         mime_type: file.mimeType,
         bytes: file.bytes,
+        page_count: pagesOf(file),
         storage_key: storageKey,
         status: "waiting_for_storage",
         uploaded_by: userId,

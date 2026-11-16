@@ -1,16 +1,18 @@
 /**
  * Upload and scan: pick or photograph documents, check each photo in the browser (blur,
- * darkness, glare), show the price, upload to Cloudflare R2, pay (or use the free trial or
- * Premium), and start the AI reader.
+ * darkness, glare), count every PDF's pages, and show what the run will cost before anything
+ * is uploaded: "You uploaded 10 JPG and 2 PDF files with 50 total combined pages." Proceed then
+ * uploads to Cloudflare R2, pays (or uses the free trial or Premium) and starts the reader.
  *
- * Steps: ensure the account -> signed upload links -> PUT each file to R2 -> confirm-upload ->
- * create-checkout (free: read now; paid: PayMongo, then back here with ?run=) -> read-documents.
+ * Steps after Proceed: ensure the account -> signed upload links -> PUT each file to R2 ->
+ * confirm-upload -> create-checkout (free: read now; paid: PayMongo, then back here with ?run=)
+ * -> read-documents, which starts a Trigger.dev job -> progress from the run's row.
  * Each step that needs a key says so plainly when it is missing. See docs/MISSING_PIECES.md.
  */
 
-import { Camera, FileText, FolderOpen, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { Camera, FileText, FolderOpen, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { DOCUMENT_KIND_LABEL, type DocumentKind } from "@shared/parser/schema.ts";
@@ -18,17 +20,21 @@ import {
   ACCEPT_ATTRIBUTE,
   FILE_PROBLEM_TEXT,
   type FileProblem,
+  MAX_BATCH_BYTES,
   PRICING,
+  batchMessage,
   checkFile,
   quoteRun,
 } from "@shared/uploads/rules.ts";
 import { buttonOutline, buttonPrimary } from "@/components/site/styles";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlan } from "@/lib/data/queries";
+import { loadRunProgress } from "@/lib/data/repository";
 import { fileSize, peso } from "@/lib/money";
 import { checkoutRun } from "@/lib/services/payments";
 import { startReading } from "@/lib/services/reader";
 import { confirmUploads, putToStorage, requestUploadSlots } from "@/lib/services/uploads";
+import { countPdfPages } from "@/lib/uploads/pdf-pages";
 import { PHOTO_FLAG_TEXT, type PhotoFlag, preparePhoto } from "@/lib/uploads/photo-prep";
 import { cn } from "@/lib/utils";
 
@@ -47,16 +53,20 @@ interface QueuedFile {
   id: string;
   file: File;
   kind: DocumentKind;
+  isPdf: boolean;
   previewUrl: string | null;
   problem: FileProblem | null;
   photoFlags: PhotoFlag[];
   prepared: { blob: Blob; mimeType: string } | null;
+  /** 1 for a photo; a PDF's page count once counted. */
+  pages: number | null;
   checking: boolean;
 }
 
 type Stage =
   | { step: "idle" }
   | { step: "working"; message: string }
+  | { step: "reading"; pages: number; pagesRead: number }
   | { step: "storage_not_connected" }
   | { step: "payments_not_connected"; uploaded: number }
   | { step: "reader_not_connected"; uploaded: number }
@@ -64,6 +74,7 @@ type Stage =
   | { step: "error"; message: string };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const isJpeg = (file: File) => file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name);
 
 export function UploadPanel({
   initialKind,
@@ -87,6 +98,13 @@ export function UploadPanel({
   const pickerRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const hintId = useId();
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // Free the photo previews when the screen closes.
   const queueRef = useRef(queue);
@@ -99,23 +117,45 @@ export function UploadPanel({
   const addFiles = (files: FileList | File[]) => {
     const added: QueuedFile[] = Array.from(files).map((file) => {
       const problem = checkFile(file);
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
       return {
         id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 8)}`,
         file,
         kind,
+        isPdf,
         previewUrl: !problem && file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
         problem,
         photoFlags: [],
         prepared: null,
+        pages: isPdf ? null : 1,
         checking: !problem,
       };
     });
     setQueue((current) => [...current, ...added]);
     setStage({ step: "idle" });
-    // Check photos one at a time so a phone stays responsive with many of them.
+    // One file at a time, so a phone stays responsive: photos are checked for blur and
+    // shrunk; PDFs have their pages counted.
     void (async () => {
       for (const item of added) {
         if (item.problem) continue;
+        if (item.isPdf) {
+          const counted = await countPdfPages(item.file);
+          setQueue((current) =>
+            current.map((q) =>
+              q.id === item.id
+                ? counted.ok
+                  ? {
+                      ...q,
+                      checking: false,
+                      pages: counted.pages,
+                      prepared: { blob: q.file, mimeType: "application/pdf" },
+                    }
+                  : { ...q, checking: false, problem: counted.problem }
+                : q,
+            ),
+          );
+          continue;
+        }
         const result = await preparePhoto(item.file);
         setQueue((current) =>
           current.map((q) =>
@@ -140,48 +180,80 @@ export function UploadPanel({
       return current.filter((q) => q.id !== id);
     });
 
+  // ---- What the person is about to run: pages, limit and price ------------------------------
   const ready = queue.filter((q) => !q.problem);
-  // An estimate for the button; create-checkout works out the real price on the server.
-  const premiumActive =
-    !clientAccountId &&
-    plan.data?.data.premiumUntil != null &&
-    new Date(plan.data.data.premiumUntil) > new Date();
-  const quote = quoteRun(ready.length, {
+  const counting = ready.some((q) => q.checking);
+  const images = ready.filter((q) => !q.isPdf);
+  const pdfs = ready.filter((q) => q.isPdf);
+  const pdfPages = pdfs.reduce((sum, q) => sum + (q.pages ?? 0), 0);
+  const totalPages = images.length + pdfPages;
+  const batchBytes = ready.reduce((sum, q) => sum + (q.prepared?.blob.size ?? q.file.size), 0);
+  const tooBig = batchBytes > MAX_BATCH_BYTES;
+  const premiumLeft = clientAccountId ? null : (plan.data?.data.premiumPagesLeft ?? null);
+  // An estimate for the message; create-checkout works out the real price on the server.
+  const quote = quoteRun(totalPages, {
     partner: Boolean(clientAccountId),
     trialAvailable: !clientAccountId && plan.data?.data.trialUsed !== true,
-    ...(premiumActive ? { premiumRemaining: PRICING.premiumDocuments } : {}),
+    ...(premiumLeft !== null ? { premiumRemaining: premiumLeft } : {}),
   });
-  const busy = stage.step === "working" || ready.some((q) => q.checking);
+  const message =
+    ready.length && !counting
+      ? batchMessage(
+          {
+            images: images.length,
+            allJpeg: images.every((q) => isJpeg(q.file)),
+            pdfs: pdfs.length,
+            pdfPages,
+          },
+          quote,
+        )
+      : [];
+  const busy = stage.step === "working" || stage.step === "reading";
 
-  /** Reads a run, waiting a little for PayMongo's confirmation if it has not arrived yet. */
+  // ---- Reading: start the Trigger.dev job, then follow its progress -------------------------
+  /** Starts reading a run, waiting a little for PayMongo's confirmation if it is not in yet. */
   const readRun = async (runId: string, uploaded: number) => {
     for (let attempt = 0; attempt < 10; attempt++) {
       setStage({
         step: "working",
-        message: attempt === 0 ? "Reading your documents…" : "Waiting for the payment to clear…",
+        message: attempt === 0 ? "Starting the reader…" : "Waiting for the payment to clear…",
       });
-      const result = await startReading({ runId });
-      if (result.ok) {
-        setStage({ step: "done", read: result.data.read, needsReview: result.data.needsReview });
-        void queryClient.invalidateQueries({ queryKey: ["workspace"] });
-        void queryClient.invalidateQueries({ queryKey: ["plan"] });
+      const started = await startReading({ runId });
+      if (started.ok) break;
+      if (started.code !== "payment_required") {
+        setStage(
+          started.reason === "not_connected"
+            ? { step: "reader_not_connected", uploaded }
+            : { step: "error", message: started.message },
+        );
         return;
       }
-      if (result.code !== "payment_required") {
-        setStage(
-          result.reason === "not_connected"
-            ? { step: "reader_not_connected", uploaded }
-            : { step: "error", message: result.message },
-        );
+      if (attempt === 9) {
+        setStage({
+          step: "error",
+          message:
+            "We have not received the payment confirmation yet. If you paid, reading starts once PayMongo confirms; check Documents in a few minutes.",
+        });
         return;
       }
       await wait(3_000);
     }
-    setStage({
-      step: "error",
-      message:
-        "We have not received the payment confirmation yet. If you paid, it will be read once PayMongo confirms; check Documents in a few minutes.",
-    });
+
+    // The job runs on Trigger.dev and writes its progress to the run. Follow it while this
+    // screen is open; leaving is fine, reading carries on.
+    while (mounted.current) {
+      const progress = await loadRunProgress(runId);
+      if (progress) {
+        if (progress.status === "complete" || progress.status === "review") {
+          setStage({ step: "done", read: progress.read, needsReview: progress.needsReview });
+          void queryClient.invalidateQueries({ queryKey: ["workspace"] });
+          void queryClient.invalidateQueries({ queryKey: ["plan"] });
+          return;
+        }
+        setStage({ step: "reading", pages: progress.pages, pagesRead: progress.pagesRead });
+      }
+      await wait(3_000);
+    }
   };
 
   // Back from PayMongo: read the run that was just paid for.
@@ -189,18 +261,18 @@ export function UploadPanel({
   useEffect(() => {
     if (!returningRunId || resumed.current) return;
     resumed.current = true;
-    void readRun(returningRunId, 0).then(() =>
-      navigate({
-        to: "/app/upload",
-        search: clientAccountId ? { account: clientAccountId } : {},
-        replace: true,
-      }),
-    );
+    void navigate({
+      to: "/app/upload",
+      search: clientAccountId ? { account: clientAccountId } : {},
+      replace: true,
+    });
+    void readRun(returningRunId, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on return
   }, [returningRunId]);
 
-  const upload = async () => {
-    if (!ready.length) return;
+  /** Proceed: upload, confirm, price on the server, pay if needed, then read. */
+  const proceed = async () => {
+    if (!ready.length || counting || tooBig) return;
     setStage({ step: "working", message: "Preparing the account…" });
 
     // A partner uploads into their client's account; a taxpayer into their own (created now if
@@ -224,6 +296,7 @@ export function UploadPanel({
         mimeType: q.prepared?.mimeType ?? q.file.type,
         bytes: q.prepared?.blob.size ?? q.file.size,
         kind: q.kind,
+        pages: q.pages ?? 1,
       })),
     );
     if (!slots.ok) {
@@ -286,8 +359,8 @@ export function UploadPanel({
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="flex flex-col gap-5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="flex min-w-0 flex-col gap-5">
         <fieldset>
           <legend className="font-semibold">What are you uploading?</legend>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -333,9 +406,9 @@ export function UploadPanel({
           )}
         >
           <p className="text-lg font-semibold">Drop photos or PDFs here</p>
-          <p id={hintId} className="max-w-[52ch] text-tk-muted">
-            Up to 10 MB each. Lay the receipt flat in good light, and fit the whole page in the
-            photo.
+          <p id={hintId} className="max-w-[56ch] text-tk-muted">
+            Up to 5 GB at a time, 200 MB a file. A photo is one page; a PDF counts each page. Lay
+            receipts flat in good light and fit the whole page in the photo.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <button
@@ -396,7 +469,11 @@ export function UploadPanel({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{item.file.name}</p>
                   <p className="text-sm text-tk-muted">
-                    {fileSize(item.file.size)} ·{" "}
+                    {fileSize(item.file.size)}
+                    {item.isPdf && item.pages
+                      ? ` · ${item.pages} page${item.pages === 1 ? "" : "s"}`
+                      : ""}{" "}
+                    ·{" "}
                     <select
                       aria-label={`Type of ${item.file.name}`}
                       value={item.kind}
@@ -422,7 +499,8 @@ export function UploadPanel({
                     <p className="mt-1 text-sm text-tk-danger">{FILE_PROBLEM_TEXT[item.problem]}</p>
                   ) : item.checking ? (
                     <p className="mt-1 flex items-center gap-1.5 text-sm text-tk-muted">
-                      <Loader2 aria-hidden className="size-4 animate-spin" /> Checking the photo…
+                      <Loader2 aria-hidden className="size-4 animate-spin" />
+                      {item.isPdf ? "Counting pages…" : "Checking the photo…"}
                     </p>
                   ) : item.photoFlags.length ? (
                     <p className="mt-1 flex items-center gap-1.5 text-sm text-tk-warn">
@@ -437,6 +515,7 @@ export function UploadPanel({
                 <button
                   type="button"
                   onClick={() => remove(item.id)}
+                  disabled={busy}
                   aria-label={`Remove ${item.file.name}`}
                   className="flex size-10 shrink-0 items-center justify-center rounded-[10px] text-tk-muted hover:bg-tk-danger-soft hover:text-tk-danger"
                 >
@@ -449,44 +528,96 @@ export function UploadPanel({
       </div>
 
       <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
-        <div className="rounded-[18px] border border-tk-line bg-tk-surface p-5">
-          <h2 className="font-semibold">This run</h2>
-          <dl className="mt-3 flex flex-col gap-2 text-[15px]">
-            <div className="flex justify-between gap-3">
-              <dt className="text-tk-muted">Documents</dt>
-              <dd className="font-tk-mono tabular-nums">{ready.length}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-tk-muted">Price</dt>
-              <dd className="font-tk-mono font-medium tabular-nums">{peso(quote.total)}</dd>
-            </div>
-          </dl>
-          <p className="mt-1 text-sm text-tk-muted">{quote.summary}</p>
+        <section
+          aria-labelledby="run-summary-title"
+          className="rounded-[18px] border border-tk-line bg-tk-surface p-5"
+        >
+          <h2 id="run-summary-title" className="font-semibold">
+            This run
+          </h2>
+          <div aria-live="polite" className="mt-3 flex flex-col gap-2 text-[15px]/[22px]">
+            {ready.length === 0 ? (
+              <p className="text-tk-muted">Add photos or PDFs to see how many pages they are.</p>
+            ) : counting ? (
+              <p className="flex items-center gap-2 text-tk-muted">
+                <Loader2 aria-hidden className="size-4 animate-spin" /> Counting pages…
+              </p>
+            ) : (
+              <>
+                {message.map((line, index) => (
+                  <p
+                    key={line}
+                    className={cn(
+                      index > 0 &&
+                        "rounded-[10px] border border-tk-accent/40 bg-tk-warn-soft px-3 py-2 text-[14px]/[20px]",
+                    )}
+                  >
+                    {line}
+                  </p>
+                ))}
+                <dl className="mt-1 flex justify-between gap-3 border-t border-tk-line pt-3">
+                  <dt className="text-tk-muted">Total</dt>
+                  <dd className="text-right">
+                    <span className="font-tk-mono text-lg font-medium tabular-nums">
+                      {peso(quote.total)}
+                    </span>
+                    <span className="block text-sm text-tk-muted">{quote.summary}</span>
+                  </dd>
+                </dl>
+              </>
+            )}
+            {tooBig ? (
+              <p role="alert" className="text-sm text-tk-danger">
+                These files add up to {fileSize(batchBytes)}. Upload up to 5 GB at a time.
+              </p>
+            ) : null}
+          </div>
           <button
             type="button"
-            onClick={() => void upload()}
-            disabled={busy || ready.length === 0}
+            onClick={() => void proceed()}
+            disabled={busy || counting || tooBig || ready.length === 0}
             className={`${buttonPrimary} mt-4 w-full`}
           >
             {stage.step === "working" ? (
               <>
                 <Loader2 aria-hidden className="size-5 animate-spin" /> {stage.message}
               </>
-            ) : quote.total > 0 ? (
-              `Upload and pay ${peso(quote.total)}`
+            ) : stage.step === "reading" ? (
+              <>
+                <Loader2 aria-hidden className="size-5 animate-spin" /> Reading…
+              </>
             ) : (
-              "Upload and read"
+              "Proceed"
             )}
           </button>
           <p className="mt-3 text-[13px]/[18px] text-tk-muted">
             {clientAccountId
-              ? `Your partner price: ₱${Math.round(PRICING.runPrice * (1 - PRICING.partnerDiscount))} reads up to ${PRICING.runDocuments} documents for this client; extra documents are ₱${PRICING.extraDocument} each.`
-              : `Your first ${PRICING.trialDocuments} documents are free. Then ₱${PRICING.runPrice} reads up to ${PRICING.runDocuments}; extra documents are ₱${PRICING.extraDocument} each.`}{" "}
-            Payment is by GCash, Maya or card through PayMongo. The final price is confirmed at
+              ? `Your partner price: ₱${Math.round(PRICING.runPrice * (1 - PRICING.partnerDiscount))} for up to ${PRICING.runPages} pages for this client, then ₱${PRICING.extraPage} a page.`
+              : `Your first ${PRICING.trialPages} pages are free. Then ₱${PRICING.runPrice} reads up to ${PRICING.runPages} pages (Premium: ${PRICING.premiumPages.toLocaleString("en-PH")} a month), then ₱${PRICING.extraPage} a page.`}{" "}
+            Payment is by GCash, Maya or card through PayMongo; the final price is confirmed at
             checkout.
           </p>
-        </div>
+        </section>
 
+        {stage.step === "reading" ? (
+          <div role="status" className="rounded-[12px] bg-tk-brand-soft px-4 py-3 text-tk-brand">
+            <p className="font-medium">
+              Reading {stage.pagesRead.toLocaleString("en-PH")} of{" "}
+              {stage.pages.toLocaleString("en-PH")} pages…
+            </p>
+            <div aria-hidden className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+              <div
+                className="h-full rounded-full bg-tk-brand transition-[width]"
+                style={{
+                  width: `${stage.pages ? Math.min((stage.pagesRead / stage.pages) * 100, 100) : 5}%`,
+                }}
+              />
+            </div>
+            <p className="mt-2 text-sm text-tk-ink/80">
+              You can leave this page. Reading carries on, and results appear in Documents.
+            </p>
+          </div>
+        ) : null}
         {stage.step === "storage_not_connected" ? (
           <NotConnectedNotice title="File storage is not connected yet">
             Your files were checked here, but nothing was uploaded. Uploading turns on once the
@@ -496,14 +627,15 @@ export function UploadPanel({
         {stage.step === "payments_not_connected" ? (
           <NotConnectedNotice title="Payments are not connected yet">
             {stage.uploaded} file{stage.uploaded === 1 ? " was" : "s were"} uploaded. They will be
-            read once you pay, after Takatax adds its PayMongo keys. Free-trial and Premium
-            documents are read without paying.
+            read once you pay, after Takatax adds its PayMongo keys. Free-trial and Premium pages
+            are read without paying.
           </NotConnectedNotice>
         ) : null}
         {stage.step === "reader_not_connected" ? (
           <NotConnectedNotice title="The AI reader is not connected yet">
-            {stage.uploaded} file{stage.uploaded === 1 ? " was" : "s were"} uploaded and will be
-            read once the AI key is added.
+            {stage.uploaded > 0
+              ? `${stage.uploaded} file${stage.uploaded === 1 ? " was" : "s were"} uploaded and will be read once the reader's keys are added.`
+              : "Your paid run will be read once the reader's keys are added."}
           </NotConnectedNotice>
         ) : null}
         {stage.step === "done" ? (

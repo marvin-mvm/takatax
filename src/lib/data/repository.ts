@@ -12,6 +12,8 @@ import type { LedgerRecord } from "@shared/domain/records.ts";
 import { estimateFiling } from "@shared/domain/tax-estimates.ts";
 import { type TaxProfile, taxTypesFor } from "@shared/domain/tax-profile.ts";
 import { redactPersonalInfo } from "@shared/community/redact.ts";
+import { PRICING } from "@shared/uploads/rules.ts";
+import type { RunProgress } from "@/lib/services/uploads";
 import type { CheckFlag } from "@shared/parser/checks.ts";
 import type { DocumentKind } from "@shared/parser/schema.ts";
 
@@ -866,10 +868,30 @@ export function loadPlan(userId: string): Promise<Loaded<PlanStatus>> {
       const account = rows<Row | null>(
         await db
           .from("accounts")
-          .select("id, trial_used, premium_until")
+          .select("id, trial_used, premium_started_at, premium_until")
           .eq("owner_user_id", userId)
           .maybeSingle(),
       );
+      // Pages Premium still covers this month (the same window create-checkout uses).
+      let premiumPagesLeft: number | null = null;
+      const until = text(account?.["premium_until"]);
+      if (account && until && Date.parse(until) > Date.now()) {
+        const windowStart = new Date(
+          Math.max(
+            Date.parse(text(account["premium_started_at"]) || until) || 0,
+            Date.now() - 30 * 86_400_000,
+          ),
+        ).toISOString();
+        const used = rows<Row[]>(
+          await db
+            .from("runs")
+            .select("page_count")
+            .eq("account_id", text(account["id"]))
+            .eq("kind", "premium_month")
+            .gte("created_at", windowStart),
+        ).reduce((sum, r) => sum + (typeof r["page_count"] === "number" ? r["page_count"] : 0), 0);
+        premiumPagesLeft = Math.max(PRICING.premiumPages - used, 0);
+      }
       const payments = rows<Row[]>(
         await db
           .from("payments")
@@ -881,6 +903,7 @@ export function loadPlan(userId: string): Promise<Loaded<PlanStatus>> {
       return {
         accountId: text(account?.["id"]),
         trialUsed: account?.["trial_used"] === true,
+        premiumPagesLeft,
         premiumUntil: text(account?.["premium_until"]) || null,
         payments: payments.map((p) => ({
           id: text(p["id"]),
@@ -892,6 +915,32 @@ export function loadPlan(userId: string): Promise<Loaded<PlanStatus>> {
         })),
       };
     },
-    () => ({ accountId: "", trialUsed: false, premiumUntil: null, payments: [] }),
+    () => ({
+      accountId: "",
+      trialUsed: false,
+      premiumUntil: null,
+      premiumPagesLeft: null,
+      payments: [],
+    }),
   );
+}
+
+/** How far the reader has got with a run, and what it produced so far. */
+export async function loadRunProgress(runId: string): Promise<RunProgress | null> {
+  const { data: run, error } = await db
+    .from("runs")
+    .select("status, page_count, pages_read")
+    .eq("id", runId)
+    .maybeSingle();
+  if (error || !run) return null;
+  const { data: documents } = await db.from("documents").select("status").eq("run_id", runId);
+  const statuses = ((documents ?? []) as Row[]).map((d) => text(d["status"]));
+  const row = run as Row;
+  return {
+    status: (text(row["status"]) || "paid") as RunProgress["status"],
+    pages: typeof row["page_count"] === "number" ? row["page_count"] : 0,
+    pagesRead: typeof row["pages_read"] === "number" ? row["pages_read"] : 0,
+    read: statuses.filter((s) => s === "accepted").length,
+    needsReview: statuses.filter((s) => s === "needs_review").length,
+  };
 }
