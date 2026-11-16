@@ -58,11 +58,11 @@ import { useAppUser } from "./app-user";
 import { NotConnectedNotice } from "./ui";
 
 const KIND_CHOICES: { kind: DocumentKind; label: string; hint: string }[] = [
+  { kind: "unknown", label: "Mixed docs", hint: "AI will sort it" },
   { kind: "expense_receipt", label: "Receipts and purchases", hint: "What you paid suppliers" },
   { kind: "sales_invoice", label: "Sales and collections", hint: "Invoices you issued" },
   { kind: "form_2307", label: "Withholding (2307)", hint: "From clients who withheld tax" },
   { kind: "cor", label: "COR (Form 2303)", hint: "Your registration" },
-  { kind: "unknown", label: "Not sure", hint: "The AI will sort it" },
 ];
 
 interface QueuedFile {

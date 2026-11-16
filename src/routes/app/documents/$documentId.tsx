@@ -7,6 +7,7 @@ import { formatIsoDate } from "@shared/domain/dates.ts";
 import { EXPENSE_CATEGORY_LABEL, RECORD_KIND_LABEL } from "@shared/domain/records.ts";
 import { CHECK_FLAG_TEXT } from "@shared/parser/checks.ts";
 import { DOCUMENT_KIND_LABEL } from "@shared/parser/schema.ts";
+import { CheckLink } from "@/components/app/DocumentTable";
 import { ReadingProgress } from "@/components/app/ReadingProgress";
 import { useAppUser } from "@/components/app/app-user";
 import {
@@ -164,9 +165,19 @@ function DocumentPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div id="check" className="grid scroll-mt-24 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
-          <CardTitle action={<StatusPill status={doc.status} />}>What we read</CardTitle>
+          <CardTitle
+            action={
+              doc.kind === "cor" && doc.status === "needs_review" ? (
+                <CheckLink doc={doc} clientAccountId={account} />
+              ) : (
+                <StatusPill status={doc.status} />
+              )
+            }
+          >
+            What we read
+          </CardTitle>
           {records.length === 0 ? (
             <p className="mt-3 text-tk-muted">
               {doc.kind === "cor"
