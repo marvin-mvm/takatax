@@ -71,15 +71,22 @@ Environment variables (Trigger.dev dashboard → Environment variables; set them
 | `SUPABASE_URL`                                                           | `https://thiznrxojzrxkjwqhtjt.supabase.co`                                                                                    |
 | `SUPABASE_SERVICE_ROLE_KEY`                                              | Supabase → Project settings → API keys → the **service role** (secret) key. It lets the job write results; keep it only here. |
 
-On your own computer, in a checkout of branch `v0.002`:
+Deploying the tasks to Production (no computer needed): GitHub Actions does it
+(`.github/workflows/trigger-deploy.yml`) every time code reaches `main`, and on demand from the
+Actions tab ("Deploy Trigger.dev tasks" → Run workflow).
 
-1. `bun install`
-2. `npx trigger.dev@4.8.3 login` (opens the browser)
-3. `npx trigger.dev@4.8.3 dev`: the dashboard's Development environment should list the tasks
-   `read-run` and `ping`. Run `ping` from the dashboard's Test page to check the connection.
-   For `dev`, the job reads its variables from `.env.local` (or the dashboard).
-4. `npx trigger.dev@4.8.3 deploy` to put the tasks in Production, then set Supabase's
-   `TRIGGER_SECRET_KEY` to the production `tr_prod_…` key.
+1. Trigger.dev dashboard → switch to **Production** → API keys. Create a key with **Deploy only**
+   access if you can; otherwise use the Production secret key (`tr_prod_…`).
+2. GitHub → the takatax repository → Settings → Secrets and variables → Actions → New repository
+   secret: name `TRIGGER_ACCESS_TOKEN`, value that key. Without it the workflow skips itself.
+3. Merge to `main` (or run the workflow from the Actions tab once it is on `main`). The dashboard's
+   Production environment then lists `read-run` and `ping`; run `ping` from its Test page.
+4. Set Supabase's `TRIGGER_SECRET_KEY` to the regular Production secret key (`tr_prod_…`). A
+   "Deploy only" key cannot start reading jobs.
+
+To test on a computer instead (needs a recent macOS for Bun): `bun install`,
+`npx trigger.dev@4.8.3 login`, then `npx trigger.dev@4.8.3 dev` (Development environment, using
+the `tr_dev_…` key).
 
 ## 4. Payments (placeholder)
 
