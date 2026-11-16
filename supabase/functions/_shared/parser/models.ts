@@ -4,8 +4,8 @@
  * function, so they can be swapped without a code change.
  *
  * The names were checked against OpenRouter's model list (https://openrouter.ai/models) on
- * 2026-11-16: all three exist and accept photos, PDFs and a JSON schema. The Gemini names end in
- * "-preview" there, so check them again when those models leave preview.
+ * 2026-11-16: the three reader models exist and accept photos, PDFs and a JSON schema. The Gemini
+ * reader names end in "-preview" there, so check them again when those models leave preview.
  */
 
 import type { ReaderStep } from "./pipeline.ts";
@@ -16,7 +16,11 @@ export const DEFAULT_READER_MODELS: Record<ReaderStep, string> = {
   settle: "google/gemini-3.1-pro-preview",
 };
 
-/** The model the assistant chat uses to answer questions about a user's records. */
-export const DEFAULT_ASSISTANT_MODEL = "google/gemini-3-flash-preview";
+/**
+ * The model the assistant chat uses to answer questions about a user's records: Gemini
+ * Flash-Lite, the small and cheap Flash, which is enough to explain a short table of figures.
+ * On OpenRouter's list on 2026-11-16. The `OPENROUTER_MODEL_ASSISTANT` secret overrides it.
+ */
+export const DEFAULT_ASSISTANT_MODEL = "google/gemini-3.5-flash-lite";
 
 export const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
