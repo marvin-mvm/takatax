@@ -5,7 +5,7 @@
  */
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ScanLine } from "lucide-react";
+import { Plus, ScanLine, X } from "lucide-react";
 import { useState } from "react";
 
 import { buttonPrimary } from "@/components/site/styles";
@@ -13,6 +13,12 @@ import { useCorToConfirm } from "@/lib/data/queries";
 import { NotConnectedError, confirmCor } from "@/lib/data/repository";
 import type { CorDetails } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
+import {
+  type CorTaxType,
+  FORM_INFO,
+  flagsFromTaxTypes,
+  normalizeFormCode,
+} from "@shared/parser/registration.ts";
 
 const field =
   "min-h-11 w-full rounded-[10px] border border-tk-line bg-tk-surface px-3 text-base focus-visible:outline-2 focus-visible:outline-tk-brand";
@@ -49,6 +55,7 @@ function emptyDetails(read: Partial<CorDetails>): CorDetails {
     incomeTaxOption: read.incomeTaxOption ?? "graduated_osd",
     businessType: read.businessType ?? "services",
     mixedIncome: read.mixedIncome ?? false,
+    taxTypes: read.taxTypes ?? [],
   };
 }
 
@@ -81,6 +88,19 @@ function CorConfirmForm({
   const [problem, setProblem] = useState<string | null>(null);
   const set = <K extends keyof CorDetails>(key: K, value: CorDetails[K]) =>
     setDetails((current) => ({ ...current, [key]: value }));
+  /** Changing the forms also updates the VAT and withholding boxes they imply. */
+  const setTaxTypes = (taxTypes: CorTaxType[]) =>
+    setDetails((current) => ({ ...current, taxTypes, ...flagsFromTaxTypes(taxTypes) }));
+  const [newForm, setNewForm] = useState("");
+  const addForm = () => {
+    const form = normalizeFormCode(newForm);
+    if (!form || details.taxTypes.some((t) => t.form === form)) return;
+    setTaxTypes([
+      ...details.taxTypes,
+      { taxType: FORM_INFO[form]?.title ?? form, form, frequency: null, effectiveDate: null },
+    ]);
+    setNewForm("");
+  };
 
   const tinDigits = details.tin.replace(/\D/g, "");
   const valid =
@@ -187,6 +207,71 @@ function CorConfirmForm({
                 {type === "services" ? "Services" : "Goods"}
               </label>
             ))}
+          </div>
+        </fieldset>
+        <fieldset className="flex flex-col gap-2 md:col-span-2">
+          <legend className="font-medium">Tax types and forms on your COR</legend>
+          <p className="text-sm text-tk-muted">
+            These are the returns your COR says you file. Check them against the tax type table on
+            the paper; remove any that are not there and add any that were missed.
+          </p>
+          {details.taxTypes.length === 0 ? (
+            <p className="rounded-[12px] border border-dashed border-tk-line p-3 text-sm text-tk-muted">
+              No tax types were read. Add each form printed on your COR below.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {details.taxTypes.map((row, index) => {
+                const info = row.form ? FORM_INFO[row.form] : undefined;
+                return (
+                  <li
+                    key={`${row.form ?? row.taxType}-${index}`}
+                    className="flex items-start gap-3 rounded-[12px] border border-tk-line p-3"
+                  >
+                    <span className="min-w-16 font-tk-mono font-semibold">{row.form ?? "—"}</span>
+                    <span className="flex-1">
+                      <span className="block font-medium">{row.taxType}</span>
+                      <span className="block text-sm text-tk-muted">
+                        {[info?.title, row.frequency ?? info?.frequency]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${row.form ?? row.taxType}`}
+                      onClick={() => setTaxTypes(details.taxTypes.filter((_, i) => i !== index))}
+                      className="inline-flex size-9 items-center justify-center rounded-full text-tk-muted hover:bg-tk-surface-2 hover:text-tk-ink"
+                    >
+                      <X aria-hidden className="size-4" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <input
+              className={cn(field, "max-w-48")}
+              value={newForm}
+              placeholder="Form, e.g. 1601-EQ"
+              aria-label="Add a form"
+              onChange={(e) => setNewForm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addForm();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={addForm}
+              disabled={!normalizeFormCode(newForm)}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-tk-line px-3 font-semibold disabled:opacity-50"
+            >
+              <Plus aria-hidden className="size-4" /> Add
+            </button>
           </div>
         </fieldset>
         <div className="flex flex-col md:col-span-2 md:flex-row md:gap-6">

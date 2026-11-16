@@ -20,6 +20,11 @@ committed, so never put a secret there).
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
       `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000`.
+- [ ] **COR tax types** (`20261116150000_cor_tax_types.sql`): keeps the tax types and forms
+      printed on the COR (0619-E, 1601-EQ, 2551Q…) on the account. Passed its rolled-back dry run
+      with `supabase/tests/40_cor_tax_types.sql`; apply it when this change reaches `main`, then
+      add `20261116150000` to the repair line above. Note: `20_behaviour_api.sql` expects an empty
+      database, so on the live project run only its helper section before the newer suites.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
       `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and `payments-webhook` are
       deployed (`payments-webhook` and `read-step` skip the login check; `read-step` accepts only

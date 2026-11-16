@@ -46,6 +46,10 @@ import {
   planReading,
   REGISTRATION_REQUEST,
 } from "../supabase/functions/_shared/parser/plan.ts";
+import {
+  parseRegistration,
+  REGISTRATION_JSON_SCHEMA,
+} from "../supabase/functions/_shared/parser/registration.ts";
 import { optionalEnv } from "./lib/env";
 import { chat, documentPart, type ContentPart } from "./lib/openrouter";
 import { extractPages, loadPdf } from "./lib/pdf";
@@ -205,9 +209,10 @@ async function readDocument(
           content: [part, { type: "text", text: REGISTRATION_REQUEST }],
         },
       ],
+      schema: { name: "registration", schema: REGISTRATION_JSON_SCHEMA },
       spend: spend("settle"),
     });
-    const cor = parseJsonReply(reply);
+    const cor = parseRegistration(parseJsonReply(reply));
     await admin
       .from("documents")
       .update({ status: "needs_review", reader_path: ["settle"], extracted: cor })
