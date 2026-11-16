@@ -84,13 +84,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Takatax" },
       {
         name: "description",
-        content: "Your BIR figures, straight from your receipts. ₱199 per run, no subscription.",
+        content: "AI for your BIR figures and tax monitoring. ₱199 per run, no subscription.",
       },
       { name: "author", content: "Takatax" },
       { property: "og:title", content: "Takatax" },
       {
         property: "og:description",
-        content: "Your BIR figures, straight from your receipts. ₱199 per run, no subscription.",
+        content: "AI for your BIR figures and tax monitoring. ₱199 per run, no subscription.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

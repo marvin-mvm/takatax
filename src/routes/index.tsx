@@ -28,9 +28,9 @@ import { PAYMENTS_LIVE } from "@shared/uploads/rules.ts";
 import { SiteShell } from "@/components/site/SiteShell";
 import { buttonOutline, buttonStart, textLink } from "@/components/site/styles";
 
-const title = "Takatax: your BIR figures, straight from your receipts";
+const title = "Takatax: AI for your BIR figures and tax monitoring";
 const description =
-  "Upload receipts, sales invoices and 2307s. AI reads each one and Takatax computes your tax returns, line by line. Verified bookkeepers and an anonymous community help you file. ₱199 per run.";
+  "Upload receipts, sales invoices and 2307s. AI reads each one and Takatax computes your tax returns, line by line. Verified bookkeepers and a community help you file. ₱199 per run.";
 
 // The home route ships no og:image, so serve-time hosting can inject the
 // project's social preview (explicit og:image or latest screenshot).
@@ -155,8 +155,8 @@ const OUTCOMES: { icon: LucideIcon; title: string; text: string; stage: Stage }[
 /** The community's promises, shown in the lead outcome. */
 const COMMUNITY_POINTS: [string, string][] = [
   [
-    "You stay anonymous",
-    "Your name is never shown, and TINs, phone numbers, emails and amounts are blurred.",
+    "Your privacy is protected",
+    "Your name is never shown, and TINs, phone numbers, emails and amounts are blurred in your community posts.",
   ],
   [
     "Real professionals, rated",
@@ -307,12 +307,11 @@ function LandingPage() {
           For Filipino sole proprietors, freelancers and small businesses
         </p>
         <h1 className="mt-6 text-[40px]/[44px] font-bold tracking-tight text-balance sm:text-[62px]/[66px]">
-          Your BIR figures, straight from your receipts.
+          AI for your BIR figures and tax monitoring.
         </h1>
         <p className="mt-6 max-w-[58ch] text-lg/7 text-tk-muted text-pretty sm:text-xl/8">
           Upload your receipts, sales invoices and 2307s. AI reads each one and Takatax computes
-          your tax returns, line by line. Verified bookkeepers and an anonymous community help you
-          file.{" "}
+          your tax returns, line by line. Verified bookkeepers and a community help you file.{" "}
           {PAYMENTS_LIVE
             ? "₱199 per run; a subscription is optional."
             : "Free during launch: up to 250 pages a run."}
@@ -409,7 +408,7 @@ function LandingPage() {
                 </span>
               </div>
               <h3 className="mt-4 text-2xl font-bold tracking-tight text-balance">
-                A community where taxpayers and bookkeepers meet, anonymously.
+                A community where taxpayers and bookkeepers meet.
               </h3>
               <p className="mt-2 text-tk-muted text-pretty">
                 Ask a tax question without your name. Verified professionals answer under theirs,

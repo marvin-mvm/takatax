@@ -31,7 +31,7 @@ export function CoverSlide() {
       eyebrow="Pitch deck · November 2026"
       title={
         <span className="block max-w-[16ch] text-[40px]/[44px] lg:text-[64px]/[68px]">
-          Your BIR figures, straight from your receipts.
+          AI for your BIR figures and tax monitoring.
         </span>
       }
       lead="Takatax reads your receipts, invoices, sales records, withholding records, 2307s and COR with AI. A tested tax engine then computes every return, per tax type. ₱199 per run; a subscription is optional."
