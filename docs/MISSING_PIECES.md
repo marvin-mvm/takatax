@@ -19,24 +19,23 @@ committed, so never put a secret there).
       `supabase/tests/run.sh` against a local Postgres.
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
-      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000`.
+      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000 20261117090000`.
 - [x] **COR tax types** (`20261116150000_cor_tax_types.sql`): keeps the tax types and forms
       printed on the COR (0619-E, 1601-EQ, 2551Q…) on the account. Applied on 2026-11-16 after its
       rolled-back dry run with `supabase/tests/40_cor_tax_types.sql`; it is in the repair line
       above.
-- [ ] **Deleting documents** (`20261117090000_document_delete.sql`): lets a file be deleted with
-      or without its records, and logs what a professional deletes. It passed its rolled-back
-      dry run on the live project on 2026-11-16 with every check file. Apply it with the
-      owner's go-ahead, add `20261117090000` to the repair line above, then deploy the
-      `delete-document` function.
+- [x] **Deleting documents** (`20261117090000_document_delete.sql`): lets a file be deleted with
+      or without its records, logs what a professional deletes, and tells a professional the
+      client's tier. Applied on 2026-11-16 after its rolled-back dry run with every check file;
+      it is in the repair line above, and the `delete-document` function is deployed.
 - A dry run sends, as one query, `begin;` + the migration + `20_behaviour_api.sql`,
   `30_invitations.sql`, `40_cor_tax_types.sql` and `50_document_delete.sql` + `rollback;`. The
   check files look only at their own test users, so they are safe on a project with real users.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
-      `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and `payments-webhook` are
-      deployed (`payments-webhook` and `read-step` skip the login check; `read-step` accepts only
-      the service role key). Each answers "not configured" until its
-      keys are set. All eight matched `main` file by file on 2026-11-16. Redeploy after changes
+      `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and
+      `payments-webhook` are deployed (`payments-webhook` and `read-step` skip the login check;
+      `read-step` accepts only the service role key). Each answers "not configured" until its
+      keys are set. All nine matched `main` file by file on 2026-11-16. Redeploy after changes
       with `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
 
 ## 1. Cloudflare R2 (file storage)

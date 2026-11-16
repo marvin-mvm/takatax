@@ -17,6 +17,7 @@ import {
   TaxTypeCards,
 } from "@/components/app/TaxCalendar";
 import { TrackerPanel } from "@/components/app/TrackerPanel";
+import { useConfirm } from "@/components/app/confirm";
 import {
   BackLink,
   EmptyState,
@@ -52,6 +53,7 @@ function ClientView() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [problem, setProblem] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
   const today = todayInManila();
   const { year, month } = parseIso(today);
   // Opening a client's account goes in their activity log (once per visit).
@@ -72,8 +74,14 @@ function ClientView() {
   const profile = account.profile;
 
   const leave = async () => {
-    if (!window.confirm(`Stop working on ${account.displayName}? You will lose access at once.`))
-      return;
+    const sure = await confirm({
+      title: "Stop working on this account?",
+      subject: account.displayName,
+      points: ["You lose access at once."],
+      confirm: "Stop working",
+      cancel: "Stay",
+    });
+    if (!sure) return;
     try {
       await leaveClient(account.id);
       await queryClient.invalidateQueries({ queryKey: ["partner-clients"] });
@@ -89,6 +97,7 @@ function ClientView() {
 
   return (
     <div className="flex flex-col gap-8">
+      {dialog}
       <BackLink to="/app">All clients</BackLink>
       <PageHeader
         title={account.displayName}

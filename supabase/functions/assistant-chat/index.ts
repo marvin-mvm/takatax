@@ -5,12 +5,13 @@
 // never from the browser, and the model only explains them; it does not give tax advice. A
 // professional's questions about a client go in the client's activity log (that they asked,
 // not what).
-// Answers 429 over the daily AI spending cap, and 503 { code: "not_configured" } until
-// OPENROUTER_API_KEY is set.
+// Answers 429 over the daily AI spending cap, 502 { code: "no_reply" } when the model gives no
+// answer, and 503 { code: "not_configured" } until OPENROUTER_API_KEY is set.
 import { adminClient, authorize, logAccess } from "../_lib/clients.ts";
 import { HttpError, json, requireEnv, serve } from "../_lib/http.ts";
 import { chat } from "../_lib/openrouter.ts";
 import { assertUnderDailyCap } from "../_lib/spend.ts";
+import { assistantPeriod } from "../_shared/assistant/period.ts";
 import { DEFAULT_ASSISTANT_MODEL } from "../_shared/parser/models.ts";
 
 const SYSTEM = `You are the Takatax records assistant for a Filipino small business owner.
@@ -31,7 +32,9 @@ serve(async (request) => {
     messages: { role: "user" | "assistant"; content: string }[];
     scope: Scope;
   };
-  if (!scope?.accountId || !Array.isArray(messages) || messages.length === 0) {
+  // The period's real first and last day: a made-up "November 31" is refused by the database.
+  const period = scope ? assistantPeriod(scope) : null;
+  if (!scope?.accountId || !period || !Array.isArray(messages) || messages.length === 0) {
     throw new HttpError(400, "bad_request", "Send a question and its scope");
   }
   const { client } = await authorize(request, scope.accountId);
@@ -40,16 +43,14 @@ serve(async (request) => {
   const admin = adminClient();
   await assertUnderDailyCap(admin);
 
-  const from = `${scope.year}-${String(scope.fromMonth).padStart(2, "0")}-01`;
-  const to = `${scope.year}-${String(scope.toMonth).padStart(2, "0")}-31`;
   const { data: records, error } = await client
     .from("ledger_records")
     .select(
       "kind, record_date, counterparty, category, amount_centavos, vat_centavos, tax_withheld_centavos",
     )
     .eq("account_id", scope.accountId)
-    .gte("record_date", from)
-    .lte("record_date", to);
+    .gte("record_date", period.from)
+    .lte("record_date", period.to);
   if (error) throw error;
 
   // A compact, numbers-only summary keeps the prompt small and the model on the facts.
@@ -67,7 +68,7 @@ serve(async (request) => {
     if (r.kind === "withholding") byMonth[month].withheld += r.tax_withheld_centavos / 100;
   }
   const facts = JSON.stringify({
-    period: { from, to },
+    period,
     taxType: scope.taxType,
     byMonth,
     expensesByCategory: byCategory,
@@ -79,8 +80,11 @@ serve(async (request) => {
       { role: "system", content: `${SYSTEM}\n\nThe user's figures (pesos):\n${facts}` },
       ...messages.slice(-10),
     ],
-    maxTokens: 800,
+    // Room for the model's own thinking as well as a short answer.
+    maxTokens: 1_500,
     spend: { admin, functionName: "assistant-chat", accountId: scope.accountId },
   });
+  // An empty answer is a failure the screen can report, not a blank bubble.
+  if (!reply.trim()) throw new HttpError(502, "no_reply", "The assistant gave no answer");
   return json({ reply });
 });

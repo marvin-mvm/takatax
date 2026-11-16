@@ -5,6 +5,7 @@ import { type ReactNode, useMemo, useState } from "react";
 
 import { MessageButton } from "@/components/app/MessageButton";
 import { useAppUser } from "@/components/app/app-user";
+import { type ConfirmContent, useConfirm } from "@/components/app/confirm";
 import {
   Card,
   EmptyState,
@@ -43,6 +44,7 @@ function AccessPage() {
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   if (query.isPending) return <LoadingBlock label="Loading who can see your account…" />;
   if (query.isError)
@@ -55,11 +57,11 @@ function AccessPage() {
 
   const act = async (
     grant: AccessGrant,
-    question: string,
+    question: ConfirmContent,
     action: (partnerId: string) => Promise<void>,
     done: string,
   ) => {
-    if (!window.confirm(question)) return;
+    if (!(await confirm(question))) return;
     setBusy(grant.partnerId);
     setNotice(null);
     try {
@@ -78,6 +80,7 @@ function AccessPage() {
 
   return (
     <div className="flex flex-col gap-8">
+      {dialog}
       <PageHeader
         title="Who can see my account"
         subtitle="Invite a bookkeeper, CPA or tax lawyer. Once they accept, they can see your receipts, sales, Forms 2307 and COR, and work with the features of your plan. They never see your payments or this page."
@@ -110,7 +113,12 @@ function AccessPage() {
                     onClick={() =>
                       void act(
                         grant,
-                        `Cancel your invitation to ${grant.partnerName}?`,
+                        {
+                          title: "Cancel this invitation?",
+                          subject: grant.partnerName,
+                          confirm: "Cancel invitation",
+                          cancel: "Keep it",
+                        },
                         cancelPartnerInvite,
                         `Your invitation to ${grant.partnerName} is cancelled.`,
                       )
@@ -153,7 +161,12 @@ function AccessPage() {
                     onClick={() =>
                       void act(
                         grant,
-                        `Remove ${grant.partnerName}'s access to your account?`,
+                        {
+                          title: "Remove their access?",
+                          subject: grant.partnerName,
+                          points: ["They can no longer see your account.", "Your messages stay."],
+                          confirm: "Remove access",
+                        },
                         revokePartnerAccess,
                         `${grant.partnerName} can no longer see your account. Your messages stay.`,
                       )
@@ -177,12 +190,12 @@ function AccessPage() {
           <p>
             <strong className="font-semibold text-tk-ink">What a professional can do.</strong> Open
             your receipts, sales invoices, Forms 2307 and COR, your tracker and return figures;
-            correct a figure the AI read wrongly; and upload documents for you.
+            correct a figure the AI read wrongly; upload documents for you; and delete a document.
           </p>
           <p>
             <strong className="font-semibold text-tk-ink">What they cannot.</strong> See your plan,
-            payments or this page, invite anyone else, or delete anything. Everything they open or
-            change appears in the activity log below, and no one can edit the log.
+            payments or this page, or invite anyone else. Everything they open, change or delete
+            appears in the activity log below, and no one can edit the log.
           </p>
         </div>
       </Card>
