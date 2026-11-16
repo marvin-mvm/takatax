@@ -59,7 +59,7 @@ Supabase → Project settings → Edge Functions → Secrets:
 ## 3. Trigger.dev (the reader)
 
 The project is `proj_afhlvwluvvvtblfsplyn` (already in `trigger.config.ts`). The SDK and CLI are
-pinned to version 4.8.3; use that version in every command so they match.
+pinned to version 4.8.5; use that version in every command so they match.
 
 Environment variables (Trigger.dev dashboard → Environment variables; set them for
 **Development** and **Production**):
@@ -85,7 +85,7 @@ Actions tab ("Deploy Trigger.dev tasks" → Run workflow).
    "Deploy only" key cannot start reading jobs.
 
 To test on a computer instead (needs a recent macOS for Bun): `bun install`,
-`npx trigger.dev@4.8.3 login`, then `npx trigger.dev@4.8.3 dev` (Development environment, using
+`npx trigger.dev@4.8.5 login`, then `npx trigger.dev@4.8.5 dev` (Development environment, using
 the `tr_dev_…` key).
 
 ## 4. Payments: Xendit, "coming soon"
