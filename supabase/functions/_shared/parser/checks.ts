@@ -14,7 +14,8 @@ export type CheckFlag =
   | "missing_date"
   | "outside_period"
   | "unusual_withholding_rate"
-  | "not_a_document";
+  | "not_a_document"
+  | "pages_not_paid";
 
 export const CHECK_FLAG_TEXT: Record<CheckFlag, string> = {
   low_confidence: "The AI was not sure about a key figure.",
@@ -25,6 +26,8 @@ export const CHECK_FLAG_TEXT: Record<CheckFlag, string> = {
   outside_period: "The date is outside the period being filed.",
   unusual_withholding_rate: "The tax withheld is not a standard rate (1, 2, 5, 10 or 15%).",
   not_a_document: "This does not look like a receipt, invoice or Form 2307.",
+  pages_not_paid:
+    "This PDF has more pages than were counted at upload; only the pages paid for were read.",
 };
 
 /** Below this, a field counts as unsure. Tune on the 200-document test set. */

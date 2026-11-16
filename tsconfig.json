@@ -5,7 +5,9 @@
     "vite.config.ts",
     "vitest.config.ts",
     "eslint.config.js",
-    "supabase/functions/_shared/**/*.ts"
+    "supabase/functions/_shared/**/*.ts",
+    "trigger/**/*.ts",
+    "trigger.config.ts"
   ],
   "compilerOptions": {
     "target": "ES2022",

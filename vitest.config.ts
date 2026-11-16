@@ -8,7 +8,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}", "supabase/functions/_shared/**/*.{test,spec}.ts"],
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      "supabase/functions/_shared/**/*.{test,spec}.ts",
+      "trigger/**/*.{test,spec}.ts",
+    ],
   },
   resolve: {
     alias: {
