@@ -9,7 +9,7 @@ Never paste a full key into a chat, an issue or a commit. Set keys only in the S
 Trigger.dev dashboards, or in `.env.local` on your own computer (git ignores it; `.env` is
 committed, so never put a secret there).
 
-## 0. Supabase project `thiznrxojzrxkjwqhtjt` (done)
+## 0. Supabase project `thiznrxojzrxkjwqhtjt`
 
 - [x] **Database**: both migrations in `supabase/migrations/` were applied on 2026-11-16, after a
       rolled-back dry run with every behaviour check passing on the live project. 15 tables,
@@ -18,6 +18,11 @@ committed, so never put a secret there).
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
       `supabase migration repair --status applied 20261115120000 20261115140000`.
+- [ ] **Invitations and the activity log**: `20261116120000_invitations_activity.sql` is not
+      applied yet. Apply it when this change is merged and the site is deployed (with no users
+      yet, the few minutes between the two do not matter): a rolled-back dry run first with
+      `supabase/tests/20_behaviour_api.sql` and `30_invitations.sql`, then the migration. Then
+      redeploy `document-link` and `assistant-chat`, which now log what a professional opens.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
       `read-documents`, `assistant-chat`, `create-checkout` and `payments-webhook` are deployed
       (only `payments-webhook` skips the login check). Each answers "not configured" until its
@@ -85,6 +90,12 @@ always matches the SDK (4.8.4 or later is needed for trusted publishing).
    Production environment then lists `read-run` and `ping`; run `ping` from its Test page.
 4. Set Supabase's `TRIGGER_SECRET_KEY` to the regular Production secret key (`tr_prod_…`). A
    "Deploy only" key cannot start reading jobs.
+
+If the deploy stops with **"Deployments are not available for this organization"**, deploys are
+switched off for the Trigger.dev organization itself. That is a setting on Trigger.dev's side:
+no key, workflow or CLI version changes it. Ask Trigger.dev support (the chat in the dashboard,
+or Discord) to enable deployments for the organization that owns `proj_afhlvwluvvvtblfsplyn`,
+then re-run the workflow.
 
 To test on a computer instead (needs a recent macOS for Bun): `bun install`,
 `npx trigger.dev@4.8.5 login`, then `npx trigger.dev@4.8.5 dev` (Development environment, using

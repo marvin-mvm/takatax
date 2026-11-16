@@ -208,7 +208,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string; status: Status 
   {
     icon: KeyRound,
     title: "You choose who sees your account",
-    text: "Give a professional access in one tap, see everyone who can open your records, and remove them at any time.",
+    text: "Invite a professional in one tap. They see your records only after they accept, every file they open or figure they change shows in your activity log, and you can remove them at any time.",
     status: "Ready",
   },
   {
@@ -269,7 +269,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Is my data private?",
-    a: "Your documents are stored privately and only you, and any bookkeeper you give access to, can see them. You can remove a bookkeeper's access or delete your files at any time.",
+    a: "Your documents are stored privately. Only you, and a bookkeeper you invite who accepts, can see them. They never see your plan or payments, everything they open or change shows in your activity log, and you can remove their access at any time.",
   },
   {
     q: "How much does it cost?",

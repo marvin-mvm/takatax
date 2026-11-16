@@ -153,8 +153,8 @@ function ConversationPage() {
         >
           {messages.length === 0 ? (
             <li className="m-auto max-w-[40ch] text-center text-tk-muted">
-              Say hello. Explain what you need help with; you can share documents by giving access
-              to your account.
+              Say hello. Explain what you need help with; to share your documents, invite them to
+              your account from their profile.
             </li>
           ) : (
             messages.map((message, index) => (

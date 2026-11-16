@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, KeyRound, MessageSquare, UserX } from "lucide-react";
+import { BadgeCheck, Hourglass, KeyRound, MessageSquare, UserPlus, UserX, X } from "lucide-react";
 import { useState } from "react";
 
 import { MessageButton } from "@/components/app/MessageButton";
@@ -10,9 +10,10 @@ import { buttonOutline, buttonPrimary } from "@/components/site/styles";
 import { useAuth } from "@/lib/auth/use-auth";
 import { useMyAccess, usePartner } from "@/lib/data/queries";
 import {
-  NotConnectedError,
+  cancelPartnerInvite,
   getPartner,
-  grantPartnerAccess,
+  invitationProblem,
+  invitePartner,
   isPartner,
   revokePartnerAccess,
   roleOf,
@@ -54,7 +55,8 @@ function PartnerPage() {
   const signedInId = auth.status === "signedIn" ? auth.user.id : "";
   const access = useMyAccess(signedInId, isTaxpayer);
   const queryClient = useQueryClient();
-  const activeGrant = access.data?.data.find((g) => g.partnerId === partnerId && !g.revokedAt);
+  const grant = access.data?.data.find((g) => g.partnerId === partnerId);
+  const status = grant?.status;
   const [message, setMessage] = useState<string | null>(null);
   const [rating, setRating] = useState(5);
   const [review, setReview] = useState("");
@@ -83,13 +85,11 @@ function PartnerPage() {
     try {
       await action();
       setMessage(done);
-      void queryClient.invalidateQueries({ queryKey: ["access"] });
     } catch (error) {
-      setMessage(
-        error instanceof NotConnectedError
-          ? `${error.message} Nothing was saved.`
-          : "Something went wrong. Please try again.",
-      );
+      setMessage(invitationProblem(error));
+    } finally {
+      void queryClient.invalidateQueries({ queryKey: ["access"] });
+      void queryClient.invalidateQueries({ queryKey: ["access-events"] });
     }
   };
   const counts = [5, 4, 3, 2, 1].map((n) => ({
@@ -227,7 +227,8 @@ function PartnerPage() {
                   Post review
                 </button>
                 <p className="text-sm text-tk-muted">
-                  Only clients who gave this professional access to their account can review them.
+                  Only clients who had them in their account (an accepted invitation) can review
+                  them.
                 </p>
               </form>
             ) : null}
@@ -259,7 +260,7 @@ function PartnerPage() {
                   primary
                   className="[&>button]:w-full"
                 />
-                {activeGrant ? (
+                {status === "active" ? (
                   <div className="flex flex-col gap-2 rounded-[12px] bg-tk-brand-soft p-3">
                     <p className="flex items-center gap-2 text-sm font-medium text-tk-brand">
                       <KeyRound aria-hidden className="size-4" /> Can see your account
@@ -277,18 +278,37 @@ function PartnerPage() {
                       <UserX aria-hidden className="size-5" /> Remove access
                     </button>
                   </div>
+                ) : status === "pending" ? (
+                  <div className="flex flex-col gap-2 rounded-[12px] bg-tk-warn-soft p-3">
+                    <p className="flex items-center gap-2 text-sm font-medium text-tk-warn">
+                      <Hourglass aria-hidden className="size-4" /> Invitation sent. Waiting for
+                      their answer.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void run(
+                          () => cancelPartnerInvite(partner.id),
+                          `Your invitation to ${partner.name} is cancelled.`,
+                        )
+                      }
+                      className={buttonOutline}
+                    >
+                      <X aria-hidden className="size-5" /> Cancel invitation
+                    </button>
+                  </div>
                 ) : (
                   <button
                     type="button"
                     onClick={() =>
                       void run(
-                        () => grantPartnerAccess(partner.id),
-                        `${partner.name} can now see your account. You can remove access at any time under Access.`,
+                        () => invitePartner(partner.id),
+                        `Invitation sent. ${partner.name} can see your account only after they accept. You can cancel it under Access.`,
                       )
                     }
                     className={buttonOutline}
                   >
-                    <KeyRound aria-hidden className="size-5" /> Give access to my account
+                    <UserPlus aria-hidden className="size-5" /> Invite to my account
                   </button>
                 )}
               </>

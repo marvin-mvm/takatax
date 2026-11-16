@@ -167,7 +167,14 @@ export interface ConversationThread {
   messages: ChatMessageRecord[];
 }
 
-/** A professional who has (or had) access to the signed-in taxpayer's account. */
+/**
+ * Where an invitation stands. "pending": waiting for the professional; "active": they accepted
+ * and can see the account; the rest are ended (declined, cancelled by the taxpayer, access
+ * removed by the taxpayer, or the professional left).
+ */
+export type AccessStatus = "pending" | "active" | "declined" | "cancelled" | "revoked" | "left";
+
+/** A professional the signed-in taxpayer invited (now or before). */
 export interface AccessGrant {
   partnerId: string;
   partnerName: string;
@@ -175,9 +182,52 @@ export interface AccessGrant {
   city: string;
   rating: number;
   reviewCount: number;
-  grantedAt: string;
-  /** Null while the access is active. */
-  revokedAt: string | null;
+  status: AccessStatus;
+  invitedAt: string;
+  /** When they accepted; null until then (and for invitations that were never accepted). */
+  grantedAt: string | null;
+  /** When the invitation or the access ended; null while pending or active. */
+  endedAt: string | null;
+}
+
+/** An invitation waiting for the signed-in professional's answer. */
+export interface PartnerInvitation {
+  accountId: string;
+  taxpayerUserId: string;
+  taxpayerName: string;
+  businessName: string;
+  invitedAt: string;
+}
+
+/** What can appear in a taxpayer's activity log. */
+export type AccessEventAction =
+  | "invited"
+  | "invite_cancelled"
+  | "accepted"
+  | "declined"
+  | "access_removed"
+  | "left"
+  | "opened_account"
+  | "opened_document"
+  | "asked_assistant"
+  | "uploaded_document"
+  | "started_reading"
+  | "edited_record"
+  | "confirmed_cor";
+
+/** One entry in the taxpayer's activity log. Entries can never be changed. */
+export interface AccessEvent {
+  id: string;
+  action: AccessEventAction;
+  /** The professional the entry is about (null if they deleted their account). */
+  partnerId: string | null;
+  partnerName: string;
+  /** True when the taxpayer did it (invited, cancelled, removed access). */
+  byOwner: boolean;
+  /** The document or record it concerns, if any. */
+  targetId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
 }
 
 /** A partner's own profile, as they edit it (including details that are not public). */
