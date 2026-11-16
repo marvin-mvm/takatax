@@ -23,9 +23,15 @@ committed, so never put a secret there).
 - [x] **COR tax types** (`20261116150000_cor_tax_types.sql`): keeps the tax types and forms
       printed on the COR (0619-E, 1601-EQ, 2551Q…) on the account. Applied on 2026-11-16 after its
       rolled-back dry run with `supabase/tests/40_cor_tax_types.sql`; it is in the repair line
-      above. For the next migration, the dry run can use all of `20_behaviour_api.sql`,
-      `30_invitations.sql` and `40_cor_tax_types.sql`: they look only at their own test users, so
-      they are safe on a project with real users.
+      above.
+- [ ] **Deleting documents** (`20261117090000_document_delete.sql`): lets a file be deleted with
+      or without its records, and logs what a professional deletes. It passed its rolled-back
+      dry run on the live project on 2026-11-16 with every check file. Apply it with the
+      owner's go-ahead, add `20261117090000` to the repair line above, then deploy the
+      `delete-document` function.
+- A dry run sends, as one query, `begin;` + the migration + `20_behaviour_api.sql`,
+  `30_invitations.sql`, `40_cor_tax_types.sql` and `50_document_delete.sql` + `rollback;`. The
+  check files look only at their own test users, so they are safe on a project with real users.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
       `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and `payments-webhook` are
       deployed (`payments-webhook` and `read-step` skip the login check; `read-step` accepts only
@@ -129,10 +135,15 @@ the `tr_dev_…` key).
 Payments are switched off for launch with one constant, `PAYMENTS_LIVE = false` in
 `supabase/functions/_shared/uploads/rules.ts`. While it is off:
 
-- every **Standard run of up to 250 pages is free**, for taxpayers and partners, as often as
+- every **Standard run of up to 80 pages is free**, for taxpayers and partners, as often as
   they like;
-- **pages over 250 (₱2 each)** and **Premium (₱800 a month)** show "coming soon" and cannot be
+- **pages over 80 (₱3.50 each)** and **Premium (₱649 a month)** show "coming soon" and cannot be
   bought, on the screens and on the server (`create-checkout` answers `coming_soon`).
+
+The price list is `PRICING` in the same file: a Standard run is ₱149 for up to 80 pages, then
+₱3.50 a page; Premium is ₱649 a month for 300 pages and 15 GB of storage, then ₱2.65 a page;
+partners pay 25% less for a client's run. The site, the app and the deck read their figures from
+it, so change a price there and redeploy the site and the edge functions.
 
 To switch payments on (Xendit: GCash, Maya, cards):
 
@@ -145,7 +156,7 @@ To switch payments on (Xendit: GCash, Maya, cards):
       `supabase/functions/_lib/payments.ts`; confirm its request and webhook fields against
       Xendit's current docs.
 - [ ] Set `PAYMENTS_LIVE = true`, then redeploy the site (merge to `main`) and the edge functions.
-      The full pricing (free trial, ₱199 runs, 25% partner price, ₱2 extra pages, Premium) then
+      The full pricing (free trial, ₱149 runs, 25% partner price, extra pages, Premium) then
       applies.
 
 ## 5. Optional settings (sensible defaults already apply)

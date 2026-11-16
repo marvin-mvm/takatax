@@ -4,8 +4,11 @@
  *
  * A COR lists the business's tax types, each with the BIR form it is filed on (for example
  * "Withholding Tax - Expanded" on 0619-E and 1601-EQ, "Percentage Tax - Quarterly" on 2551Q).
- * Those forms are what the taxpayer must file, so they are read one by one and kept.
+ * Those forms are what the taxpayer must file, so they are read one by one and kept. What each
+ * form is, and how often it is filed, comes from the table of BIR forms (domain/bir-forms.ts).
  */
+
+import { BIR_FORMS, canonicalFormCode } from "../domain/bir-forms.ts";
 
 /** One tax type row of a COR, with the BIR form it is filed on. */
 export interface CorTaxType {
@@ -103,8 +106,9 @@ const isoOrNull = (value: unknown): string | null => {
 
 /**
  * A BIR form number the way the BIR writes it: "0619E" -> "0619-E", "1601 EQ" -> "1601-EQ",
- * "BIR Form No. 2551Q" -> "2551Q". Withholding forms (06xx, 16xx) take a dash before their
- * letters; the others (1701Q, 2550Q, 2551Q…) do not. Anything that is not a form number is null.
+ * "BIR Form No. 2551Q" -> "2551Q", "1702RT" -> "1702-RT". Known forms take the spelling in the
+ * table of BIR forms. For a form that is not in the table, withholding forms (06xx, 16xx) take a
+ * dash before their letters and the others do not. Anything that is not a form number is null.
  */
 export function normalizeFormCode(value: unknown): string | null {
   const text = str(value);
@@ -113,6 +117,8 @@ export function normalizeFormCode(value: unknown): string | null {
   if (!match) return null;
   const [, digits = "", letters = ""] = match;
   const suffix = letters.toUpperCase();
+  const known = canonicalFormCode(digits, suffix);
+  if (known) return known;
   if (!suffix) return digits;
   return /^(06|16)/.test(digits) ? `${digits}-${suffix}` : `${digits}${suffix}`;
 }
@@ -170,63 +176,17 @@ export function parseRegistration(raw: unknown): ExtractedRegistration {
 export interface FormInfo {
   title: string;
   frequency: string;
-  /** False for forms no longer filed (the annual registration fee ended in 2024). */
+  /** False for forms no longer filed (for example the annual registration fee, ended in 2024). */
   active: boolean;
 }
 
-export const FORM_INFO: Record<string, FormInfo> = {
-  "0619-E": {
-    title: "Monthly remittance of expanded withholding tax",
-    frequency: "Monthly (first two months of each quarter)",
-    active: true,
-  },
-  "1601-EQ": {
-    title: "Quarterly return of expanded withholding tax",
-    frequency: "Quarterly",
-    active: true,
-  },
-  "1604-E": {
-    title: "Annual information return of expanded withholding tax",
-    frequency: "Yearly",
-    active: true,
-  },
-  "0619-F": {
-    title: "Monthly remittance of final withholding tax",
-    frequency: "Monthly (first two months of each quarter)",
-    active: true,
-  },
-  "1601-FQ": {
-    title: "Quarterly return of final withholding tax",
-    frequency: "Quarterly",
-    active: true,
-  },
-  "1601-C": {
-    title: "Monthly return of tax withheld on salaries",
-    frequency: "Monthly",
-    active: true,
-  },
-  "1604-C": {
-    title: "Annual information return of tax withheld on salaries",
-    frequency: "Yearly",
-    active: true,
-  },
-  "2551Q": { title: "Quarterly percentage tax return", frequency: "Quarterly", active: true },
-  "2550Q": { title: "Quarterly VAT return", frequency: "Quarterly", active: true },
-  "2550M": { title: "Monthly VAT declaration", frequency: "Monthly", active: true },
-  "1701Q": { title: "Quarterly income tax return", frequency: "Quarterly", active: true },
-  "1701": { title: "Annual income tax return", frequency: "Yearly", active: true },
-  "1701A": {
-    title: "Annual income tax return (business or profession only)",
-    frequency: "Yearly",
-    active: true,
-  },
-  "1702Q": { title: "Quarterly corporate income tax return", frequency: "Quarterly", active: true },
-  "0605": {
-    title: "Annual registration fee (no longer paid since January 2024)",
-    frequency: "No longer filed",
-    active: false,
-  },
-};
+/** Every form in the table of BIR forms, by form number. */
+export const FORM_INFO: Record<string, FormInfo> = Object.fromEntries(
+  BIR_FORMS.map((entry) => [
+    entry.form,
+    { title: entry.title, frequency: entry.frequency, active: entry.schedule !== "retired" },
+  ]),
+);
 
 const formsOf = (taxTypes: CorTaxType[]) =>
   new Set(taxTypes.map((t) => t.form).filter((f): f is string => f !== null));

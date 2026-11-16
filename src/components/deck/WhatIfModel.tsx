@@ -19,6 +19,7 @@ import {
   type ReaderMode,
   type YearResult,
 } from "@/lib/deck/model";
+import { PRICE } from "@/lib/pricing-copy";
 import { cn } from "@/lib/utils";
 
 import { MoneyChart, StreamsChart } from "./charts";
@@ -26,7 +27,7 @@ import { Cite } from "./primitives";
 
 interface SliderRowProps {
   label: string;
-  /** The current value as the reader should see it, for example "₱199". */
+  /** The current value as the reader should see it, for example "₱149". */
   display: string;
   value: number;
   min: number;
@@ -253,7 +254,7 @@ function RunEconomicsPanel({
   const rows: { label: string; value: (run: typeof regular) => number; minus?: boolean }[] = [
     { label: `Price, up to ${RUN_PAGE_LIMIT} pages`, value: (run) => run.basePrice },
     {
-      label: `Pages over ${RUN_PAGE_LIMIT}, ₱${EXTRA_PAGE_PRICE} each`,
+      label: `Pages over ${RUN_PAGE_LIMIT}, ${PRICE.extraPage} each`,
       value: (run) => run.extraRevenue,
     },
     { label: "AI (OpenRouter)", value: (run) => run.aiCost, minus: true },
@@ -347,11 +348,11 @@ function RunEconomicsPanel({
   );
 }
 
-/** Premium limits to compare: the old plan (300) and the new one (1,000). */
+/** Premium limits to compare: the plan's 300 pages and a much larger 1,000. */
 const COMPARED_LIMITS = [300, 1_000];
 
 /**
- * Premium limit check: the old 300 and the new 1,000 pages a month side by side, plus the
+ * Premium limit check: 300 and 1,000 pages a month side by side, plus the
  * slider's own value when it is different. Every other input comes from the sliders, so the
  * comparison moves with them. "Use" buttons set the limit slider.
  */
@@ -381,9 +382,9 @@ function PremiumLimitCheck({
       </h3>
       <p className="mt-1 text-[13px]/[18px] text-tk-muted text-pretty">
         Same price (₱{inputs.premiumPrice}), same customers. A bigger limit earns nothing more and
-        costs more AI only for customers who use it; pages over the limit are ₱{EXTRA_PAGE_PRICE}{" "}
-        each. At your settings a Premium customer uses {inputs.premiumUsagePct}% of the limit, and
-        one Premium month breaks even at about{" "}
+        costs more AI only for customers who use it; pages over the limit are{" "}
+        {PRICE.premiumExtraPage} each. At your settings a Premium customer uses{" "}
+        {inputs.premiumUsagePct}% of the limit, and one Premium month breaks even at about{" "}
         {Number.isFinite(breakEven) ? formatNumber(breakEven) : "any number of"} pages.
       </p>
       <div className="relative mt-3 overflow-x-auto">
@@ -530,7 +531,7 @@ export function WhatIfModel() {
               summary={`₱${inputs.runPrice} run, ₱${inputs.premiumPrice} Premium, ₱${inputs.storagePrice} storage`}
             >
               <SliderRow
-                label="Parse run"
+                label="Standard run"
                 display={formatPesos(inputs.runPrice)}
                 value={inputs.runPrice}
                 min={99}
@@ -542,8 +543,8 @@ export function WhatIfModel() {
                 label="Premium, per month"
                 display={formatPesos(inputs.premiumPrice)}
                 value={inputs.premiumPrice}
-                min={400}
-                max={1500}
+                min={399}
+                max={1499}
                 step={50}
                 onChange={(value) => set("premiumPrice", value)}
               />
@@ -575,7 +576,7 @@ export function WhatIfModel() {
                 label="Pages per run"
                 display={
                   inputs.pagesPerRun > RUN_PAGE_LIMIT
-                    ? `${inputs.pagesPerRun} · +₱${(inputs.pagesPerRun - RUN_PAGE_LIMIT) * EXTRA_PAGE_PRICE}`
+                    ? `${inputs.pagesPerRun} · +${formatPesos((inputs.pagesPerRun - RUN_PAGE_LIMIT) * EXTRA_PAGE_PRICE)}`
                     : String(inputs.pagesPerRun)
                 }
                 value={inputs.pagesPerRun}
@@ -597,7 +598,7 @@ export function WhatIfModel() {
                 label="Premium limit, pages a month"
                 display={formatNumber(inputs.premiumPageLimit)}
                 value={inputs.premiumPageLimit}
-                min={300}
+                min={100}
                 max={2_000}
                 step={50}
                 onChange={(value) => set("premiumPageLimit", value)}
@@ -725,7 +726,7 @@ export function WhatIfModel() {
               <p className="text-[13px]/[18px] text-tk-muted">
                 Xendit: 2.3% for GCash, 1.8% for Maya, 3.2% + ₱10 for cards. A merchant of record
                 (for example Dodo Payments: 4% + $0.40, plus 1.5% for cards outside the US) also
-                handles tax and refunds, but its fixed fee weighs heavily on a ₱199 run.
+                handles tax and refunds, but its fixed fee weighs heavily on a {PRICE.run} run.
               </p>
             </ControlGroup>
             <ControlGroup
@@ -885,13 +886,13 @@ export function WhatIfModel() {
       <p className="text-[13px]/[18px] text-tk-muted text-pretty">
         Fixed assumptions: {formatNumber(MICRO_ENTERPRISES)} micro enterprises{" "}
         <Cite source="DTI" refs={[1, 2]} />; 2% monthly churn; partners grow to 1,608 by month 36
-        with one client each; 1 in 18 regular customers buys storage; ₱2 for each page over a run's
-        or Premium's limit; Trigger.dev Pro at $50 a month including $50 of usage; 3% percentage tax
-        up to ₱3M of yearly revenue, VAT above it; income tax of 20% or 25%. Unit costs from{" "}
-        <Cite source="Takatax" refs={[21]} />, <Cite source="Google" refs={[19]} />,{" "}
-        <Cite source="Anthropic" refs={[20]} />, <Cite source="Trigger.dev" refs={[24]} />,{" "}
-        <Cite source="Xendit" refs={[26]} /> and <Cite source="Dodo Payments" refs={[25]} />. A
-        projection, not a forecast.
+        with one client each; 1 in 18 regular customers buys storage; {PRICE.extraPage} for each
+        page over a run's limit and {PRICE.premiumExtraPage} over Premium's; Trigger.dev Pro at $50
+        a month including $50 of usage; 3% percentage tax up to ₱3M of yearly revenue, VAT above it;
+        income tax of 20% or 25%. Unit costs from <Cite source="Takatax" refs={[21]} />,{" "}
+        <Cite source="Google" refs={[19]} />, <Cite source="Anthropic" refs={[20]} />,{" "}
+        <Cite source="Trigger.dev" refs={[24]} />, <Cite source="Xendit" refs={[26]} /> and{" "}
+        <Cite source="Dodo Payments" refs={[25]} />. A projection, not a forecast.
       </p>
     </div>
   );

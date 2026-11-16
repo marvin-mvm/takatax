@@ -175,6 +175,7 @@ function toDocument(row: Row): StoredDocument {
     readerPath: Array.isArray(row["reader_path"]) ? (row["reader_path"] as string[]) : [],
     flags: Array.isArray(row["flags"]) ? (row["flags"] as CheckFlag[]) : [],
     previewUrl: null,
+    fileDeleted: Boolean(row["file_deleted_at"]),
   };
 }
 
@@ -1007,6 +1008,17 @@ export async function loadCorToConfirm(
       taxTypes: read.taxTypes,
     },
   };
+}
+
+/**
+ * The tier of an account the signed-in user can work on: their own, or a client's. A
+ * professional gets the client's tier and nothing else about their billing. Standard when the
+ * account has no Premium month running, or when it cannot be asked.
+ */
+export async function loadAccountTier(accountId: string): Promise<"standard" | "premium"> {
+  if (!accountId || accountId.startsWith("sample-")) return "standard";
+  const { data, error } = await db.rpc("account_tier", { account: accountId });
+  return !error && data === "premium" ? "premium" : "standard";
 }
 
 /** Saves the confirmed COR: this sets the account's tax types and deadlines. */

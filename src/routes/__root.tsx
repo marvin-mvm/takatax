@@ -12,6 +12,10 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { PRICE } from "../lib/pricing-copy";
+
+/** The site-wide description, with the price taken from the pricing rules. */
+const SITE_DESCRIPTION = `AI for your BIR figures and tax monitoring. ${PRICE.run} per run, no subscription.`;
 
 function NotFoundComponent() {
   return (
@@ -84,13 +88,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Takatax" },
       {
         name: "description",
-        content: "AI for your BIR figures and tax monitoring. ₱199 per run, no subscription.",
+        content: SITE_DESCRIPTION,
       },
       { name: "author", content: "Takatax" },
       { property: "og:title", content: "Takatax" },
       {
         property: "og:description",
-        content: "AI for your BIR figures and tax monitoring. ₱199 per run, no subscription.",
+        content: SITE_DESCRIPTION,
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

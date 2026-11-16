@@ -2,8 +2,8 @@
 // hosted Invoice checkout.
 //
 // "COMING SOON": payments are off while PAYMENTS_LIVE (supabase/functions/_shared/uploads/rules.ts)
-// is false. Then Standard runs of up to 250 pages are free, and everything that needs a payment
-// (pages over 250 and Premium) is blocked before reaching this file.
+// is false. Then Standard runs of up to 80 pages are free, and everything that needs a payment
+// (pages over 80 and Premium) is blocked before reaching this file.
 //
 // MISSING, to switch payments on:
 // 1. Xendit dashboard -> Settings -> API keys: a secret key with "Money-in" write access.

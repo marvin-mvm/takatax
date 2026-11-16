@@ -20,6 +20,7 @@ import {
   loadMyPartnerProfile,
   loadMyWorkspace,
   loadPartnerClients,
+  loadAccountTier,
   loadPlan,
 } from "./repository";
 import type { AccountRole, Loaded, PartnerKind, Workspace } from "./types";
@@ -119,3 +120,12 @@ export const useCorToConfirm = (accountId: string) =>
 
 export const usePlan = (userId: string) =>
   useQuery({ queryKey: ["plan", userId], queryFn: () => loadPlan(userId) });
+
+/** The tier of a client's account, for a professional: their features follow it. */
+export const useAccountTier = (accountId: string) =>
+  useQuery({
+    queryKey: ["account-tier", accountId],
+    queryFn: () => loadAccountTier(accountId),
+    enabled: Boolean(accountId),
+    staleTime: 5 * 60_000,
+  });

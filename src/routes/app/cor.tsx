@@ -137,7 +137,7 @@ function MyCorPage() {
                           {formatIsoDate(filing.dueDate)}
                         </td>
                         <td className="px-4 py-2.5 text-right font-tk-mono tabular-nums">
-                          {filing.periodEnd <= today || filing.periodStart <= today
+                          {filing.payment === "estimated" && filing.periodStart <= today
                             ? peso(estimateFiling(filing, records, profile).payable)
                             : "—"}
                         </td>

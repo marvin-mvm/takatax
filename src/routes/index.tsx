@@ -25,12 +25,12 @@ import {
 import type { ReactNode } from "react";
 
 import { PAYMENTS_LIVE } from "@shared/uploads/rules.ts";
+import { PAGE_RULE, PRICE } from "@/lib/pricing-copy";
 import { SiteShell } from "@/components/site/SiteShell";
 import { buttonOutline, buttonStart, textLink } from "@/components/site/styles";
 
 const title = "Takatax: AI for your BIR figures and tax monitoring";
-const description =
-  "Upload receipts, sales invoices and 2307s. AI reads each one and Takatax computes your tax returns, line by line. Verified bookkeepers and a community help you file. ₱199 per run.";
+const description = `Upload receipts, sales invoices and 2307s. AI reads each one and Takatax computes your tax returns, line by line. Verified bookkeepers and a community help you file. ${PRICE.run} per run.`;
 
 // The home route ships no og:image, so serve-time hosting can inject the
 // project's social preview (explicit og:image or latest screenshot).
@@ -228,7 +228,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string; status: Status 
 const FAQ: { q: string; a: ReactNode }[] = [
   {
     q: "How do I use Takatax?",
-    a: "Create a free account, upload your COR (BIR Form 2303), then upload your receipts, sales invoices and 2307s. AI reads them, and your tracker and return figures fill in. Your first 10 pages are free.",
+    a: `Create a free account, upload your COR (BIR Form 2303), then upload your receipts, sales invoices and 2307s. AI reads them, and your tracker and return figures fill in. Your first ${PRICE.trialPages} pages are free.`,
   },
   {
     q: "Who files my tax return?",
@@ -247,6 +247,18 @@ const FAQ: { q: string; a: ReactNode }[] = [
     a: "We flag blurry, dark or glary photos before you upload so you can retake them. If the AI is still unsure about an amount or TIN, it asks you to check that one figure instead of guessing.",
   },
   {
+    q: "What if my receipt is in US dollars or another currency?",
+    a: "Takatax reads the currency printed on the document and converts the amount to pesos at the exchange rate of the document's date. The record shows the original amount and the rate used, so a $250 receipt is never counted as ₱250. This works for sales invoices too.",
+  },
+  {
+    q: "Which BIR returns and deadlines does Takatax cover?",
+    a: "The ones on your COR. Takatax knows every return a COR can list: income tax, percentage tax, VAT, withholding tax and more. Each return you file regularly goes on your calendar with its due date, including old form numbers still printed on older CORs. Amounts are estimated for the main returns (1701Q, 1701 or 1701A, 2551Q, 2550Q, 0619-E and 1601-EQ); for the others you see the deadline and what to have ready.",
+  },
+  {
+    q: "Can I delete a document I uploaded?",
+    a: `Yes, in the Documents tab, and you are asked to confirm first. On Standard, deleting a file also removes the records read from it, so their amounts leave your tracker and tax figures. On Premium${PAYMENTS_LIVE ? "" : " (coming soon)"}, only the file is removed: its records stay until you delete them as a second step. If you upload and read the same document again, its pages count again. A bookkeeper you invited can delete documents too, and it shows in your activity log.`,
+  },
+  {
     q: "Can I find a reliable bookkeeper to help me?",
     a: (
       <>
@@ -261,7 +273,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Does Takatax handle payments between me and my bookkeeper?",
-    a: "No. You agree on fees and pay your bookkeeper directly. Takatax takes no cut and never holds that money. Bookkeepers pay us 25% less per run, and that is all.",
+    a: `No. You agree on fees and pay your bookkeeper directly. Takatax takes no cut and never holds that money. Bookkeepers pay us ${PRICE.partnerDiscount} less per run, and that is all.`,
   },
   {
     q: "Are my community questions public?",
@@ -269,17 +281,19 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Is my data private?",
-    a: "Your documents are stored privately. Only you, and a bookkeeper you invite who accepts, can see them. They never see your plan or payments, everything they open or change shows in your activity log, and you can remove their access at any time.",
+    a: "Your documents are stored privately. Only you, and a bookkeeper you invite who accepts, can see them. They work with the features of your plan (Standard or Premium) but never see your payments. Everything they open, change or delete shows in your activity log, and you can remove their access at any time.",
   },
   {
     q: "How much does it cost?",
     a: (
       <>
         {PAYMENTS_LIVE
-          ? "Your first 10 pages are free. "
-          : "During launch, every run of up to 250 pages is free; extra pages and Premium are coming soon. After launch: "}
-        ₱199 reads up to 250 pages (a photo is one page; a PDF counts each page), then ₱2 a page,
-        and every return computed from them is free. Premium is ₱800 a month for 1,000 pages.{" "}
+          ? `Your first ${PRICE.trialPages} pages are free. `
+          : `During launch, every run of up to ${PRICE.runPages} pages is free; extra pages and Premium are coming soon. After launch: `}
+        {PRICE.run} reads up to {PRICE.runPages} pages ({PAGE_RULE}), then {PRICE.extraPage} a page,
+        and every return computed from them is free. Premium is {PRICE.premium} a month for{" "}
+        {PRICE.premiumPages} pages and {PRICE.premiumStorage} of storage, then{" "}
+        {PRICE.premiumExtraPage} a page.{" "}
         <Link to="/pricing" className={textLink}>
           See pricing
         </Link>
@@ -313,14 +327,14 @@ function LandingPage() {
           Upload your receipts, sales invoices and 2307s. AI reads each one and Takatax computes
           your tax returns, line by line. Verified bookkeepers and a community help you file.{" "}
           {PAYMENTS_LIVE
-            ? "₱199 per run; a subscription is optional."
-            : "Free during launch: up to 250 pages a run."}
+            ? `${PRICE.run} per run; a subscription is optional.`
+            : `Free during launch: up to ${PRICE.runPages} pages a run.`}
         </p>
         <div className="mt-10">
           <StartButton />
         </div>
         <p className="mt-5 text-tk-muted">
-          {PAYMENTS_LIVE ? "Your first 10 pages are free." : "Free during launch."}{" "}
+          {PAYMENTS_LIVE ? `Your first ${PRICE.trialPages} pages are free.` : "Free during launch."}{" "}
           <Link to="/login" className={textLink}>
             Log in
           </Link>{" "}
@@ -440,7 +454,7 @@ function LandingPage() {
                   For bookkeepers, CPAs and tax lawyers
                 </p>
                 <p className="mt-2 text-2xl font-bold text-balance">
-                  25% off every client run. No platform fee.
+                  {PRICE.partnerDiscount} off every client run. No platform fee.
                 </p>
                 <p className="mt-2 text-white/85 text-pretty">
                   Manage every client in one dashboard, answer questions to build your reputation,
@@ -531,19 +545,23 @@ function LandingPage() {
         intro={
           PAYMENTS_LIVE
             ? undefined
-            : "During launch, every Standard run of up to 250 pages is free. Extra pages and Premium are coming soon."
+            : `During launch, every Standard run of up to ${PRICE.runPages} pages is free. Extra pages and Premium are coming soon.`
         }
         className="bg-tk-surface/70"
       >
         <ul className="grid gap-4 md:grid-cols-3">
           {[
-            ["Free trial", "₱0", "Your first 10 pages, full results."],
+            ["Free trial", "₱0", `Your first ${PRICE.trialPages} pages, full results.`],
             [
-              "Parse run",
-              "₱199",
-              "Up to 250 pages, then ₱2 a page. Every return computed is free.",
+              "Standard run",
+              PRICE.run,
+              `Up to ${PRICE.runPages} pages, then ${PRICE.extraPage} a page. Every return computed is free.`,
             ],
-            ["Premium", "₱800 / month", "1,000 pages a month and 15 GB of storage."],
+            [
+              "Premium",
+              `${PRICE.premium} / month`,
+              `${PRICE.premiumPages} pages a month and ${PRICE.premiumStorage} of storage, then ${PRICE.premiumExtraPage} a page.`,
+            ],
           ].map(([name, price, text]) => (
             <li key={name} className="rounded-[18px] border border-tk-line bg-tk-surface p-6">
               <p className="font-semibold">{name}</p>
@@ -582,8 +600,8 @@ function LandingPage() {
       <section className="mx-auto max-w-[860px] px-4 pb-24 text-center sm:px-6">
         <h2 className="text-[30px]/[36px] font-bold tracking-tight text-balance sm:text-[38px]/[44px]">
           {PAYMENTS_LIVE
-            ? "Start with your first 10 pages, free."
-            : "Start free: up to 250 pages a run during launch."}
+            ? `Start with your first ${PRICE.trialPages} pages, free.`
+            : `Start free: up to ${PRICE.runPages} pages a run during launch.`}
         </h2>
         <p className="mt-3 text-lg text-tk-muted">No card needed. Takes a few minutes.</p>
         <div className="mt-8">

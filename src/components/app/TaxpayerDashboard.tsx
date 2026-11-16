@@ -8,6 +8,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, Upload } from "lucide-react";
 
 import { daysBetween, formatIsoDate, parseIso } from "@shared/domain/dates.ts";
+import { FORM_PAYMENT_TEXT } from "@shared/domain/bir-forms.ts";
 import { upcomingFilings } from "@shared/domain/deadlines.ts";
 import { estimateFiling } from "@shared/domain/tax-estimates.ts";
 import type { TaxProfile } from "@shared/domain/tax-profile.ts";
@@ -130,9 +131,13 @@ export function TaxpayerDashboard() {
                         </p>
                         <p className="text-sm text-tk-muted">{filing.periodLabel}</p>
                         <p className="mt-3 font-tk-mono text-xl font-medium tabular-nums">
-                          {peso(estimate.payable)}
+                          {filing.payment === "estimated" ? peso(estimate.payable) : "—"}
                         </p>
-                        <p className="text-[13px] text-tk-muted">expected to pay</p>
+                        <p className="text-[13px] text-tk-muted">
+                          {filing.payment === "estimated"
+                            ? "expected to pay"
+                            : FORM_PAYMENT_TEXT[filing.payment]}
+                        </p>
                       </Card>
                     </li>
                   );

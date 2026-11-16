@@ -61,6 +61,8 @@ export interface StoredDocument {
   flags: CheckFlag[];
   /** A short-lived link to the file in storage. Null until storage is connected. */
   previewUrl: string | null;
+  /** True when the file was deleted and only its records were kept (Premium). */
+  fileDeleted: boolean;
 }
 
 export interface TaxpayerAccount {
@@ -218,7 +220,8 @@ export type AccessEventAction =
   | "uploaded_document"
   | "started_reading"
   | "edited_record"
-  | "confirmed_cor";
+  | "confirmed_cor"
+  | "deleted_document";
 
 /** One entry in the taxpayer's activity log. Entries can never be changed. */
 export interface AccessEvent {

@@ -244,6 +244,7 @@ function buildWorkspace(business: SampleBusiness, today: string): Workspace {
       readerPath: status === "accepted" ? (flags.length ? ["fast", "recheck"] : ["fast"]) : [],
       flags,
       previewUrl: null,
+      fileDeleted: false,
     });
     return id;
   };
