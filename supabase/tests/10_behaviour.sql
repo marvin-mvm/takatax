@@ -155,7 +155,7 @@ select public.t_grant(:p1);
 -- 11. Ledger and account columns the browser may and may not change.
 reset role;
 insert into public.ledger_records (account_id, kind, record_date, amount_centavos)
-  select id, 'sale', '2026-10-01', 100000 from public.accounts;
+  select id, 'sale', '2026-10-01', 100000 from public.accounts where owner_user_id = :t1;
 set role authenticated;
 select public.t_as(:p1);
 update public.ledger_records set amount_centavos = 120000, user_corrected = true;
@@ -169,7 +169,7 @@ update public.accounts set registered_name = 'ANA SANTOS', tin = '123456789000';
 -- 11b. COR confirmation: the owner or their partner; never someone else.
 reset role;
 insert into public.documents (id, account_id, kind, file_name, mime_type, bytes, status, extracted)
-  select '66666666-6666-6666-6666-666666666666', id, 'cor', 'cor.jpg', 'image/jpeg', 1000, 'needs_review', '{"tin":"999"}' from public.accounts;
+  select '66666666-6666-6666-6666-666666666666', id, 'cor', 'cor.jpg', 'image/jpeg', 1000, 'needs_review', '{"tin":"999"}' from public.accounts where owner_user_id = :t1;
 set role authenticated;
 select public.t_as(:t2);
 select public.t_expect_error($$select public.confirm_cor('66666666-6666-6666-6666-666666666666', '{}')$$, 'COR not found');

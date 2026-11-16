@@ -66,11 +66,11 @@ function AppNav({ role, userId }: { role: AccountRole; userId: string }) {
           </>
         ) : (
           <>
-            <Link to="/app" activeOptions={{ exact: true }} className={tab}>
-              Tracker
-            </Link>
             <Link to="/app/upload" className={tab}>
               Upload
+            </Link>
+            <Link to="/app" activeOptions={{ exact: true }} className={tab}>
+              Tracker
             </Link>
             <Link to="/app/documents" className={tab}>
               Documents
