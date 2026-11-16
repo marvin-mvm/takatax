@@ -1,4 +1,4 @@
-// POST from the payment provider (not from browsers) when a checkout is paid.
+// POST from the payment provider (Xendit, not from browsers) when a checkout is paid.
 //
 // readPaymentWebhook (_lib/payments.ts) checks the signature and says which checkout was paid;
 // this function then marks the payment paid and either the run paid (so read-documents will
@@ -6,17 +6,22 @@
 // that is already paid is left alone.
 //
 // Deployed without JWT verification (supabase/config.toml), since the provider has no Supabase
-// login; the signature is the check. Answers 503 { code: "not_configured" } until a payment
-// provider is set up (see _lib/payments.ts).
+// login; the provider's token is the check. Answers 503 { code: "not_configured" } while
+// payments are "coming soon" (see _lib/payments.ts).
 import { adminClient } from "../_lib/clients.ts";
-import { json, serve } from "../_lib/http.ts";
+import { HttpError, json, serve } from "../_lib/http.ts";
 import { readPaymentWebhook } from "../_lib/payments.ts";
 
 const DAY = 86_400_000;
 
 serve(async (request) => {
   const raw = await request.text();
-  const event = await readPaymentWebhook(request, raw);
+  const event = await readPaymentWebhook(request, raw).catch((error: unknown) => {
+    if (error instanceof Error && /token does not match/.test(error.message)) {
+      throw new HttpError(401, "bad_signature", "Webhook token does not match");
+    }
+    throw error;
+  });
   if (event.kind !== "paid") return json({ ignored: event.type });
 
   const admin = adminClient();
