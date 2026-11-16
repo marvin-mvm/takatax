@@ -5,6 +5,9 @@
 
 create table public.t_vars (name text primary key, value uuid);
 grant all on public.t_vars to anon, authenticated;
+-- Supabase's ensure_rls event trigger turns on row-level security for every new table in
+-- public; this test-only helper needs it off (the rollback removes the table anyway).
+alter table public.t_vars disable row level security;
 
 create function public.t_expect_error(statement text, pattern text) returns void language plpgsql as $$
 begin
