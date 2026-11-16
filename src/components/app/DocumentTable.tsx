@@ -8,6 +8,7 @@ import { DOCUMENT_KIND_LABEL } from "@shared/parser/schema.ts";
 import type { StoredDocument } from "@/lib/data/types";
 import { fileSize } from "@/lib/money";
 
+import { ReadingProgress } from "./ReadingProgress";
 import { StatusPill } from "./ui";
 
 export function DocumentTable({
@@ -52,7 +53,17 @@ export function DocumentTable({
               </td>
               <td className="px-3 py-2.5 text-tk-muted">{fileSize(doc.bytes)}</td>
               <td className="px-4 py-2.5">
-                <StatusPill status={doc.status} />
+                {doc.status === "reading" ? (
+                  <ReadingProgress
+                    compact
+                    status={doc.status}
+                    pages={doc.pageCount}
+                    pagesRead={doc.pagesRead}
+                    fileName={doc.fileName}
+                  />
+                ) : (
+                  <StatusPill status={doc.status} />
+                )}
               </td>
             </tr>
           ))}

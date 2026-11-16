@@ -137,7 +137,24 @@ function toProfile(row: Row): TaxProfile | null {
   };
 }
 
+/** Statuses of a document whose reading has finished: it is never read again. */
+export const READ_FINISHED: DocumentStatus[] = ["accepted", "needs_review", "rejected"];
+
+/**
+ * Pages read so far. While reading, both readers save it in extracted.reading.pagesDone; a
+ * finished document has read every page.
+ */
+function pagesReadOf(row: Row, status: DocumentStatus, pageCount: number): number {
+  if (READ_FINISHED.includes(status)) return pageCount;
+  if (status !== "reading") return 0;
+  const reading = (row["extracted"] as { reading?: { pagesDone?: unknown } } | null)?.reading;
+  const done = Number(reading?.pagesDone ?? 0);
+  return Number.isFinite(done) ? Math.min(Math.max(done, 0), pageCount) : 0;
+}
+
 function toDocument(row: Row): StoredDocument {
+  const status = (text(row["status"]) || "waiting_for_reader") as DocumentStatus;
+  const pageCount = typeof row["page_count"] === "number" ? Math.max(row["page_count"], 1) : 1;
   return {
     id: text(row["id"]),
     accountId: text(row["account_id"]),
@@ -146,7 +163,9 @@ function toDocument(row: Row): StoredDocument {
     mimeType: text(row["mime_type"]),
     bytes: typeof row["bytes"] === "number" ? row["bytes"] : 0,
     uploadedAt: text(row["created_at"]),
-    status: (text(row["status"]) || "waiting_for_reader") as DocumentStatus,
+    status,
+    pageCount,
+    pagesRead: pagesReadOf(row, status, pageCount),
     readerPath: Array.isArray(row["reader_path"]) ? (row["reader_path"] as string[]) : [],
     flags: Array.isArray(row["flags"]) ? (row["flags"] as CheckFlag[]) : [],
     previewUrl: null,
@@ -1054,8 +1073,14 @@ export async function loadRunProgress(runId: string): Promise<RunProgress | null
     .eq("id", runId)
     .maybeSingle();
   if (error || !run) return null;
-  const { data: documents } = await db.from("documents").select("status").eq("run_id", runId);
-  const statuses = ((documents ?? []) as Row[]).map((d) => text(d["status"]));
+  // Only the progress number from `extracted`, not the whole reading.
+  const { data: documents } = await db
+    .from("documents")
+    .select("id, file_name, status, page_count, pages_done:extracted->reading->pagesDone")
+    .eq("run_id", runId)
+    .order("created_at", { ascending: true });
+  const rowsOf = (documents ?? []) as Row[];
+  const statuses = rowsOf.map((d) => text(d["status"]));
   const row = run as Row;
   return {
     status: (text(row["status"]) || "paid") as RunProgress["status"],
@@ -1063,5 +1088,20 @@ export async function loadRunProgress(runId: string): Promise<RunProgress | null
     pagesRead: typeof row["pages_read"] === "number" ? row["pages_read"] : 0,
     read: statuses.filter((s) => s === "accepted").length,
     needsReview: statuses.filter((s) => s === "needs_review").length,
+    documents: rowsOf.map((d) => {
+      const status = (text(d["status"]) || "waiting_for_reader") as DocumentStatus;
+      const pages = typeof d["page_count"] === "number" ? Math.max(d["page_count"], 1) : 1;
+      return {
+        id: text(d["id"]),
+        fileName: text(d["file_name"]),
+        status,
+        pages,
+        pagesRead: pagesReadOf(
+          { extracted: { reading: { pagesDone: d["pages_done"] } } },
+          status,
+          pages,
+        ),
+      };
+    }),
   };
 }

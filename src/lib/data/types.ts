@@ -51,6 +51,10 @@ export interface StoredDocument {
   bytes: number;
   uploadedAt: string;
   status: DocumentStatus;
+  /** Pages the AI reads: 1 for a photo, every page of a PDF. */
+  pageCount: number;
+  /** Pages read so far: grows while the status is "reading", all of them once read. */
+  pagesRead: number;
   /** Which reader steps ran, for example ["fast", "recheck"]. */
   readerPath: string[];
   flags: CheckFlag[];

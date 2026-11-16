@@ -8,6 +8,7 @@
  */
 
 import type { DocumentKind } from "@shared/parser/schema.ts";
+import type { DocumentStatus } from "@/lib/data/types";
 
 import { callFunction, type FunctionResult } from "./functions";
 
@@ -69,11 +70,22 @@ export function getDocumentLink(
   return callFunction("document-link", { accountId, documentId });
 }
 
-/** A run's reading progress, for the progress bar while the Trigger.dev job works. */
+/** One document of a run, for its own progress bar. */
+export interface RunDocumentProgress {
+  id: string;
+  fileName: string;
+  status: DocumentStatus;
+  pages: number;
+  pagesRead: number;
+}
+
+/** A run's reading progress, for the progress bars while the reader works. */
 export interface RunProgress {
   status: "awaiting_payment" | "paid" | "reading" | "review" | "complete";
   pages: number;
   pagesRead: number;
   read: number;
   needsReview: number;
+  /** Each document, oldest first (the order the readers read them in). */
+  documents: RunDocumentProgress[];
 }
