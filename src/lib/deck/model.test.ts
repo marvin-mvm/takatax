@@ -22,10 +22,11 @@ const withInputs = (changes: Partial<ModelInputs>): ModelInputs => ({
   ...changes,
 });
 
-/** A local gateway: 2.5% and no fixed fee, for hand-checkable figures. */
-const GATEWAY = {
-  paymentFeePct: PAYMENT_PRESETS.gateway.pct,
-  paymentFeeFixedUsd: PAYMENT_PRESETS.gateway.fixedUsd,
+/** A 2.5% fee and nothing fixed, for hand-checkable figures. */
+const GATEWAY = { paymentFeePct: 2.5, paymentFeeFixedUsd: 0 };
+const MOR = {
+  paymentFeePct: PAYMENT_PRESETS.mor.pct,
+  paymentFeeFixedUsd: PAYMENT_PRESETS.mor.fixedUsd,
 };
 
 describe("aiCostPerPage", () => {
@@ -290,6 +291,10 @@ describe("compareLimits", () => {
 });
 
 describe("payment fees", () => {
+  it("uses Xendit's GCash rate by default", () => {
+    expect(paymentFee(DEFAULT_INPUTS, 199)).toBeCloseTo(0.023 * 199, 9);
+  });
+
   it("charges a merchant of record its share plus $0.40 a payment", () => {
     const mor = { paymentFeePct: 5.5, paymentFeeFixedUsd: 0.4 };
     expect(paymentFee(mor, 199)).toBeCloseTo(0.055 * 199 + 0.4 * 63, 9);
@@ -297,7 +302,7 @@ describe("payment fees", () => {
   });
 
   it("leaves less of a ₱199 run with a merchant of record than with a local gateway", () => {
-    const mor = runEconomics(withInputs({ pagesPerRun: 250 }));
+    const mor = runEconomics(withInputs({ ...MOR, pagesPerRun: 250 }));
     const gateway = runEconomics(withInputs({ ...GATEWAY, pagesPerRun: 250 }));
     expect(mor.paymentFee).toBeGreaterThan(30);
     expect(gateway.paymentFee).toBeCloseTo(4.975, 9);
@@ -305,8 +310,8 @@ describe("payment fees", () => {
   });
 
   it("costs the plan more with a fixed fee per payment", () => {
-    const withFixed = runModel(DEFAULT_INPUTS).totals.netProfit;
-    const noFixed = runModel(withInputs({ paymentFeeFixedUsd: 0 })).totals.netProfit;
+    const withFixed = runModel(withInputs(MOR)).totals.netProfit;
+    const noFixed = runModel(withInputs({ ...MOR, paymentFeeFixedUsd: 0 })).totals.netProfit;
     expect(withFixed).toBeLessThan(noFixed);
   });
 });

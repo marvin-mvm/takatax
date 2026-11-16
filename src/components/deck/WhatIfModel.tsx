@@ -684,14 +684,14 @@ export function WhatIfModel() {
                   inputs.paymentFeePct === PAYMENT_PRESETS.mor.pct &&
                   inputs.paymentFeeFixedUsd === PAYMENT_PRESETS.mor.fixedUsd
                     ? "mor"
-                    : inputs.paymentFeePct === PAYMENT_PRESETS.gateway.pct &&
-                        inputs.paymentFeeFixedUsd === PAYMENT_PRESETS.gateway.fixedUsd
-                      ? "gateway"
+                    : inputs.paymentFeePct === PAYMENT_PRESETS.xendit.pct &&
+                        inputs.paymentFeeFixedUsd === PAYMENT_PRESETS.xendit.fixedUsd
+                      ? "xendit"
                       : "custom"
                 }
                 options={[
+                  { value: "xendit", label: PAYMENT_PRESETS.xendit.label },
                   { value: "mor", label: PAYMENT_PRESETS.mor.label },
-                  { value: "gateway", label: PAYMENT_PRESETS.gateway.label },
                   { value: "custom", label: "Custom" },
                 ]}
                 onChange={(value) => {
@@ -723,9 +723,9 @@ export function WhatIfModel() {
                 onChange={(value) => set("paymentFeeFixedUsd", value)}
               />
               <p className="text-[13px]/[18px] text-tk-muted">
-                A merchant of record (for example Dodo Payments: 4% + $0.40, plus 1.5% for cards
-                outside the US) also handles tax and refunds; the fixed fee weighs most on small
-                payments like a ₱199 run.
+                Xendit: 2.3% for GCash, 1.8% for Maya, 3.2% + ₱10 for cards. A merchant of record
+                (for example Dodo Payments: 4% + $0.40, plus 1.5% for cards outside the US) also
+                handles tax and refunds, but its fixed fee weighs heavily on a ₱199 run.
               </p>
             </ControlGroup>
             <ControlGroup
@@ -889,8 +889,9 @@ export function WhatIfModel() {
         or Premium's limit; Trigger.dev Pro at $50 a month including $50 of usage; 3% percentage tax
         up to ₱3M of yearly revenue, VAT above it; income tax of 20% or 25%. Unit costs from{" "}
         <Cite source="Takatax" refs={[21]} />, <Cite source="Google" refs={[19]} />,{" "}
-        <Cite source="Anthropic" refs={[20]} />, <Cite source="Trigger.dev" refs={[24]} /> and{" "}
-        <Cite source="Dodo Payments" refs={[25]} />. A projection, not a forecast.
+        <Cite source="Anthropic" refs={[20]} />, <Cite source="Trigger.dev" refs={[24]} />,{" "}
+        <Cite source="Xendit" refs={[26]} /> and <Cite source="Dodo Payments" refs={[25]} />. A
+        projection, not a forecast.
       </p>
     </div>
   );

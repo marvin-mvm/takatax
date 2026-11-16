@@ -188,4 +188,11 @@ export const SOURCES: Source[] = [
     note: "Merchant of record fees used for the payment preset: 4% + $0.40 a payment, plus 1.5% for cards outside the US.",
     url: "https://dodopayments.com/pricing",
   },
+  {
+    id: 26,
+    publisher: "Xendit",
+    title: "Pricing, Philippines",
+    note: "The payment gateway Takatax will use: 2.3% for GCash, 1.8% for Maya, 3.2% + ₱10 for local cards.",
+    url: "https://www.xendit.co/en-ph/pricing/",
+  },
 ];

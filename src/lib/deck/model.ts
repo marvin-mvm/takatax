@@ -30,14 +30,15 @@ const PARTNER_DISCOUNT = 0.25;
 const PARTNERS_TARGET = 1_608; // 20% of BIR-accredited tax agents, plus CPAs at half that
 const PARTNERS_TARGET_MONTH = 36;
 /**
- * Payment fees: a share of each payment plus a fixed amount per payment. Two presets: a merchant
- * of record (Dodo Payments' published rate: 4% + $0.40, plus 1.5% for cards outside the US,
- * which Philippine cards are) and a local Philippine gateway (about 2.5%, nothing fixed).
- * Source: dodopayments.com/pricing.
+ * Payment fees: a share of each payment plus a fixed amount per payment. Two presets: Xendit, the
+ * Philippine gateway Takatax will use (2.3% for GCash, the most common way to pay; Maya is 1.8%
+ * and cards 3.2% + ₱10), and a merchant of record for comparison (Dodo Payments' published rate:
+ * 4% + $0.40, plus 1.5% for cards outside the US). Sources: xendit.co/en-ph/pricing,
+ * dodopayments.com/pricing.
  */
 export const PAYMENT_PRESETS = {
+  xendit: { label: "Xendit", pct: 2.3, fixedUsd: 0 },
   mor: { label: "Merchant of record", pct: 5.5, fixedUsd: 0.4 },
-  gateway: { label: "Local gateway", pct: 2.5, fixedUsd: 0 },
 } as const;
 
 // Background jobs on Trigger.dev, which read the pages so long PDFs never hit Supabase's
@@ -132,8 +133,8 @@ export const DEFAULT_INPUTS: ModelInputs = {
   storagePrice: 250,
   runsPerYear: 6,
   pagesPerRun: 100,
-  paymentFeePct: PAYMENT_PRESETS.mor.pct,
-  paymentFeeFixedUsd: PAYMENT_PRESETS.mor.fixedUsd,
+  paymentFeePct: PAYMENT_PRESETS.xendit.pct,
+  paymentFeeFixedUsd: PAYMENT_PRESETS.xendit.fixedUsd,
   premiumSharePct: 10,
   premiumPageLimit: 1_000,
   premiumUsagePct: 40,
