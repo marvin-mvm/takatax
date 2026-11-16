@@ -4,6 +4,7 @@ import { ThumbsUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { MessageButton } from "@/components/app/MessageButton";
+import { useConfirm } from "@/components/app/confirm";
 import { Stars } from "@/components/app/ui";
 import { CommunityRules, VisibilityBadge } from "@/components/community/parts";
 import { SiteShell } from "@/components/site/SiteShell";
@@ -64,6 +65,7 @@ function PostPage() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["post", postId] });
   const [answer, setAnswer] = useState("");
   const [answerMessage, setAnswerMessage] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   if (!post) {
     return (
@@ -110,7 +112,14 @@ function PostPage() {
   };
 
   const removePost = async () => {
-    if (!window.confirm("Delete your question? Answers to it will no longer be shown.")) return;
+    const sure = await confirm({
+      title: "Delete your question?",
+      subject: post.title,
+      kind: "delete",
+      points: ["Answers to it will no longer be shown."],
+      confirm: "Delete question",
+    });
+    if (!sure) return;
     try {
       await deleteMyPost(post.id);
       void queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -122,6 +131,7 @@ function PostPage() {
 
   return (
     <SiteShell>
+      {dialog}
       <article className="mx-auto grid max-w-[1120px] gap-6 px-4 pt-10 pb-20 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-6">
           <Link to="/community" className="text-sm font-semibold text-tk-brand hover:underline">

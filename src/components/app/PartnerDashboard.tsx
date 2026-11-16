@@ -18,6 +18,7 @@ import { displayName } from "@/lib/auth/use-auth";
 
 import { MessageButton } from "./MessageButton";
 import { useAppUser } from "./app-user";
+import { useConfirm } from "./confirm";
 import { Card, EmptyState, LoadingBlock, PageHeader, SampleDataNotice, Tag } from "./ui";
 
 export function PartnerDashboard() {
@@ -195,12 +196,22 @@ function Invitations({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
   const invitations = query.data?.data ?? [];
   if (invitations.length === 0 && !notice) return null;
 
   const answer = async (invitation: PartnerInvitation, accept: boolean) => {
     const who = invitation.businessName || invitation.taxpayerName || "this taxpayer";
-    if (!accept && !window.confirm(`Decline the invitation from ${who}?`)) return;
+    if (
+      !accept &&
+      !(await confirm({
+        title: "Decline this invitation?",
+        subject: `From ${who}`,
+        confirm: "Decline",
+        cancel: "Not now",
+      }))
+    )
+      return;
     setBusy(invitation.accountId);
     setNotice(null);
     try {
@@ -223,6 +234,7 @@ function Invitations({ userId }: { userId: string }) {
 
   return (
     <section aria-labelledby="invitations-title" className="flex flex-col gap-3">
+      {dialog}
       <h2 id="invitations-title" className="flex items-center gap-2 text-xl font-semibold">
         <MailOpen aria-hidden className="size-5 text-tk-brand" /> Invitations{" "}
         <span className="font-tk-mono text-tk-muted">({invitations.length})</span>
