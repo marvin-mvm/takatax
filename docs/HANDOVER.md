@@ -206,25 +206,25 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
 
 ## 4. Live state (2026-11-16) and how to check it
 
-GitHub: `main` contains all of `v0.002` up to PR #29. The owner backfills `v0.001` from `main`
+GitHub: `main` contains all of `v0.002` up to PR #30. The owner backfills `v0.001` from `main`
 after each merge. Netlify serves `main`. Every row below was checked against the live project on
 2026-11-16.
 
-| Item                                                  | State                                                                                                                                                                                                                                                                               |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Migration 1 `20261115120000_takatax_core.sql`         | Applied                                                                                                                                                                                                                                                                             |
-| Migration 2 `20261115140000_chat_access_payments.sql` | Applied                                                                                                                                                                                                                                                                             |
-| Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                                                                             |
-| Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                                                                          |
-| Migration 5 `20261117090000_document_delete.sql`      | **Not applied yet.** It passed its rolled-back dry run on the live project on 2026-11-16 (section 5)                                                                                                                                                                                |
-| Edge functions                                        | Eight are deployed and match `main` file by file (checked after PR #29): `create-upload-urls`, `confirm-upload`, `document-link`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`. `delete-document` is new and not deployed yet (section 5) |
-| Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                                                                          |
-| Trigger.dev deploys                                   | **Blocked**: "Deployments are not available for this organization". Only Trigger.dev support can enable them (project `proj_afhlvwluvvvtblfsplyn`). Trusted publishing is set up and the workflow is ready                                                                          |
-| `READER` secret                                       | `supabase`                                                                                                                                                                                                                                                                          |
-| AI models                                             | Set by the `OPENROUTER_MODEL_*` secrets: `google/gemini-3-flash-preview`, `anthropic/claude-haiku-5.5`, `google/gemini-3.1-pro-preview`. All three exist on OpenRouter, and the defaults in `models.ts` are now the same names                                                      |
-| Auth                                                  | 1 user (the owner). Email confirmation off. Site URL `https://takatax.netlify.app`, also in the redirect URLs                                                                                                                                                                       |
-| Staff                                                 | Nobody yet: `public.admins` is empty (section 5)                                                                                                                                                                                                                                    |
-| Migration history table                               | None: migrations were applied by hand (see the repair line in `docs/MISSING_PIECES.md`)                                                                                                                                                                                             |
+| Item                                                  | State                                                                                                                                                                                                                                          |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration 1 `20261115120000_takatax_core.sql`         | Applied                                                                                                                                                                                                                                        |
+| Migration 2 `20261115140000_chat_access_payments.sql` | Applied                                                                                                                                                                                                                                        |
+| Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                                        |
+| Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                                     |
+| Migration 5 `20261117090000_document_delete.sql`      | Applied on 2026-11-16, after its rolled-back dry run: `documents.file_deleted_at`, the `deleted_document` log entry, `delete_document()` and `account_tier()`                                                                                  |
+| Edge functions                                        | All nine are deployed and match `main` file by file (checked after PR #30): `create-upload-urls`, `confirm-upload`, `document-link`, `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook` |
+| Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                                     |
+| Trigger.dev deploys                                   | **Blocked**: "Deployments are not available for this organization". Only Trigger.dev support can enable them (project `proj_afhlvwluvvvtblfsplyn`). Trusted publishing is set up and the workflow is ready                                     |
+| `READER` secret                                       | `supabase`                                                                                                                                                                                                                                     |
+| AI models                                             | Set by the `OPENROUTER_MODEL_*` secrets: `google/gemini-3-flash-preview`, `anthropic/claude-haiku-5.5`, `google/gemini-3.1-pro-preview`. All three exist on OpenRouter, and the defaults in `models.ts` are now the same names                 |
+| Auth                                                  | 1 user (the owner). Email confirmation off. Site URL `https://takatax.netlify.app`, also in the redirect URLs                                                                                                                                  |
+| Staff                                                 | Nobody yet: `public.admins` is empty (section 5)                                                                                                                                                                                               |
+| Migration history table                               | None: migrations were applied by hand (see the repair line in `docs/MISSING_PIECES.md`)                                                                                                                                                        |
 
 Checking with the Supabase access token (Management API; the session's network must allow
 `api.supabase.com`). Never print the token.
@@ -263,16 +263,13 @@ The live steps of PR #18 and PR #25 are done: migration 4 is applied, the defaul
 (`supabase/functions/_shared/domain/bir-forms.ts`, checked against the BIR's forms list and 2026
 tax calendar on 2026-11-16), and each repeating return a COR names is put on the calendar. Old
 form numbers on old CORs are swapped for today's forms, and retired ones such as 0605 never
-show.
+show. Documents can be deleted, and a professional's features follow the client's tier.
 
-1. **Live steps waiting for the owner's go-ahead**, in this order:
-   - Apply migration 5, `20261117090000_document_delete.sql` (its dry run passed), then add
-     `20261117090000` to the repair line in `docs/MISSING_PIECES.md`.
-   - Deploy the new `delete-document` function from `main`, and redeploy `read-step` (the example
-     TIN in its COR prompt changed). Until then the delete buttons answer "not connected yet".
-   - The owner's two US dollar receipts (Google Workspace and Twilio) were saved as ₱8.40 and
-     ₱250 before the reader converted currencies. The owner will delete them and upload them
-     again once deleting is live: that is the first real test of both features.
+1. **Nothing is waiting to be applied or deployed.** Migration 5 is applied and all nine
+   functions match `main`. Deleting works on the live site: on 2026-11-16 the owner deleted
+   the two US dollar receipts that had been saved as ₱8.40 and ₱250, to upload them again and
+   see them converted. That upload is the first real read with the currency field: check the
+   two records afterwards (about ₱535 and ₱15,700 at those dates' rates).
 2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff
    tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); an SMTP
