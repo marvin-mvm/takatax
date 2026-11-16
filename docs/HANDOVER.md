@@ -180,23 +180,24 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
 
 ## 4. Live state (2026-11-16) and how to check it
 
-GitHub: `main` contains all of `v0.002` up to PR #22; `v0.001` was backfilled after it and matches
-`main`. Netlify serves `main`. Every row below was checked against the live project on 2026-11-16.
+GitHub: `main` contains all of `v0.002` up to PR #24. The owner backfills `v0.001` from `main`
+after each merge. Netlify serves `main`. Every row below was checked against the live project on
+2026-11-16.
 
-| Item                                                  | State                                                                                                                                                                                                                  |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Migration 1 `20261115120000_takatax_core.sql`         | Applied                                                                                                                                                                                                                |
-| Migration 2 `20261115140000_chat_access_payments.sql` | Applied                                                                                                                                                                                                                |
-| Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                |
-| Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                             |
-| Edge functions                                        | All eight are deployed and match `main` file by file: `create-upload-urls`, `confirm-upload`, `document-link`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`                  |
-| Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                             |
-| Trigger.dev deploys                                   | **Blocked**: "Deployments are not available for this organization". Only Trigger.dev support can enable them (project `proj_afhlvwluvvvtblfsplyn`). Trusted publishing is set up and the workflow is ready             |
-| `READER` secret                                       | `supabase`                                                                                                                                                                                                             |
-| AI models                                             | Set by the `OPENROUTER_MODEL_*` secrets: `google/gemini-3-flash-preview`, `anthropic/claude-haiku-5.5`, `google/gemini-3.1-pro-preview`. All three exist on OpenRouter; two defaults in `models.ts` do not (section 5) |
-| Auth                                                  | 1 user (the owner). Email confirmation off. Site URL `https://takatax.netlify.app`, also in the redirect URLs                                                                                                          |
-| Staff                                                 | Nobody yet: `public.admins` is empty (section 5)                                                                                                                                                                       |
-| Migration history table                               | None: migrations were applied by hand (see the repair line in `docs/MISSING_PIECES.md`)                                                                                                                                |
+| Item                                                  | State                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration 1 `20261115120000_takatax_core.sql`         | Applied                                                                                                                                                                                                                                                                    |
+| Migration 2 `20261115140000_chat_access_payments.sql` | Applied                                                                                                                                                                                                                                                                    |
+| Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                                                                    |
+| Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                                                                 |
+| Edge functions                                        | All eight are deployed, and matched `main` file by file after PR #24: `create-upload-urls`, `confirm-upload`, `document-link`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`. Two need a redeploy for the model names (section 5) |
+| Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                                                                 |
+| Trigger.dev deploys                                   | **Blocked**: "Deployments are not available for this organization". Only Trigger.dev support can enable them (project `proj_afhlvwluvvvtblfsplyn`). Trusted publishing is set up and the workflow is ready                                                                 |
+| `READER` secret                                       | `supabase`                                                                                                                                                                                                                                                                 |
+| AI models                                             | Set by the `OPENROUTER_MODEL_*` secrets: `google/gemini-3-flash-preview`, `anthropic/claude-haiku-5.5`, `google/gemini-3.1-pro-preview`. All three exist on OpenRouter, and the defaults in `models.ts` are now the same names                                             |
+| Auth                                                  | 1 user (the owner). Email confirmation off. Site URL `https://takatax.netlify.app`, also in the redirect URLs                                                                                                                                                              |
+| Staff                                                 | Nobody yet: `public.admins` is empty (section 5)                                                                                                                                                                                                                           |
+| Migration history table                               | None: migrations were applied by hand (see the repair line in `docs/MISSING_PIECES.md`)                                                                                                                                                                                    |
 
 Checking with the Supabase access token (Management API; the session's network must allow
 `api.supabase.com`). Never print the token.
@@ -229,13 +230,13 @@ Deploy functions with
 
 ## 5. Next things to do, in order
 
-The live steps of PR #18 are done: migration 4 is applied and every function is deployed from
+The live steps of PR #18 are done: migration 4 is applied and every function was deployed from
 `main`.
 
-1. **Fix the default model names** in `supabase/functions/_shared/parser/models.ts`:
-   `google/gemini-3-flash` and `google/gemini-3.1-pro` are not on OpenRouter (the names there end
-   in `-preview`). The live project works only because the `OPENROUTER_MODEL_*` secrets override
-   them. Fix this before switching to `READER=trigger`, or set the same overrides in Trigger.dev.
+1. **Redeploy `read-step` and `assistant-chat` from `main`** (owner's go-ahead): they carry the
+   corrected default model names in `supabase/functions/_shared/parser/models.ts`. Nothing
+   changes for users, because the `OPENROUTER_MODEL_*` secrets already set the same names; after
+   it, the app no longer depends on those secrets.
 2. **Deadlines from the confirmed COR forms** (`accounts.cor_tax_types`), not only from the
    profile flags. Reported by the "connect Supabase" session and still to confirm against
    `supabase/functions/_shared/domain/deadlines.ts` and `tax-profile.ts`: a COR that lists 1701
