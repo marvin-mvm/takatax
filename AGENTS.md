@@ -124,6 +124,18 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
   `delete-document` function removes the file from R2 and then calls `delete_document()`; a
   professional's deletion is in the activity log. The screens' rules and wording are in
   `src/lib/documents/delete.ts`.
+- Usage meters: "AI doc parsing" and "Doc storage" as used / limit (`UsageMeters`, on the
+  Documents tab and the account settings page). The limits come from `PRICING` through
+  `supabase/functions/_shared/uploads/usage.ts`; `loadUsage()` counts and
+  `src/lib/account/usage.ts` words them. Standard counts the latest run's pages out of 80 (every
+  upload starts a new run); Premium counts the Premium month's pages out of 300. Storage is the
+  size of the files still stored, out of 300 MB (Standard) or 15 GB (Premium). The storage limit
+  is shown, not enforced: uploads are not refused when it is passed.
+- Account settings: `/app/settings`, opened from "Hi [first name]" in the header (which replaced
+  the Log out button): the user's details and Log out, the current tier
+  (`src/lib/account/tier.ts`), the usage meters, Premium and the transaction history.
+  `/app/plan` only redirects there, because the payment provider's return links use it. The
+  header scrolls away with the page on a phone and stays in view from 768px up.
 - Pop-ups: ask "are you sure?" with `useConfirm()` (`src/components/app/confirm.tsx`), the themed
   pop-up with a short list of what will happen, never `window.confirm`. Keep the wording to a
   few short lines. Short hover help is `Hint` (`src/components/app/Hint.tsx`).

@@ -153,6 +153,15 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
   bookkeepers, CPAs and tax lawyers pay 25% less for a client's run (₱112). The site, the app
   and the deck take their figures from `PRICING` (through `src/lib/pricing-copy.ts`), so a price
   changes in one place.
+- Usage and account settings. The Documents tab shows two meters, "AI doc parsing" and "Doc
+  storage", as used / limit ("75 / 80 pages", "240 MB / 300 MB"). Standard counts the latest
+  run's pages out of 80, because every upload starts a new run; Premium counts the pages of its
+  month out of 300. Storage is what the stored files take, out of 300 MB or 15 GB. "Hi [first
+  name]" in the header (in place of Log out) opens `/app/settings`: the user's details and Log
+  out, the current tier, the same meters, Premium and the transaction history. The Plan tab is
+  gone; `/app/plan` redirects to the settings page. On a phone the green header scrolls away with
+  the page. Code: `supabase/functions/_shared/uploads/usage.ts`, `src/lib/account/`,
+  `src/components/app/UsageMeters.tsx`, `src/routes/app/settings.tsx`.
 - Launch mode: `PAYMENTS_LIVE = false` in the same file. Standard runs up to 80 pages are free;
   extra pages and Premium show "coming soon". Payments provider: Xendit, built but switched off.
 
@@ -206,25 +215,25 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
 
 ## 4. Live state (2026-11-16) and how to check it
 
-GitHub: `main` contains all of `v0.002` up to PR #30. The owner backfills `v0.001` from `main`
+GitHub: `main` contains all of `v0.002` up to PR #32. The owner backfills `v0.001` from `main`
 after each merge. Netlify serves `main`. Every row below was checked against the live project on
 2026-11-16.
 
-| Item                                                  | State                                                                                                                                                                                                                                          |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Migration 1 `20261115120000_takatax_core.sql`         | Applied                                                                                                                                                                                                                                        |
-| Migration 2 `20261115140000_chat_access_payments.sql` | Applied                                                                                                                                                                                                                                        |
-| Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                                        |
-| Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                                     |
-| Migration 5 `20261117090000_document_delete.sql`      | Applied on 2026-11-16, after its rolled-back dry run: `documents.file_deleted_at`, the `deleted_document` log entry, `delete_document()` and `account_tier()`                                                                                  |
-| Edge functions                                        | All nine are deployed and match `main` file by file (checked after PR #30): `create-upload-urls`, `confirm-upload`, `document-link`, `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook` |
-| Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                                     |
-| Trigger.dev deploys                                   | **Blocked**: "Deployments are not available for this organization". Only Trigger.dev support can enable them (project `proj_afhlvwluvvvtblfsplyn`). Trusted publishing is set up and the workflow is ready                                     |
-| `READER` secret                                       | `supabase`                                                                                                                                                                                                                                     |
-| AI models                                             | Set by the `OPENROUTER_MODEL_*` secrets: `google/gemini-3-flash-preview`, `anthropic/claude-haiku-5.5`, `google/gemini-3.1-pro-preview`. All three exist on OpenRouter, and the defaults in `models.ts` are now the same names                 |
-| Auth                                                  | 1 user (the owner). Email confirmation off. Site URL `https://takatax.netlify.app`, also in the redirect URLs                                                                                                                                  |
-| Staff                                                 | Nobody yet: `public.admins` is empty (section 5)                                                                                                                                                                                               |
-| Migration history table                               | None: migrations were applied by hand (see the repair line in `docs/MISSING_PIECES.md`)                                                                                                                                                        |
+| Item                                                  | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration 1 `20261115120000_takatax_core.sql`         | Applied                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Migration 2 `20261115140000_chat_access_payments.sql` | Applied                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Migration 3 `20261116120000_invitations_activity.sql` | Applied                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Migration 5 `20261117090000_document_delete.sql`      | Applied on 2026-11-16, after its rolled-back dry run: `documents.file_deleted_at`, the `deleted_document` log entry, `delete_document()` and `account_tier()`                                                                                                                                                                                                                                                                                                                                                                                            |
+| Edge functions                                        | All nine are deployed and match `main` file by file (checked after PR #32): `create-upload-urls`, `confirm-upload`, `document-link`, `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`                                                                                                                                                                                                                                                                                                           |
+| Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                                                                                                                                                                                                                                                                                                                                               |
+| Trigger.dev deploys                                   | **Blocked by Trigger.dev**: "Deployments are not available for this organization", after the sign-in and the upload work (all 16 runs of the workflow up to 2026-11-16). Their support said on 2026-11-16 that deployments for the organization are blocked by their risk-based automated account restrictions, tightened after a security incident, and that they will tell the owner when deployments are available. Nothing to change in the repository (`docs/MISSING_PIECES.md`, section 3). Trusted publishing is set up and the workflow is ready |
+| `READER` secret                                       | `supabase`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| AI models                                             | Set by the `OPENROUTER_MODEL_*` secrets. Reader: `google/gemini-3-flash-preview`, `anthropic/claude-haiku-5.5`, `google/gemini-3.1-pro-preview`. Records assistant (`OPENROUTER_MODEL_ASSISTANT`): `google/gemini-3.5-flash-lite`, set on 2026-11-16. All four exist on OpenRouter, and the defaults in `models.ts` are the same names                                                                                                                                                                                                                   |
+| Auth                                                  | 1 user (the owner). Email confirmation off. Site URL `https://takatax.netlify.app`, also in the redirect URLs                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Staff                                                 | Nobody yet: `public.admins` is empty (section 5)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Migration history table                               | None: migrations were applied by hand (see the repair line in `docs/MISSING_PIECES.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 Checking with the Supabase access token (Management API; the session's network must allow
 `api.supabase.com`). Never print the token.
@@ -265,18 +274,22 @@ tax calendar on 2026-11-16), and each repeating return a COR names is put on the
 form numbers on old CORs are swapped for today's forms, and retired ones such as 0605 never
 show. Documents can be deleted, and a professional's features follow the client's tier.
 
-1. **Waiting for a deploy: the records assistant.** The chat on the Tracker has never answered
-   on the live site (`ai_spend` has no `assistant-chat` row): it asked the database for records
-   up to day 31 of the month on screen, and the database refuses "2026-11-31". The fix
-   (`supabase/functions/_shared/assistant/period.ts`) and the new default model, Gemini
-   Flash-Lite (`google/gemini-3.5-flash-lite`, the owner's choice of a small Flash), are in the
-   code. Once they are in `main`, with the owner's go-ahead: deploy `assistant-chat` and
-   `read-step` (it bundles the same `models.ts`; nothing changes in how it reads), and set the
-   `OPENROUTER_MODEL_ASSISTANT` secret to `google/gemini-3.5-flash-lite`, because the secret
-   wins over the default. Then ask a question on the Tracker and check that `ai_spend` gets
-   its first `assistant-chat` row. Everything else matches `main`: migration 5 is applied, and
-   deleting and the US dollar conversion work on the live site (the owner confirmed both on
-   2026-11-16).
+1. **Two decisions for the owner about the usage meters** (asked on 2026-11-16, not answered
+   yet). Nothing is broken while they wait.
+   - Should the pages of a Standard run carry over? Today every upload is its own run of up to 80
+     pages, so the meter shows the latest run and the pages it did not use are not kept. If the
+     owner wants ₱149 to buy 80 pages that last across uploads ("75 of 80 used, 5 left"), that is
+     a change to the pricing rules in `create-checkout` and `quoteRun`, not to the meter alone.
+   - Should uploads be refused when storage is full? The meter shows the limit (300 MB, or 15 GB
+     on Premium) but `create-upload-urls` does not check it. On Standard, deleting a file to
+     make room also deletes its records, and more storage cannot be bought yet.
+
+   The records assistant is done: the owner confirmed on 2026-11-16 that the chat on the Tracker
+   answers (Gemini Flash-Lite, `google/gemini-3.5-flash-lite`; the fix for the month's last day
+   is in `supabase/functions/_shared/assistant/period.ts`). It sees the period's figures only,
+   which is enough for now. Migration 5 is applied, and deleting and the US dollar conversion
+   work on the live site.
+
 2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff
    tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); an SMTP
@@ -297,9 +310,15 @@ show. Documents can be deleted, and a professional's features follow the client'
 
    In Supabase → Authentication, also turn on leaked-password protection.
 
-5. **Trigger.dev**: when support enables deploys, run the "Deploy Trigger.dev tasks" workflow,
-   set Supabase's `TRIGGER_SECRET_KEY` to the Production secret key, and switch `READER` to
-   `trigger` if the owner wants it.
+5. **Trigger.dev**: wait for Trigger.dev. Their support confirmed on 2026-11-16 that deployments
+   for the organization are blocked on their side (risk-based automated restrictions after a
+   security incident) and that they will tell the owner when that changes; details and what the
+   owner can ask them are in `docs/MISSING_PIECES.md`, section 3. Do not spend time on keys, the
+   workflow or the CLI version: they are fine. Once a deploy goes through: run `ping` from the
+   dashboard's Test page, check that the seven environment variables are set for Production,
+   set Supabase's `TRIGGER_SECRET_KEY` to the Production secret key (a key is set today, of
+   unknown kind), and switch `READER` to `trigger` if the owner wants it. Until then the
+   Supabase reader does the reading.
 6. **Payments** when the owner decides: Xendit keys and webhook, test mode, then
    `PAYMENTS_LIVE = true` (steps in `docs/MISSING_PIECES.md`, section 4).
 7. **Before launch, not code**: privacy notice and terms (Data Privacy Act), community and
@@ -326,6 +345,11 @@ show. Documents can be deleted, and a professional's features follow the client'
 - Screens: `src/routes/` (file routes; `src/routeTree.gen.ts` is generated by the build),
   `src/components/app/` (the app), `src/components/site/` (header, logo, landing pieces),
   `src/components/deck/` and `src/lib/deck/` (the pitch deck and its model).
+- Usage meters and account settings: the limits and the counting rules are in
+  `supabase/functions/_shared/uploads/usage.ts`, the wording in `src/lib/account/usage.ts` and
+  `tier.ts`, the screens in `src/components/app/UsageMeters.tsx` and
+  `src/routes/app/settings.tsx`. `loadUsage()` in the repository reads the runs and the stored
+  files.
 - Pop-ups: every "are you sure?" uses `useConfirm()` in `src/components/app/confirm.tsx` (the
   themed pop-up: a question, the thing it is about, a short list of what happens), never the
   browser's `window.confirm`. Short hover help is `Hint` in `src/components/app/Hint.tsx`.

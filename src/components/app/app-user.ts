@@ -6,6 +6,10 @@ import type { AccountRole } from "@/lib/data/types";
 export interface AppUser {
   user: User;
   role: AccountRole;
+  /** Logs the user out and goes to the home page. The button is on the account settings page. */
+  signOut: () => void;
+  /** True from the moment Log out is pressed. */
+  signingOut: boolean;
 }
 
 /** The signed-in user, provided by the /app layout to every screen inside it. */

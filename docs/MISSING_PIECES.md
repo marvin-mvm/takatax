@@ -119,11 +119,26 @@ always matches the SDK (4.8.4 or later is needed for trusted publishing).
 4. Set Supabase's `TRIGGER_SECRET_KEY` to the regular Production secret key (`tr_prod_…`). A
    "Deploy only" key cannot start reading jobs.
 
-If the deploy stops with **"Deployments are not available for this organization"**, deploys are
-switched off for the Trigger.dev organization itself. That is a setting on Trigger.dev's side:
-no key, workflow or CLI version changes it. Ask Trigger.dev support (the chat in the dashboard,
-or Discord) to enable deployments for the organization that owns `proj_afhlvwluvvvtblfsplyn`,
-then re-run the workflow.
+If the deploy stops with **"Deployments are not available for this organization"**: Trigger.dev
+refuses the deploy for the organization itself, after the sign-in and the upload have worked. No
+key, workflow or CLI version changes it (checked on 2026-11-16: trusted publishing signs in, the
+files upload, and 4.8.5 is the latest CLI).
+
+**Why (Trigger.dev support, 2026-11-16):** deployments for the organization are blocked by
+Trigger.dev's "risk-based automated account restrictions", tightened as a precaution after a
+security incident on their side. Working in the Development environment still works. They said
+they will tell the owner when deployments are available for the organization. Until then:
+
+- Nothing can be done in this repository. The Supabase reader (`READER=supabase`) reads every
+  document meanwhile, and the "Deploy Trigger.dev tasks" workflow fails on each merge to `main`;
+  that failure is expected and breaks nothing.
+- It is worth asking support whether verifying a card or moving to a paid plan lifts the
+  restriction sooner. Since early November 2026 Trigger.dev Cloud also asks an organization on
+  the **Free** plan to verify a card before it may deploy (Billing → **Verify card**; nothing is
+  charged), and their access check looks at whether the organization pays. Support has not said
+  that either one is enough.
+- When Trigger.dev says deployments are available: Actions → "Deploy Trigger.dev tasks" → Run
+  workflow, then the steps above (run `ping`, set `TRIGGER_SECRET_KEY`, switch `READER`).
 
 To test on a computer instead (needs a recent macOS for Bun): `bun install`,
 `npx trigger.dev@4.8.5 login`, then `npx trigger.dev@4.8.5 dev` (Development environment, using
@@ -143,6 +158,15 @@ The price list is `PRICING` in the same file: a Standard run is ₱149 for up to
 ₱3.50 a page; Premium is ₱649 a month for 300 pages and 15 GB of storage, then ₱2.65 a page;
 partners pay 25% less for a client's run. The site, the app and the deck read their figures from
 it, so change a price there and redeploy the site and the edge functions.
+
+Two things the screens show that the server does not enforce yet, for the owner to decide
+before payments go live (`docs/HANDOVER.md`, section 5):
+
+- **Storage.** The usage meter shows 300 MB (Standard) or 15 GB (Premium), from `PRICING`, but
+  `create-upload-urls` does not refuse an upload that goes over it, and the storage add-on
+  (₱250 for 5 GB a month) has no checkout.
+- **A Standard run's unused pages.** Every upload is its own run, so pages left over from a run
+  of up to 80 are not kept for the next upload.
 
 To switch payments on (Xendit: GCash, Maya, cards):
 

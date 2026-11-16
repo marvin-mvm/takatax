@@ -22,6 +22,7 @@ import {
   loadPartnerClients,
   loadAccountTier,
   loadPlan,
+  loadUsage,
 } from "./repository";
 import type { AccountRole, Loaded, PartnerKind, Workspace } from "./types";
 
@@ -120,6 +121,10 @@ export const useCorToConfirm = (accountId: string) =>
 
 export const usePlan = (userId: string) =>
   useQuery({ queryKey: ["plan", userId], queryFn: () => loadPlan(userId) });
+
+/** Pages read and storage used on the signed-in user's own account. */
+export const useUsage = (userId: string) =>
+  useQuery({ queryKey: ["usage", userId], queryFn: loadUsage });
 
 /** The tier of a client's account, for a professional: their features follow it. */
 export const useAccountTier = (accountId: string) =>

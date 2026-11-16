@@ -13,6 +13,7 @@ import { estimateFiling } from "@shared/domain/tax-estimates.ts";
 import { type TaxProfile, taxTypesFor } from "@shared/domain/tax-profile.ts";
 import { redactPersonalInfo } from "@shared/community/redact.ts";
 import { PRICING } from "@shared/uploads/rules.ts";
+import { premiumWindowStart, tierOf } from "@shared/uploads/usage.ts";
 import type { RunProgress } from "@/lib/services/uploads";
 import type { CheckFlag } from "@shared/parser/checks.ts";
 import {
@@ -32,6 +33,7 @@ import {
   sampleInvitations,
   samplePartnerClients,
   sampleThread,
+  sampleUsage,
   sampleWorkspace,
 } from "./sample";
 import type {
@@ -40,6 +42,7 @@ import type {
   AccessGrant,
   AccessStatus,
   AccountRole,
+  AccountUsage,
   ChatMessageRecord,
   CommunityAnswer,
   ConversationSummary,
@@ -1038,10 +1041,7 @@ export function loadPlan(userId: string): Promise<Loaded<PlanStatus>> {
       const until = text(account?.["premium_until"]);
       if (account && until && Date.parse(until) > Date.now()) {
         const windowStart = new Date(
-          Math.max(
-            Date.parse(text(account["premium_started_at"]) || until) || 0,
-            Date.now() - 30 * 86_400_000,
-          ),
+          premiumWindowStart(text(account["premium_started_at"]), until),
         ).toISOString();
         const used = rows<Row[]>(
           await db
@@ -1083,6 +1083,88 @@ export function loadPlan(userId: string): Promise<Loaded<PlanStatus>> {
       premiumPagesLeft: null,
       payments: [],
     }),
+  );
+}
+
+/** The size and number of the account's files in storage, a thousand rows at a time. */
+async function storedFiles(accountId: string): Promise<{ bytes: number; files: number }> {
+  const PAGE = 1_000;
+  let bytes = 0;
+  let files = 0;
+  for (let from = 0; ; from += PAGE) {
+    const page = rows<Row[]>(
+      await db
+        .from("documents")
+        .select("bytes")
+        .eq("account_id", accountId)
+        // A file that was deleted (its records kept) or never reached storage takes no space.
+        .is("file_deleted_at", null)
+        .neq("status", "waiting_for_storage")
+        .order("id")
+        .range(from, from + PAGE - 1),
+    );
+    for (const row of page) bytes += typeof row["bytes"] === "number" ? row["bytes"] : 0;
+    files += page.length;
+    if (page.length < PAGE) return { bytes, files };
+  }
+}
+
+/**
+ * What the signed-in user's account has used of its tier: pages read and file storage.
+ * Standard counts the latest run's pages (every upload starts a new run of up to 80 pages);
+ * Premium counts the pages of the current Premium month, the window create-checkout prices by.
+ */
+export function loadUsage(): Promise<Loaded<AccountUsage>> {
+  return liveOrSample(
+    async () => {
+      // Billing columns are not readable from the table; my_plan() returns the owner's only.
+      const plan = rows<Row[]>(await db.rpc("my_plan"))[0];
+      const accountId = text(plan?.["account_id"]);
+      const premiumUntil = text(plan?.["premium_until"]) || null;
+      const tier = tierOf(premiumUntil);
+      const usage: AccountUsage = {
+        accountId,
+        tier,
+        premiumUntil,
+        pagesUsed: 0,
+        pagesReadInAll: 0,
+        storageBytes: 0,
+        files: 0,
+      };
+      // No account yet: nothing was uploaded, so nothing is used.
+      if (!accountId) return usage;
+
+      const [runRows, stored] = await Promise.all([
+        db
+          .from("runs")
+          .select("kind, status, page_count, pages_read, created_at")
+          .eq("account_id", accountId)
+          .order("created_at", { ascending: false })
+          .limit(1_000),
+        storedFiles(accountId),
+      ]);
+      const count = (value: unknown) => (typeof value === "number" ? Math.max(value, 0) : 0);
+      // A run whose payment was never finished read nothing.
+      const runs = rows<Row[]>(runRows).filter((run) => run["status"] !== "awaiting_payment");
+      if (tier === "premium" && premiumUntil) {
+        const windowStart = premiumWindowStart(text(plan?.["premium_started_at"]), premiumUntil);
+        usage.pagesUsed = runs
+          .filter(
+            (run) =>
+              run["kind"] === "premium_month" && Date.parse(text(run["created_at"])) >= windowStart,
+          )
+          .reduce((sum, run) => sum + count(run["page_count"]), 0);
+      } else {
+        usage.pagesUsed = count(
+          runs.find((run) => run["kind"] !== "premium_month")?.["page_count"],
+        );
+      }
+      usage.pagesReadInAll = runs.reduce((sum, run) => sum + count(run["pages_read"]), 0);
+      usage.storageBytes = stored.bytes;
+      usage.files = stored.files;
+      return usage;
+    },
+    () => sampleUsage(todayInManila()),
   );
 }
 
