@@ -14,27 +14,9 @@ function Logo() {
   return (
     <span
       aria-hidden
-      className="flex size-8 items-center justify-center rounded-[8px] bg-tk-surface"
+      className="flex size-8 items-center justify-center rounded-[9px] bg-white font-tk-mono text-base font-semibold text-tk-brand"
     >
-      <svg viewBox="0 0 48 48" className="size-7" fill="none">
-        <path
-          d="M12 6h24v32l-4-3-4 3-4-3-4 3-4-3-4 3V6Z"
-          className="fill-tk-brand"
-        />
-        <path
-          d="M18 15h12M18 21h12"
-          stroke="var(--tk-surface)"
-          strokeLinecap="round"
-          strokeWidth="2.5"
-        />
-        <path
-          d="m22 31 5 5 13-14"
-          className="stroke-tk-accent"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="4"
-        />
-      </svg>
+      ₱
     </span>
   );
 }
