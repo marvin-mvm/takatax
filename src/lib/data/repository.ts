@@ -1010,6 +1010,17 @@ export async function loadCorToConfirm(
   };
 }
 
+/**
+ * The tier of an account the signed-in user can work on: their own, or a client's. A
+ * professional gets the client's tier and nothing else about their billing. Standard when the
+ * account has no Premium month running, or when it cannot be asked.
+ */
+export async function loadAccountTier(accountId: string): Promise<"standard" | "premium"> {
+  if (!accountId || accountId.startsWith("sample-")) return "standard";
+  const { data, error } = await db.rpc("account_tier", { account: accountId });
+  return !error && data === "premium" ? "premium" : "standard";
+}
+
 /** Saves the confirmed COR: this sets the account's tax types and deadlines. */
 export async function confirmCor(documentId: string, details: CorDetails): Promise<void> {
   await rpc("confirm_cor", { document: documentId, details }, "COR confirmation");

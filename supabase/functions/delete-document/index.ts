@@ -3,14 +3,18 @@
 //
 // Deletes an uploaded document, for the account's owner or a professional with access.
 //
+// The tier is the account's: a professional working on a client's account gets the client's
+// tier, Standard or Premium.
+//
 // what = "file" (the "Delete File" column):
-//   - Standard, and any professional working on a client's account: the file is removed from
-//     storage, and the document and the records read from it are deleted. Their amounts leave
-//     the tracker and every tax figure.
-//   - Premium, for the owner: only the file is removed. The document's row and its records stay
+//   - Standard account: the file is removed from storage, and the document and the records read
+//     from it are deleted. Their amounts leave the tracker and every tax figure.
+//   - Premium account: only the file is removed. The document's row and its records stay
 //     (documents.file_deleted_at is set), so the tracker does not change.
-// what = "records" (the "Parsed Records" column): the owner deletes the records that Premium
-//   kept. Refused until the file is gone, so two separate steps are always needed.
+// what = "records" (the "Parsed Records" column): deletes the records that Premium kept.
+//   Refused until the file is gone, so two separate steps are always needed. For a professional
+//   it is a Premium feature, so it needs the client's Premium to be running; the owner can
+//   always clear records they kept, even after Premium ends.
 //
 // A document that is being read cannot be deleted. A professional's deletion goes in the
 // client's activity log (delete_document() in the database writes it).
@@ -58,10 +62,12 @@ serve(async (request) => {
     );
   }
 
+  // The account's tier decides, for its owner and for a professional alike.
+  const premium = Boolean(account.premium_until) && Date.parse(account.premium_until) > Date.now();
   let keepRecords = false;
   if (what === "records") {
-    if (!owner) {
-      throw new HttpError(403, "forbidden", "Only the account's owner can delete kept records");
+    if (!owner && !premium) {
+      throw new HttpError(403, "premium_only", "Deleting kept records is a Premium feature");
     }
     if (!document.file_deleted_at) {
       throw new HttpError(409, "file_first", "Delete the file first, then its records");
@@ -70,9 +76,8 @@ serve(async (request) => {
     if (document.file_deleted_at) {
       throw new HttpError(409, "already_deleted", "This file was already deleted");
     }
-    // Premium keeps the records, for the owner only: a professional always deletes like Standard.
-    keepRecords =
-      owner && Boolean(account.premium_until) && Date.parse(account.premium_until) > Date.now();
+    // Premium keeps the records.
+    keepRecords = premium;
     if (document.storage_key) await deleteObject(document.storage_key);
   }
 

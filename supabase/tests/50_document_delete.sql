@@ -3,12 +3,13 @@
 -- t_grant() helpers. No psql variables, so the same file works in the rolled-back dry run
 -- through the Management API.
 --
--- People: O taxpayer who owns the account (f0…), B verified bookkeeper (fa…).
+-- People: O taxpayer who owns the account (f0…), B verified bookkeeper (fa…), S stranger (fb…).
 
 reset role;
 insert into auth.users (id, email, raw_user_meta_data) values
   ('f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0', 'olive@example.com', '{"full_name":"Olive Ramos","account_type":"taxpayer"}'),
-  ('fafafafa-fafa-fafa-fafa-fafafafafafa', 'bert@example.com', '{"full_name":"Bert Cruz","account_type":"bookkeeper"}');
+  ('fafafafa-fafa-fafa-fafa-fafafafafafa', 'bert@example.com', '{"full_name":"Bert Cruz","account_type":"bookkeeper"}'),
+  ('fbfbfbfb-fbfb-fbfb-fbfb-fbfbfbfbfbfb', 'sol@example.com', '{"full_name":"Sol Yap","account_type":"taxpayer"}');
 update public.partner_profiles set verified_at = now(), display_name = 'Bert Cruz'
   where user_id = 'fafafafa-fafa-fafa-fafa-fafafafafafa';
 insert into public.accounts (id, owner_user_id) values
@@ -131,5 +132,47 @@ end $$;
 select public.t_expect_error(
   $$insert into public.access_events (account_id, action) values ('f0f0f0f0-0000-0000-0000-000000000001', 'made_up')$$,
   'access_events_action_check');
+
+-- 7. The log says when only the kept records were deleted (the second step on Premium).
+do $$ begin
+  assert (select (details ->> 'recordsOnly')::boolean from public.access_events
+          where account_id = 'f0f0f0f0-0000-0000-0000-000000000001' and action = 'deleted_document') = false,
+    'a whole document was deleted, not only its records';
+end $$;
+
+-- 8. The account's tier: the same for its owner and for a professional with access, and
+--    nothing for anyone else. (Signed in as the owner while the account changes, so the
+--    change is not logged as a professional's.)
+set role authenticated;
+select public.t_as('f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0');
+do $$ begin
+  assert public.account_tier('f0f0f0f0-0000-0000-0000-000000000001') = 'standard', 'standard to start with';
+end $$;
+reset role;
+update public.accounts set premium_started_at = now(), premium_until = now() + interval '30 days'
+  where id = 'f0f0f0f0-0000-0000-0000-000000000001';
+set role authenticated;
+do $$ begin
+  assert public.account_tier('f0f0f0f0-0000-0000-0000-000000000001') = 'premium', 'the owner sees premium';
+end $$;
+select public.t_as('fafafafa-fafa-fafa-fafa-fafafafafafa');
+do $$ begin
+  assert public.account_tier('f0f0f0f0-0000-0000-0000-000000000001') = 'premium',
+    'a professional with access gets the client''s tier';
+  assert (select count(*) from public.my_plan()) = 0, 'but not the client''s plan dates';
+end $$;
+select public.t_as('fbfbfbfb-fbfb-fbfb-fbfb-fbfbfbfbfbfb');
+do $$ begin
+  assert public.account_tier('f0f0f0f0-0000-0000-0000-000000000001') is null, 'a stranger learns nothing';
+end $$;
+select public.t_as('f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0');
+reset role;
+update public.accounts set premium_until = now() - interval '1 day'
+  where id = 'f0f0f0f0-0000-0000-0000-000000000001';
+set role authenticated;
+do $$ begin
+  assert public.account_tier('f0f0f0f0-0000-0000-0000-000000000001') = 'standard', 'standard again once Premium ends';
+end $$;
+reset role;
 
 select 'ALL DOCUMENT DELETE CHECKS PASSED';

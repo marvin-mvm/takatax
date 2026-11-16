@@ -136,13 +136,17 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
   key needed). The ledger record says what was printed and the rate used. If no rate can be
   fetched, the document goes to review with no peso amount, so a $250 receipt is never counted
   as ₱250. Code: `supabase/functions/_shared/parser/currency.ts`.
-- Deleting documents (the Delete File and Parsed Records columns of the Documents tab). On
-  Standard, and for a professional on a client's account, deleting a file also deletes the
-  records read from it, so their amounts leave the tracker. On Premium the owner's file goes but
-  its records stay (`documents.file_deleted_at`), and the owner can delete those afterwards. The
+- Deleting documents (the Delete File and Parsed Records columns of the Documents tab). On a
+  Standard account, deleting a file also deletes the records read from it, so their amounts
+  leave the tracker. On a Premium account the file goes but its records stay
+  (`documents.file_deleted_at`), and they can be deleted afterwards as a second step. The
+  account's tier decides, for its owner and for a professional alike (`account_tier()`). The
   `delete-document` function removes the file from R2 and calls `delete_document()` in the
   database; a professional's deletion goes in the client's activity log. Rules and wording:
   `src/lib/documents/delete.ts`.
+- Tiers: a professional working on a client's account gets that client's tier, Standard or
+  Premium. Their own runs stay Standard with the partner discount. Premium is not on sale yet
+  (`PAYMENTS_LIVE = false`), but its features are built behind that switch.
 - Pricing by pages (a photo is 1 page, a PDF every page). Every figure is in `PRICING` in
   `supabase/functions/_shared/uploads/rules.ts`: a Standard run is ₱149 for up to 80 pages, then
   ₱3.50 a page; Premium is ₱649 a month for 300 pages and 15 GB of storage, then ₱2.65 a page;
@@ -166,9 +170,10 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
 - Database migrations 1, 2 and 3 (see section 4) with behaviour checks.
 - **Invitations and activity log**: only a taxpayer invites a professional; the professional
   accepts or declines; the taxpayer can cancel and remove access; the professional can leave.
-  Professionals see receipts, sales, 2307s, COR and tracker, never the plan, payments or Access
-  page. An owner-only, unchangeable activity log lists invitation steps and what professionals
-  open or change.
+  Professionals see receipts, sales, 2307s, COR and tracker, never the payments or Access page.
+  Their features follow the client's tier (Standard or Premium), which is all they learn about
+  the client's plan. An owner-only, unchangeable activity log lists invitation steps and what
+  professionals open or change.
 - **Read once**: a document is read once. `read-documents` starts only documents waiting to be
   read (or stalled), claiming them in one update; finished ones answer 409 `already_read`.
   "Read again" locks on click and disappears once read.
@@ -261,14 +266,13 @@ form numbers on old CORs are swapped for today's forms, and retired ones such as
 show.
 
 1. **Live steps waiting for the owner's go-ahead**, in this order:
-   - Read the owner's two US dollar receipts again (Google Workspace and Twilio were saved as
-     ₱8.40 and ₱250 before the reader converted currencies). A finished document is read once,
-     so first set it back with SQL (`status = 'waiting_for_reader'`, `extracted = null`,
-     `reader_path = '{}'`, `flags = '{}'`); "Read again" then shows on its page.
    - Apply migration 5, `20261117090000_document_delete.sql` (its dry run passed), then add
      `20261117090000` to the repair line in `docs/MISSING_PIECES.md`.
    - Deploy the new `delete-document` function from `main`, and redeploy `read-step` (the example
      TIN in its COR prompt changed). Until then the delete buttons answer "not connected yet".
+   - The owner's two US dollar receipts (Google Workspace and Twilio) were saved as ₱8.40 and
+     ₱250 before the reader converted currencies. The owner will delete them and upload them
+     again once deleting is live: that is the first real test of both features.
 2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff
    tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); an SMTP

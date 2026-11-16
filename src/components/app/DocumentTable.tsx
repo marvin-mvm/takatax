@@ -86,13 +86,16 @@ export function DocumentTable({
   /** Set when a partner views a client's documents, so the detail page opens that account. */
   clientAccountId?: string;
   limit?: number;
-  /** "premium" when the owner's Premium month is running: deleting a file keeps its records. */
+  /**
+   * The account's tier. "premium" keeps the records of a deleted file. A professional on a
+   * client's page gets the client's tier.
+   */
   plan?: DeletePlan;
 }) {
   const queryClient = useQueryClient();
   const viewer: DeleteViewer = clientAccountId ? "partner" : "owner";
-  // A professional always deletes like Standard, whatever plan the client is on.
-  const rules: DeletePlan = viewer === "owner" ? plan : "standard";
+  // The account's tier decides, for its owner and for a professional alike.
+  const rules: DeletePlan = plan;
   /** The document being deleted, so its buttons lock until the server answers. */
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -120,7 +123,9 @@ export function DocumentTable({
           ? "Deleting is not connected yet, so nothing was deleted."
           : result.code === "being_read"
             ? "This document is being read. Delete it when reading is done."
-            : `Nothing was deleted. ${result.message}`,
+            : result.code === "premium_only"
+              ? "Deleting kept records is a Premium feature of this account."
+              : `Nothing was deleted. ${result.message}`,
       );
     }
     setBusy(null);
@@ -149,7 +154,7 @@ export function DocumentTable({
           <tbody>
             {documents.slice(0, limit).map((doc) => {
               const working = busy === doc.id;
-              const recordsOpen = canDeleteRecords(doc, viewer);
+              const recordsOpen = canDeleteRecords(doc, viewer, rules);
               // Premium, file still there: explain the two steps. Everyone else: Premium only.
               const recordsHint =
                 rules === "premium" || recordsOpen ? DELETE_RECORDS_HINT : RECORDS_LOCKED_HINT;

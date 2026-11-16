@@ -25,7 +25,7 @@ import {
   SampleDataNotice,
 } from "@/components/app/ui";
 import { buttonOutline, buttonPrimary } from "@/components/site/styles";
-import { useClientWorkspace } from "@/lib/data/queries";
+import { useAccountTier, useClientWorkspace } from "@/lib/data/queries";
 import {
   NotConnectedError,
   leaveClient,
@@ -47,6 +47,8 @@ export const Route = createFileRoute("/app/clients/$accountId")({
 function ClientView() {
   const { accountId } = Route.useParams();
   const query = useClientWorkspace(accountId);
+  // A professional's features follow the client's tier.
+  const tier = useAccountTier(accountId);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [problem, setProblem] = useState<string | null>(null);
@@ -160,7 +162,12 @@ function ClientView() {
           <section className="flex flex-col gap-3">
             <h2 className="text-xl font-semibold">Documents</h2>
             {documents.length ? (
-              <DocumentTable documents={documents} clientAccountId={account.id} limit={50} />
+              <DocumentTable
+                documents={documents}
+                clientAccountId={account.id}
+                limit={50}
+                plan={tier.data ?? "standard"}
+              />
             ) : (
               <p className="text-tk-muted">No documents yet.</p>
             )}

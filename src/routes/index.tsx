@@ -269,7 +269,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Is my data private?",
-    a: "Your documents are stored privately. Only you, and a bookkeeper you invite who accepts, can see them. They never see your plan or payments, everything they open or change shows in your activity log, and you can remove their access at any time.",
+    a: "Your documents are stored privately. Only you, and a bookkeeper you invite who accepts, can see them. They work with the features of your plan but never see your payments, everything they open or change shows in your activity log, and you can remove their access at any time.",
   },
   {
     q: "How much does it cost?",

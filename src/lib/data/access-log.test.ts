@@ -43,6 +43,29 @@ describe("describeAccessEvent", () => {
     expect(ACTION_GROUP.deleted_document).toBe("changed");
   });
 
+  it("tells a kept-records deletion apart from deleting the file only", () => {
+    const fileOnly = describeAccessEvent(
+      event("deleted_document", "2026-11-17T01:00:00Z", {
+        fileName: "rent.jpg",
+        documentKind: "expense_receipt",
+        records: 0,
+        recordsKept: true,
+      }),
+    );
+    expect(fileOnly.title).toBe("Liza Mendoza deleted rent.jpg");
+    expect(fileOnly.lines.join(" ")).toContain("file only, its records were kept");
+    const recordsOnly = describeAccessEvent(
+      event("deleted_document", "2026-11-17T02:00:00Z", {
+        fileName: "rent.jpg",
+        documentKind: "expense_receipt",
+        records: 2,
+        recordsOnly: true,
+      }),
+    );
+    expect(recordsOnly.title).toBe("Liza Mendoza deleted the parsed records of rent.jpg");
+    expect(recordsOnly.lines.join(" ")).toContain("2 records removed from your tracker");
+  });
+
   it("names the professional and the file", () => {
     const opened = describeAccessEvent(
       event("opened_document", "2026-11-15T01:00:00Z", {

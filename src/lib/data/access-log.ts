@@ -171,9 +171,17 @@ export function describeAccessEvent(event: AccessEvent): { title: string; lines:
       const kind = kindLabel(d);
       const records = count(d["records"]);
       const removed = records ? `${plural(records, "record")} removed from your tracker` : "";
+      // Premium keeps the records when the file goes; deleting them is a second, separate step.
+      if (d["recordsOnly"] === true) {
+        return {
+          title: `${who} deleted the parsed records of ${fileLabel(d)}`,
+          lines: [[kind, removed].filter(Boolean).join(", ")].filter(Boolean),
+        };
+      }
+      const outcome = d["recordsKept"] === true ? "file only, its records were kept" : removed;
       return {
         title: `${who} deleted ${fileLabel(d)}`,
-        lines: [[kind, removed].filter(Boolean).join(", ")].filter(Boolean),
+        lines: [[kind, outcome].filter(Boolean).join(", ")].filter(Boolean),
       };
     }
   }

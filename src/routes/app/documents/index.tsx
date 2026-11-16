@@ -77,10 +77,7 @@ function DocumentsPage() {
       {documents.length === 0 ? (
         <EmptyState title="No documents here yet." />
       ) : (
-        <DocumentTable
-          documents={documents}
-          plan={deletePlan(plan.data?.data.premiumUntil, "owner")}
-        />
+        <DocumentTable documents={documents} plan={deletePlan(plan.data?.data.premiumUntil)} />
       )}
     </div>
   );
