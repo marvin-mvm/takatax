@@ -22,6 +22,7 @@
 import { AbortTaskRunError, logger, task } from "@trigger.dev/sdk";
 
 import type { CheckFlag } from "../supabase/functions/_shared/parser/checks.ts";
+import { convertReading } from "../supabase/functions/_shared/parser/currency.ts";
 import { toLedgerRows } from "../supabase/functions/_shared/parser/ledger.ts";
 import { DEFAULT_READER_MODELS } from "../supabase/functions/_shared/parser/models.ts";
 import { combineReadings } from "../supabase/functions/_shared/parser/pages.ts";
@@ -51,6 +52,7 @@ import {
   REGISTRATION_JSON_SCHEMA,
 } from "../supabase/functions/_shared/parser/registration.ts";
 import { optionalEnv } from "./lib/env";
+import { pesoRate } from "./lib/fx";
 import { chat, documentPart, type ContentPart } from "./lib/openrouter";
 import { extractPages, loadPdf } from "./lib/pdf";
 import { mapWithConcurrency } from "./lib/pool";
@@ -294,7 +296,8 @@ async function readDocument(
   });
 
   // ---- Save: the document, then its ledger rows (replacing any from an earlier reading) ------
-  const result = combineReadings(results, extraFlags);
+  // Amounts printed in another currency become pesos at the rate of the document's date.
+  const result = await convertReading(combineReadings(results, extraFlags), pesoRate);
   const first = result.documents[0];
   const { error: documentError } = await admin
     .from("documents")

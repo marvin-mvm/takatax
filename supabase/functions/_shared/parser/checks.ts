@@ -4,6 +4,7 @@
  * the errors a second model alone does not catch.
  */
 
+import { PESO, currencyOf } from "./currency.ts";
 import type { ExtractedDocument } from "./schema.ts";
 
 export type CheckFlag =
@@ -15,7 +16,8 @@ export type CheckFlag =
   | "outside_period"
   | "unusual_withholding_rate"
   | "not_a_document"
-  | "pages_not_paid";
+  | "pages_not_paid"
+  | "currency_not_converted";
 
 export const CHECK_FLAG_TEXT: Record<CheckFlag, string> = {
   low_confidence: "The AI was not sure about a key figure.",
@@ -28,6 +30,8 @@ export const CHECK_FLAG_TEXT: Record<CheckFlag, string> = {
   not_a_document: "This does not look like a receipt, invoice or Form 2307.",
   pages_not_paid:
     "This PDF has more pages than were counted at upload; only the pages paid for were read.",
+  currency_not_converted:
+    "The amounts are in another currency and its exchange rate could not be fetched, so no peso amount was recorded. Read this document again later.",
 };
 
 /** Below this, a field counts as unsure. Tune on the 200-document test set. */
@@ -85,6 +89,8 @@ export function checkDocument(
   } else {
     if (!doc.totalAmount || doc.totalAmount <= 0) flags.push("missing_amount");
     else if (
+      // The 12/112 rule is Philippine VAT: a foreign supplier's tax follows its own rules.
+      currencyOf(doc) === PESO &&
       doc.vatAmount &&
       doc.vatAmount > 0 &&
       !vatMatchesTotal(doc.totalAmount, doc.vatAmount)
@@ -102,6 +108,7 @@ export function sameTaxFields(a: ExtractedDocument, b: ExtractedDocument): boole
   return (
     a.kind === b.kind &&
     a.date === b.date &&
+    currencyOf(a) === currencyOf(b) &&
     normalizeTin(a.issuerTin) === normalizeTin(b.issuerTin) &&
     money(a.totalAmount, b.totalAmount) &&
     money(a.vatAmount, b.vatAmount) &&

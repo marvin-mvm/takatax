@@ -130,6 +130,12 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
 - Reader: either the Trigger.dev task `read-run` (`trigger/`) or the Supabase edge function
   `read-step`, chosen by the Supabase secret `READER` (`trigger` default, `supabase`). The live
   project uses **`READER=supabase`** because Trigger.dev deploys are blocked (section 4).
+- Foreign currency: the reader records the currency each document is printed in and turns foreign
+  amounts into pesos at the exchange rate of the document's date (the European Central Bank's
+  rates through `api.frankfurter.dev`, then the currency-api data set on `cdn.jsdelivr.net`; no
+  key needed). The ledger record says what was printed and the rate used. If no rate can be
+  fetched, the document goes to review with no peso amount, so a $250 receipt is never counted
+  as ₱250. Code: `supabase/functions/_shared/parser/currency.ts`.
 - Pricing by pages (a photo is 1 page, a PDF every page). Every figure is in `PRICING` in
   `supabase/functions/_shared/uploads/rules.ts`: a Standard run is ₱149 for up to 80 pages, then
   ₱3.50 a page; Premium is ₱649 a month for 300 pages and 15 GB of storage, then ₱2.65 a page;
@@ -250,7 +256,12 @@ show.
    new prices are merged: `read-step` (the COR reader spells form numbers with the table, for
    example 1702-RT and 1604-C), and `create-checkout`, `create-upload-urls` and
    `payments-webhook` (they carry the price list). Until then the server still allows free runs
-   of up to 250 pages while the screens say 80.
+   of up to 250 pages while the screens say 80. `read-step` also brings the foreign-currency
+   conversion: after deploying it, read the owner's two US dollar receipts again (Google
+   Workspace and Twilio were saved as ₱8.40 and ₱250). A finished document is read once, so
+   first set it back with SQL (`status = 'waiting_for_reader'`, `extracted = null`,
+   `reader_path = '{}'`, `flags = '{}'`); "Read again" then shows on its page. This is a change
+   to live data: ask the owner first.
 2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff
    tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); an SMTP
