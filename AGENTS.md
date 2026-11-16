@@ -36,6 +36,9 @@ use the editor.
 These rules are the project owner's and take precedence over the Lovable block above
 where they differ.
 
+A new session starts with `docs/HANDOVER.md`: the owner's rules in one place, the live state
+of Supabase and Trigger.dev, what has been built, and what to do next.
+
 ## Authorship
 
 - Every commit is authored as `marvin-mvm <marvinmata19@gmail.com>`. Set
