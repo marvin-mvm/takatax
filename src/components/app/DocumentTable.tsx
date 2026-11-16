@@ -11,6 +11,50 @@ import { fileSize } from "@/lib/money";
 import { ReadingProgress } from "./ReadingProgress";
 import { StatusPill } from "./ui";
 
+/**
+ * "Please check" as a link to where the check is done: the COR is checked on My COR (or on the
+ * client's page for a professional); any other document on its own page, at what was read.
+ */
+export function CheckLink({
+  doc,
+  clientAccountId,
+}: {
+  doc: Pick<StoredDocument, "id" | "kind" | "status">;
+  clientAccountId?: string | undefined;
+}) {
+  const pill = (
+    <span className="inline-flex items-center gap-1 rounded-full underline-offset-2 hover:underline">
+      <StatusPill status={doc.status} />
+      <span aria-hidden className="text-tk-warn">
+        →
+      </span>
+    </span>
+  );
+  const label = doc.kind === "cor" ? "Check your COR" : "Check this document";
+  if (doc.kind === "cor") {
+    return clientAccountId ? (
+      <Link to="/app/clients/$accountId" params={{ accountId: clientAccountId }} aria-label={label}>
+        {pill}
+      </Link>
+    ) : (
+      <Link to="/app/cor" aria-label={label}>
+        {pill}
+      </Link>
+    );
+  }
+  return (
+    <Link
+      to="/app/documents/$documentId"
+      params={{ documentId: doc.id }}
+      search={clientAccountId ? { account: clientAccountId } : {}}
+      hash="check"
+      aria-label={label}
+    >
+      {pill}
+    </Link>
+  );
+}
+
 export function DocumentTable({
   documents,
   clientAccountId,
@@ -61,6 +105,8 @@ export function DocumentTable({
                     pagesRead={doc.pagesRead}
                     fileName={doc.fileName}
                   />
+                ) : doc.status === "needs_review" ? (
+                  <CheckLink doc={doc} clientAccountId={clientAccountId} />
                 ) : (
                   <StatusPill status={doc.status} />
                 )}

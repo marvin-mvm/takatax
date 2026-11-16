@@ -34,11 +34,7 @@ function UploadPage() {
         title={account ? "Upload for your client" : "Upload documents"}
         subtitle="Receipts, sales invoices and collections, Form 2307s and the COR. Take photos with your phone or choose PDFs."
       />
-      <UploadPanel
-        initialKind={kind ?? "expense_receipt"}
-        clientAccountId={account}
-        returningRunId={run}
-      />
+      <UploadPanel initialKind={kind ?? "unknown"} clientAccountId={account} returningRunId={run} />
     </div>
   );
 }
