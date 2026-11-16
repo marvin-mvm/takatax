@@ -9,16 +9,20 @@ Never paste a full key into a chat, an issue or a commit. Set keys only in the S
 Trigger.dev dashboards, or in `.env.local` on your own computer (git ignores it; `.env` is
 committed, so never put a secret there).
 
-## 0. Supabase project `thiznrxojzrxkjwqhtjt`
+## 0. Supabase project `thiznrxojzrxkjwqhtjt` (done)
 
-- [ ] **Database**: apply both migrations in `supabase/migrations/` (tables, row-level security,
-      chat, access, payments, AI spend log). A rolled-back dry run on the live project passed:
-      `begin;` + both migrations + `supabase/tests/20_behaviour_api.sql` + `rollback;`.
-      Re-run the checks any time with `supabase/tests/run.sh` against a local Postgres.
-- [ ] **Edge functions**: deploy `create-upload-urls`, `confirm-upload`, `document-link`,
-      `read-documents`, `assistant-chat`, `create-checkout` and `payments-webhook`
-      (`supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`). Supabase gives
-      them `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
+- [x] **Database**: both migrations in `supabase/migrations/` were applied on 2026-11-16, after a
+      rolled-back dry run with every behaviour check passing on the live project. 15 tables,
+      all with row-level security; Realtime on `messages`. Re-run the checks any time with
+      `supabase/tests/run.sh` against a local Postgres.
+      They were applied by hand, so Supabase's migration history is empty. If you start using
+      `supabase db push`, first mark them as applied:
+      `supabase migration repair --status applied 20261115120000 20261115140000`.
+- [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
+      `read-documents`, `assistant-chat`, `create-checkout` and `payments-webhook` are deployed
+      (only `payments-webhook` skips the login check). Each answers "not configured" until its
+      keys are set. Redeploy after changes with
+      `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
 
 ## 1. Cloudflare R2 (file storage)
 
