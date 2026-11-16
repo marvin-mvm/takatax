@@ -1,12 +1,13 @@
 /**
  * A table of uploaded documents with their reading status, each linking to its detail page, and
  * the two delete columns: "Delete File", and "Parsed Records" (the records Premium keeps after a
- * file is deleted). The rules are in `@/lib/documents/delete`.
+ * file is deleted). The rules and the wording are in `@/lib/documents/delete`; every delete asks
+ * first, in the themed pop-up from `./confirm`.
  */
 
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { FileText, Info, Loader2, Trash2 } from "lucide-react";
+import { FileText, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { formatIsoDate } from "@shared/domain/dates.ts";
@@ -16,6 +17,7 @@ import {
   DELETE_RECORDS_HINT,
   type DeletePlan,
   type DeleteViewer,
+  PARSED_RECORDS_HINT,
   RECORDS_LOCKED_HINT,
   canDeleteFile,
   canDeleteRecords,
@@ -25,7 +27,9 @@ import {
 import { fileSize } from "@/lib/money";
 import { deleteDocument } from "@/lib/services/documents";
 
+import { Hint } from "./Hint";
 import { ReadingProgress } from "./ReadingProgress";
+import { useConfirm } from "./confirm";
 import { StatusPill } from "./ui";
 
 /**
@@ -93,6 +97,7 @@ export function DocumentTable({
   plan?: DeletePlan;
 }) {
   const queryClient = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const viewer: DeleteViewer = clientAccountId ? "partner" : "owner";
   // The account's tier decides, for its owner and for a professional alike.
   const rules: DeletePlan = plan;
@@ -106,7 +111,7 @@ export function DocumentTable({
       what === "file"
         ? deleteFileQuestion(rules, viewer, doc.fileName)
         : deleteRecordsQuestion(doc.fileName);
-    if (!window.confirm(question)) return;
+    if (!(await confirm(question))) return;
     setProblem(null);
     if (!UUID.test(doc.id) || !doc.accountId) {
       setProblem("These are sample documents, so there is nothing to delete yet.");
@@ -133,6 +138,7 @@ export function DocumentTable({
 
   return (
     <div className="flex flex-col gap-3">
+      {dialog}
       {problem ? (
         <p role="alert" className="rounded-[12px] bg-tk-warn-soft px-4 py-3 text-sm text-tk-warn">
           {problem}
@@ -148,14 +154,20 @@ export function DocumentTable({
               <th className="px-3 py-2 font-medium">Size</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Delete File</th>
-              <th className="px-4 py-2 font-medium">Parsed Records</th>
+              <th className="px-4 py-2 font-medium">
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  Parsed Records
+                  <Hint label="About Parsed Records" text={PARSED_RECORDS_HINT} />
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {documents.slice(0, limit).map((doc) => {
               const working = busy === doc.id;
               const recordsOpen = canDeleteRecords(doc, viewer, rules);
-              // Premium, file still there: explain the two steps. Everyone else: Premium only.
+              // Premium, file still there: explain the two steps. Everyone else: Premium only
+              // (the "(?)" on the column's name says so on screen).
               const recordsHint =
                 rules === "premium" || recordsOpen ? DELETE_RECORDS_HINT : RECORDS_LOCKED_HINT;
               return (
@@ -221,7 +233,7 @@ export function DocumentTable({
                     )}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className="inline-flex items-center gap-1.5" title={recordsHint}>
+                    <span className="inline-flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => void remove(doc, "records")}
@@ -234,14 +246,11 @@ export function DocumentTable({
                         Delete record
                       </button>
                       {rules === "premium" && !recordsOpen ? (
-                        <span
-                          tabIndex={0}
-                          role="note"
-                          aria-label={recordsHint}
-                          className="inline-flex size-5 cursor-help items-center justify-center rounded-full text-tk-muted"
-                        >
-                          <Info aria-hidden className="size-4" />
-                        </span>
+                        <Hint
+                          icon="info"
+                          label={`Why the records of ${doc.fileName} cannot be deleted yet`}
+                          text={recordsHint}
+                        />
                       ) : null}
                       <span id={`records-hint-${doc.id}`} className="sr-only">
                         {recordsHint}

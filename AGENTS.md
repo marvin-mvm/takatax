@@ -124,6 +124,13 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
   `delete-document` function removes the file from R2 and then calls `delete_document()`; a
   professional's deletion is in the activity log. The screens' rules and wording are in
   `src/lib/documents/delete.ts`.
+- Pop-ups: ask "are you sure?" with `useConfirm()` (`src/components/app/confirm.tsx`), the themed
+  pop-up with a short list of what will happen, never `window.confirm`. Keep the wording to a
+  few short lines. Short hover help is `Hint` (`src/components/app/Hint.tsx`).
+- Records assistant: `assistant-chat` reads the period on screen (its real first and last day,
+  `supabase/functions/_shared/assistant/period.ts`) and asks a small model:
+  `DEFAULT_ASSISTANT_MODEL` in `supabase/functions/_shared/parser/models.ts`, unless the
+  `OPENROUTER_MODEL_ASSISTANT` secret names another.
 - Database changes go in a new file in `supabase/migrations/`; check them with
   `supabase/tests/run.sh` (local Postgres) before applying them to the project.
 
