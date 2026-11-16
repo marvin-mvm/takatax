@@ -232,21 +232,22 @@ Deploy functions with
 
 The live steps of PR #18 and PR #25 are done: migration 4 is applied, the default model names in
 `supabase/functions/_shared/parser/models.ts` are corrected, and every function is deployed from
-`main`.
+`main`. The deadline list now follows the forms confirmed from the COR
+(`supabase/functions/_shared/domain/deadlines.ts`): it adds the annual withholding return 1604-E,
+shows the annual income tax form the COR names, never shows the retired 0605, and no longer skips
+January's returns late in the year.
 
-1. **Deadlines from the confirmed COR forms** (`accounts.cor_tax_types`), not only from the
-   profile flags. Reported by the "connect Supabase" session and still to confirm against
-   `supabase/functions/_shared/domain/deadlines.ts` and `tax-profile.ts`: a COR that lists 1701
-   gets 1701A when the option is OSD, 1604-E is missing from the deadline list, and 0605 should
-   never appear.
-2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
+1. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff
    tab; confirm the R2 bucket is private and has its CORS rule (uploads already work); an SMTP
    provider, then turn email confirmation back on; Google Search Console.
-3. **First full end-to-end run** on the Supabase reader. So far one COR and two receipts have been
+2. **First full end-to-end run** on the Supabase reader. So far one COR and two receipts have been
    read. Upload photos and a 10 to 20 page PDF, watch `runs`, `documents` and the logs, confirm
    that OpenRouter returns `usage.cost`, and tune `CONFIDENCE_THRESHOLD` in
    `supabase/functions/_shared/parser/checks.ts`.
+3. **Deadlines for the other forms a COR can list**: 1601-C and 1604-C (tax withheld on
+   salaries), 0619-F and 1601-FQ (final withholding tax). They show under "Your tax types" on My
+   COR but are not on the calendar yet.
 4. **Database hardening before launch**, from Supabase's advisors (Database → Advisors, read on
    2026-11-16), as one new migration with the usual dry run:
    - take `execute` away from `anon` on the functions a visitor never needs. The advisor flags 25
@@ -265,7 +266,11 @@ The live steps of PR #18 and PR #25 are done: migration 4 is applied, the defaul
 6. **Payments** when the owner decides: Xendit keys and webhook, test mode, then
    `PAYMENTS_LIVE = true` (steps in `docs/MISSING_PIECES.md`, section 4).
 7. **Before launch, not code**: privacy notice and terms (Data Privacy Act), community and
-   partner terms, a CPA review of the tax rules in `supabase/functions/_shared/domain/`.
+   partner terms, a CPA review of the tax rules in `supabase/functions/_shared/domain/`. One point
+   for that review: the annual income tax form. The app shows the one confirmed from the COR (1701
+   or 1701A), except that itemized deductions or a salary always mean 1701. CORs usually print
+   1701, while the BIR gives 1701A to business-only filers on the standard deduction or the 8%
+   rate.
 8. **Later product ideas** on the landing page ("After launch", "After year 1": taxpayer
    profile, lender sharing, investor newsletter): each needs its own design, consent flow and
    legal review before building.
