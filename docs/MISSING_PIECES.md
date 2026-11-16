@@ -11,7 +11,7 @@ committed, so never put a secret there).
 
 ## 0. Supabase project `thiznrxojzrxkjwqhtjt`
 
-- [x] **Database**: all three migrations in `supabase/migrations/` were applied on 2026-11-16,
+- [x] **Database**: the first three migrations in `supabase/migrations/` were applied on 2026-11-16,
       each after a rolled-back dry run with every behaviour check passing on the live project
       (the invitations and activity log migration, `20261116120000`, after its own dry run with
       `supabase/tests/20_behaviour_api.sql` and `30_invitations.sql`). 16 tables, all with
@@ -19,19 +19,19 @@ committed, so never put a secret there).
       `supabase/tests/run.sh` against a local Postgres.
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
-      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000`.
-- [ ] **COR tax types** (`20261116150000_cor_tax_types.sql`): keeps the tax types and forms
-      printed on the COR (0619-E, 1601-EQ, 2551Q…) on the account. Passed its rolled-back dry run
-      with `supabase/tests/40_cor_tax_types.sql`; apply it when this change reaches `main`, then
-      add `20261116150000` to the repair line above. The dry run can use all of
-      `20_behaviour_api.sql`, `30_invitations.sql` and `40_cor_tax_types.sql`: they look only at
-      their own test users, so they are safe on a project with real users.
+      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000`.
+- [x] **COR tax types** (`20261116150000_cor_tax_types.sql`): keeps the tax types and forms
+      printed on the COR (0619-E, 1601-EQ, 2551Q…) on the account. Applied on 2026-11-16 after its
+      rolled-back dry run with `supabase/tests/40_cor_tax_types.sql`; it is in the repair line
+      above. For the next migration, the dry run can use all of `20_behaviour_api.sql`,
+      `30_invitations.sql` and `40_cor_tax_types.sql`: they look only at their own test users, so
+      they are safe on a project with real users.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
       `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and `payments-webhook` are
       deployed (`payments-webhook` and `read-step` skip the login check; `read-step` accepts only
       the service role key). Each answers "not configured" until its
-      keys are set. Redeploy after changes with
-      `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
+      keys are set. All eight matched `main` file by file on 2026-11-16. Redeploy after changes
+      with `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
 
 ## 1. Cloudflare R2 (file storage)
 
@@ -107,7 +107,9 @@ always matches the SDK (4.8.4 or later is needed for trusted publishing).
 1. Trigger.dev dashboard → switch to **Production** → GitHub → Trusted publishing: add the
    `marvin-mvm/takatax` repository (done).
 2. Do not set a `TRIGGER_ACCESS_TOKEN` repository secret: the workflow does not read one, and
-   the CLI would use a key instead of trusted publishing if one were set.
+   the CLI would use a key instead of trusted publishing if one were set. A secret with that name
+   was added on 2026-11-16. It does nothing today; delete it under GitHub → Settings → Secrets and
+   variables → Actions.
 3. Merge to `main` (or run the workflow from the Actions tab once it is on `main`). The dashboard's
    Production environment then lists `read-run` and `ping`; run `ping` from its Test page.
 4. Set Supabase's `TRIGGER_SECRET_KEY` to the regular Production secret key (`tr_prod_…`). A
@@ -168,15 +170,16 @@ To switch payments on (Xendit: GCash, Maya, cards):
 
 ## 6. One-time settings (no keys)
 
-- [ ] **Supabase → Authentication → URL configuration**: set the Site URL to the live Netlify
-      address (today it is `http://localhost:3000`, so password-reset and other emails link
-      there) and add `https://<your-netlify-address>/**` to the redirect URLs.
+- [x] **Supabase → Authentication → URL configuration**: the Site URL is
+      `https://takatax.netlify.app` and `https://takatax.netlify.app/**` is in the redirect URLs
+      (checked on 2026-11-16), so password-reset and other emails link to the live site.
 - [ ] **Email confirmation is off** (turned off on 2026-11-16, so sign-ups need no email). Anyone
       can then sign up with an address they do not own. Turn "Confirm email" back on in Supabase →
       Authentication → Sign In / Providers → Email once an SMTP provider is set up (section 5).
       Partner access is unaffected: professionals still need staff verification.
-- [ ] **Make yourself Takatax staff**, so the Staff tab appears and you can verify partners.
-      After signing up, run in the Supabase SQL editor:
+- [ ] **Make yourself Takatax staff**, so the Staff tab appears and you can verify partners
+      (not done yet on 2026-11-16: `public.admins` is empty). After signing up, run in the
+      Supabase SQL editor:
       `insert into public.admins (user_id) select id from auth.users where email = '<your email>';`
 - [ ] **Verify partners** on the Staff tab: check each BIR accreditation or PRC licence number
       first. Only verified partners are listed, can answer in the community, and can be
@@ -190,11 +193,17 @@ To switch payments on (Xendit: GCash, Maya, cards):
 
 - [ ] Confirm the model slugs in `supabase/functions/_shared/parser/models.ts` on
       openrouter.ai/models, run a test batch of real receipts and PDFs, and tune
-      `CONFIDENCE_THRESHOLD` in `supabase/functions/_shared/parser/checks.ts`.
+      `CONFIDENCE_THRESHOLD` in `supabase/functions/_shared/parser/checks.ts`. On 2026-11-16 the
+      model names were confirmed on OpenRouter and the defaults in `models.ts` corrected to match
+      the Supabase secrets; the test batch and the threshold are still to do.
 - [ ] Confirm that OpenRouter returns `usage.cost` (US dollars) so the AI spend log and daily cap
       count real money.
 - [ ] Pay for one run and one Premium month in the payment provider's test mode, then switch to
       live keys.
+- [ ] Database hardening from Supabase's advisors (Database → Advisors): limit which functions
+      a visitor without a login may call, pin `search_path` on four functions, speed up the
+      row-level security policies and index the foreign keys, and turn on leaked-password
+      protection in Authentication. The list is in `docs/HANDOVER.md`, section 5.
 - [ ] Privacy notice and terms (Data Privacy Act), community rules and partner terms, reviewed
       by a Philippine lawyer.
 - [ ] A CPA review of the tax rules in `supabase/functions/_shared/domain/` against real filed
