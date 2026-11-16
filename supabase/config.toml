@@ -4,3 +4,8 @@ project_id = "thiznrxojzrxkjwqhtjt"
 # signature instead.
 [functions.payments-webhook]
 verify_jwt = false
+
+# The Supabase reader is called only by read-documents and by itself, with the service role key
+# (checked in the function).
+[functions.read-step]
+verify_jwt = false

@@ -34,6 +34,8 @@ export async function chat(options: {
   schema?: { name: string; schema: unknown };
   maxTokens?: number;
   spend?: SpendContext;
+  /** Give up after this long (the Supabase reader must finish each step in time). */
+  timeoutMs?: number;
 }): Promise<string> {
   const { OPENROUTER_API_KEY } = requireEnv("OPENROUTER_API_KEY");
   const response = await fetch(OPENROUTER_CHAT_URL, {
@@ -43,6 +45,7 @@ export async function chat(options: {
       "Content-Type": "application/json",
       "X-Title": "Takatax",
     },
+    ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
     body: JSON.stringify({
       model: options.model,
       messages: options.messages,

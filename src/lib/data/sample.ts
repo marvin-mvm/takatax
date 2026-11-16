@@ -5,7 +5,7 @@
  * Delete this file's use in `repository.ts` once real data flows end to end.
  */
 
-import { endOfMonth, isoDate, parseIso, quarterBounds } from "@shared/domain/dates.ts";
+import { addDays, endOfMonth, isoDate, parseIso, quarterBounds } from "@shared/domain/dates.ts";
 import { upcomingFilings } from "@shared/domain/deadlines.ts";
 import { type ExpenseCategory, type LedgerRecord, round2 } from "@shared/domain/records.ts";
 import { estimateFiling } from "@shared/domain/tax-estimates.ts";
@@ -14,12 +14,15 @@ import type { CheckFlag } from "@shared/parser/checks.ts";
 import type { DocumentKind } from "@shared/parser/schema.ts";
 
 import type {
+  AccessEvent,
   AccessGrant,
+  AccessStatus,
   ChatMessageRecord,
   CommunityPost,
   ConversationSummary,
   ConversationThread,
   PartnerClientSummary,
+  PartnerInvitation,
   PartnerProfile,
   StoredDocument,
   Workspace,
@@ -608,7 +611,13 @@ export const SAMPLE_POSTS: CommunityPost[] = [
 /** Professionals with access to the sample taxpayer's account: two now, one in the past. */
 export function sampleAccess(today: string): AccessGrant[] {
   const year = Number(today.slice(0, 4));
-  const grant = (partnerId: string, grantedAt: string, revokedAt: string | null): AccessGrant => {
+  const grant = (
+    partnerId: string,
+    status: AccessStatus,
+    invitedAt: string,
+    grantedAt: string | null,
+    endedAt: string | null,
+  ): AccessGrant => {
     const partner = SAMPLE_PARTNERS.find((p) => p.id === partnerId);
     if (!partner) throw new Error(`No sample partner ${partnerId}`);
     return {
@@ -618,14 +627,117 @@ export function sampleAccess(today: string): AccessGrant[] {
       city: partner.city,
       rating: partner.rating,
       reviewCount: partner.reviewCount,
+      status,
+      invitedAt,
       grantedAt,
-      revokedAt,
+      endedAt,
     };
   };
   return [
-    grant("sample-partner-1", isoDate(year, 1, 8), null),
-    grant("sample-partner-2", isoDate(year, 4, 2), null),
-    grant("sample-partner-4", isoDate(year - 1, 3, 15), isoDate(year - 1, 12, 20)),
+    grant("sample-partner-3", "pending", addDays(today, -2), null, null),
+    grant("sample-partner-2", "active", isoDate(year, 4, 1), isoDate(year, 4, 2), null),
+    grant("sample-partner-1", "active", isoDate(year, 1, 7), isoDate(year, 1, 8), null),
+    grant(
+      "sample-partner-4",
+      "revoked",
+      isoDate(year - 1, 3, 14),
+      isoDate(year - 1, 3, 15),
+      isoDate(year - 1, 12, 20),
+    ),
+  ];
+}
+
+/** An invitation for the sample partner view. */
+export function sampleInvitations(today: string): PartnerInvitation[] {
+  return [
+    {
+      accountId: "sample-invite-lopez",
+      taxpayerUserId: "sample-owner-lopez",
+      taxpayerName: "Maria Lopez",
+      businessName: "Lopez Sari-Sari Store",
+      invitedAt: `${addDays(today, -1)}T08:30:00+08:00`,
+    },
+  ];
+}
+
+/** The sample taxpayer's activity log, newest first. */
+export function sampleAccessEvents(today: string): AccessEvent[] {
+  const year = Number(today.slice(0, 4));
+  const name = (partnerId: string) => SAMPLE_PARTNERS.find((p) => p.id === partnerId)?.name ?? "";
+  let next = 0;
+  const event = (
+    partnerId: string,
+    action: AccessEvent["action"],
+    day: string,
+    time: string,
+    details: Record<string, unknown> = {},
+    byOwner = false,
+  ): AccessEvent => ({
+    id: `sample-event-${++next}`,
+    action,
+    partnerId,
+    partnerName: name(partnerId),
+    byOwner,
+    targetId: null,
+    details,
+    createdAt: `${day}T${time}:00+08:00`,
+  });
+  const yesterday = addDays(today, -1);
+  const threeDaysAgo = addDays(today, -3);
+  const receipt = (fileName: string) => ({
+    fileName,
+    documentKind: "form_2307",
+    pages: 1,
+  });
+  return [
+    event("sample-partner-1", "edited_record", yesterday, "10:05", {
+      kind: "expense",
+      counterparty: "Shell Gasoline Station",
+      recordDate: addDays(today, -20),
+      changes: { amount_centavos: { from: 125000, to: 152000 } },
+    }),
+    event("sample-partner-1", "opened_document", yesterday, "09:51", {
+      fileName: "receipt-shell-oct.jpg",
+      documentKind: "expense_receipt",
+    }),
+    event("sample-partner-1", "opened_account", yesterday, "09:48"),
+    event("sample-partner-3", "invited", addDays(today, -2), "08:02", {}, true),
+    event("sample-partner-2", "started_reading", threeDaysAgo, "15:26", {
+      documents: 3,
+      pages: 3,
+    }),
+    event(
+      "sample-partner-2",
+      "uploaded_document",
+      threeDaysAgo,
+      "15:24",
+      receipt("2307-acme-q3.pdf"),
+    ),
+    event(
+      "sample-partner-2",
+      "uploaded_document",
+      threeDaysAgo,
+      "15:23",
+      receipt("2307-bpo-q3.pdf"),
+    ),
+    event(
+      "sample-partner-2",
+      "uploaded_document",
+      threeDaysAgo,
+      "15:22",
+      receipt("2307-cafe-q3.pdf"),
+    ),
+    event("sample-partner-2", "accepted", isoDate(year, 4, 2), "11:40"),
+    event("sample-partner-2", "invited", isoDate(year, 4, 1), "19:12", {}, true),
+    event("sample-partner-1", "confirmed_cor", isoDate(year, 1, 9), "14:03", {
+      changes: {
+        income_tax_option: { from: "graduated_osd", to: "eight_percent" },
+        rdo_code: { from: null, to: "043" },
+      },
+    }),
+    event("sample-partner-1", "accepted", isoDate(year, 1, 8), "09:15"),
+    event("sample-partner-1", "invited", isoDate(year, 1, 7), "21:30", {}, true),
+    event("sample-partner-4", "access_removed", isoDate(year - 1, 12, 20), "16:45", {}, true),
   ];
 }
 

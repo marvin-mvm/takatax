@@ -9,7 +9,7 @@ Never paste a full key into a chat, an issue or a commit. Set keys only in the S
 Trigger.dev dashboards, or in `.env.local` on your own computer (git ignores it; `.env` is
 committed, so never put a secret there).
 
-## 0. Supabase project `thiznrxojzrxkjwqhtjt` (done)
+## 0. Supabase project `thiznrxojzrxkjwqhtjt`
 
 - [x] **Database**: both migrations in `supabase/migrations/` were applied on 2026-11-16, after a
       rolled-back dry run with every behaviour check passing on the live project. 15 tables,
@@ -18,9 +18,15 @@ committed, so never put a secret there).
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
       `supabase migration repair --status applied 20261115120000 20261115140000`.
+- [ ] **Invitations and the activity log**: `20261116120000_invitations_activity.sql` is not
+      applied yet. Apply it when this change is merged and the site is deployed (with no users
+      yet, the few minutes between the two do not matter): a rolled-back dry run first with
+      `supabase/tests/20_behaviour_api.sql` and `30_invitations.sql`, then the migration. Then
+      redeploy `document-link` and `assistant-chat`, which now log what a professional opens.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
-      `read-documents`, `assistant-chat`, `create-checkout` and `payments-webhook` are deployed
-      (only `payments-webhook` skips the login check). Each answers "not configured" until its
+      `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and `payments-webhook` are
+      deployed (`payments-webhook` and `read-step` skip the login check; `read-step` accepts only
+      the service role key). Each answers "not configured" until its
       keys are set. Redeploy after changes with
       `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
 
@@ -55,6 +61,24 @@ Supabase → Project settings → Edge Functions → Secrets:
 | `R2_BUCKET`            | The bucket name, for example `takatax-documents`                                                                     | Same                                       |
 | `OPENROUTER_API_KEY`   | Your `sk-or-v1-…` key                                                                                                | The records assistant chat                 |
 | `TRIGGER_SECRET_KEY`   | Trigger.dev **secret key**: `tr_dev_…` while testing with `trigger.dev dev`, then `tr_prod_…` after the first deploy | Starting the reader                        |
+| `READER`               | `supabase` or `trigger` (see "Which reader" below)                                                                   | Which reader reads documents               |
+
+### Which reader: `READER=supabase` or `READER=trigger`
+
+The `READER` secret picks who reads documents. Change it in Supabase → Edge Functions → Secrets;
+it applies to the next run, with no redeploy.
+
+- `READER=supabase` (now, while Trigger.dev deployments are not available): the `read-step`
+  edge function reads inside Supabase, a few groups of pages per step, each step starting the
+  next, so no step comes near the edge function limits. It uses the Supabase secrets above
+  (`OPENROUTER_API_KEY`, the four `R2_…`). PDFs over 25 MB (`READER_MAX_MB`) are too big to load
+  there: they stay "Waiting to be read" until Trigger.dev reads them.
+- `READER=trigger` (the default when `READER` is not set): the Trigger.dev job `read-run`, once
+  it is deployed (section 3). Starting a run again with this setting also reads anything the
+  Supabase reader left waiting.
+
+Both readers read the same way: the same page groups (`_shared/parser/plan.ts`), prompts, models
+and checks.
 
 ## 3. Trigger.dev (the reader)
 
@@ -85,6 +109,12 @@ always matches the SDK (4.8.4 or later is needed for trusted publishing).
    Production environment then lists `read-run` and `ping`; run `ping` from its Test page.
 4. Set Supabase's `TRIGGER_SECRET_KEY` to the regular Production secret key (`tr_prod_…`). A
    "Deploy only" key cannot start reading jobs.
+
+If the deploy stops with **"Deployments are not available for this organization"**, deploys are
+switched off for the Trigger.dev organization itself. That is a setting on Trigger.dev's side:
+no key, workflow or CLI version changes it. Ask Trigger.dev support (the chat in the dashboard,
+or Discord) to enable deployments for the organization that owns `proj_afhlvwluvvvtblfsplyn`,
+then re-run the workflow.
 
 To test on a computer instead (needs a recent macOS for Bun): `bun install`,
 `npx trigger.dev@4.8.5 login`, then `npx trigger.dev@4.8.5 dev` (Development environment, using
@@ -119,8 +149,11 @@ To switch payments on (Xendit: GCash, Maya, cards):
 - `AI_DAILY_CAP_USD` (Supabase and Trigger.dev): the most the AI may spend in one Manila day
   (default 20).
 - `READER_CONCURRENCY` (Trigger.dev): page groups read at the same time per document (default 4).
-- `OPENROUTER_MODEL_FAST`, `OPENROUTER_MODEL_RECHECK`, `OPENROUTER_MODEL_SETTLE` (Trigger.dev)
-  and `OPENROUTER_MODEL_ASSISTANT` (Supabase): override the models in
+- `READER_GROUPS_PER_STEP` (Supabase, `READER=supabase`): page groups read in each step
+  (default 3, up to 5 pages each). `READER_MAX_MB` (Supabase): the largest PDF the Supabase reader
+  loads (default 25).
+- `OPENROUTER_MODEL_FAST`, `OPENROUTER_MODEL_RECHECK`, `OPENROUTER_MODEL_SETTLE` (Trigger.dev,
+  and Supabase for `READER=supabase`) and `OPENROUTER_MODEL_ASSISTANT` (Supabase): override the models in
   `supabase/functions/_shared/parser/models.ts`.
 - `SITE_URL` (Supabase): fallback address for the payment page's return links (the caller's
   address is used first).

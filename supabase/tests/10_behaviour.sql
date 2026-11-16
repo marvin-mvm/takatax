@@ -26,6 +26,21 @@ create function public.t_as(who uuid) returns void language sql as $$
 $$;
 grant execute on function public.t_as(uuid) to anon, authenticated;
 
+-- Gives a professional access the way the app does: the taxpayer invites, the professional
+-- accepts. Runs as the signed-in taxpayer and leaves them signed in.
+create function public.t_grant(partner uuid) returns void language plpgsql as $$
+declare
+  me uuid := auth.uid();
+  account uuid;
+begin
+  perform public.invite_partner(partner);
+  account := public.my_account_id();
+  perform public.t_as(partner);
+  perform public.respond_to_invite(account, true);
+  perform public.t_as(me);
+end $$;
+grant execute on function public.t_grant(uuid) to anon, authenticated;
+
 -- 1. Sign-ups create profiles; partners also get a partner profile.
 insert into auth.users (id, email, raw_user_meta_data) values
   (:t1, 'ana@example.com', '{"full_name":"Ana Santos","account_type":"taxpayer"}'),
@@ -59,14 +74,14 @@ select public.verify_partner(:p1, true);
 reset role;
 do $$ begin assert (select verified_at is not null from public.partner_profiles where user_id = '33333333-3333-3333-3333-333333333333'), 'p1 verified'; end $$;
 
--- 5. Access: only verified partners; creates the account.
+-- 5. Access: only verified partners are invited; inviting creates the account.
 set role authenticated;
 select public.t_as(:t1);
-select public.t_expect_error($$select public.grant_partner_access('44444444-4444-4444-4444-444444444444')$$, 'Only verified');
-select public.grant_partner_access(:p1);
+select public.t_expect_error($$select public.invite_partner('44444444-4444-4444-4444-444444444444')$$, 'Only verified');
+select public.t_grant(:p1);
 do $$ begin
   assert (select count(*) from public.accounts) = 1, 't1 sees own account';
-  assert (select count(*) from public.partner_access where revoked_at is null) = 1, 't1 sees the grant';
+  assert (select count(*) from public.partner_access where status = 'active') = 1, 't1 sees the grant';
   assert (select pp.display_name from public.partner_access pa join public.partner_profiles pp on pp.user_id = pa.partner_user_id) = 'Pia Cruz', 'partner name visible';
 end $$;
 
@@ -120,7 +135,7 @@ select public.t_as(:p1);
 select public.t_expect_error($$select public.start_conversation('22222222-2222-2222-2222-222222222222')$$, 'clients only');
 do $$ begin assert (select public.start_conversation('11111111-1111-1111-1111-111111111111')) is not null, 'partner reopens client chat'; end $$;
 
--- 10. Removing access hides the account at once; granting again restores it.
+-- 10. Removing access hides the account at once; a new invitation, accepted, restores it.
 select public.t_as(:t1);
 select public.revoke_partner_access(:p1);
 select public.t_as(:p1);
@@ -129,13 +144,13 @@ do $$ begin
   assert (select count(*) from public.messages) = 2, 'chat stays after access is removed';
 end $$;
 select public.t_as(:t1);
-select public.grant_partner_access(:p1);
+select public.t_grant(:p1);
 select public.t_as(:p1);
 do $$ begin assert (select count(*) from public.accounts) = 1, 'access restored'; end $$;
 select public.leave_client((select id from public.accounts limit 1));
 do $$ begin assert (select count(*) from public.accounts) = 0, 'partner left the client'; end $$;
 select public.t_as(:t1);
-select public.grant_partner_access(:p1);
+select public.t_grant(:p1);
 
 -- 11. Ledger and account columns the browser may and may not change.
 reset role;

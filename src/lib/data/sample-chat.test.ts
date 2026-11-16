@@ -40,9 +40,15 @@ describe("sample chat", () => {
 });
 
 describe("sample access", () => {
-  it("lists two professionals with access now and one from before", () => {
+  it("lists two professionals with access, one invited and one from before", () => {
     const grants = sampleAccess(TODAY);
-    expect(grants.filter((g) => !g.revokedAt)).toHaveLength(2);
-    expect(grants.filter((g) => g.revokedAt)).toHaveLength(1);
+    expect(grants.filter((g) => g.status === "active")).toHaveLength(2);
+    expect(grants.filter((g) => g.status === "pending")).toHaveLength(1);
+    expect(grants.filter((g) => g.endedAt)).toHaveLength(1);
+    // Every status's dates agree with what the database allows.
+    for (const g of grants) {
+      expect(Boolean(g.grantedAt)).toBe(g.status !== "pending");
+      expect(Boolean(g.endedAt)).toBe(g.status !== "pending" && g.status !== "active");
+    }
   });
 });

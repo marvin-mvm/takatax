@@ -76,6 +76,10 @@ where they differ.
   (`read-documents`) and answer the short records-assistant chat. Keys live in Trigger.dev's
   environment variables and Supabase Edge Function secrets, never in the repo or the browser.
   This replaces the Lovable AI gateway rule above.
+- Reader switch: the Supabase secret `READER` picks the reader. `READER=trigger` (default) starts
+  the Trigger.dev job; `READER=supabase` uses the `read-step` edge function, which reads a few page
+  groups per call and starts itself again for the rest (used while Trigger.dev deployments are
+  unavailable). Both use the shared plan in `supabase/functions/_shared/parser/plan.ts`.
 - Pricing is per page (a photo is one page, a PDF every page): `quoteRun` in
   `supabase/functions/_shared/uploads/rules.ts`, shared by the upload screen and
   `create-checkout`.
@@ -89,9 +93,17 @@ where they differ.
   Takatax never handles payments between taxpayers and their bookkeepers.
 - Chat between taxpayers and partners: `conversations` and `messages`. Messages are a permanent
   record: clients have no update or delete rights and a trigger refuses any change.
-- Access: taxpayers grant and remove a verified partner's access with
-  `grant_partner_access()` / `revoke_partner_access()`; every policy checks access through
-  `has_account_access()`.
+- Access: only a taxpayer invites a verified professional (`invite_partner()`, no firms or
+  groups); the professional answers with `respond_to_invite()`. The taxpayer can
+  `cancel_partner_invite()` and `revoke_partner_access()`; the professional can `leave_client()`.
+  `partner_access.status` is pending, active, declined, cancelled, revoked or left, and every
+  policy checks access through `has_account_access()` (active only). Professionals see the
+  client's documents, ledger, tracker and COR; never the plan, payments, access page or the
+  billing columns of `accounts` (the owner reads those through `my_plan()`, so select account
+  columns by name, never `*`).
+- Activity log: `access_events` is owner-only and cannot be edited. Triggers log invitation
+  steps and what a professional changes (records, uploads, runs, COR); `log_access_event()`
+  logs what they open (the app, `document-link` and `assistant-chat` call it).
 - Database changes go in a new file in `supabase/migrations/`; check them with
   `supabase/tests/run.sh` (local Postgres) before applying them to the project.
 
