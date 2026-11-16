@@ -247,6 +247,18 @@ const FAQ: { q: string; a: ReactNode }[] = [
     a: "We flag blurry, dark or glary photos before you upload so you can retake them. If the AI is still unsure about an amount or TIN, it asks you to check that one figure instead of guessing.",
   },
   {
+    q: "What if my receipt is in US dollars or another currency?",
+    a: "Takatax reads the currency printed on the document and converts the amount to pesos at the exchange rate of the document's date. The record shows the original amount and the rate used, so a $250 receipt is never counted as ₱250. This works for sales invoices too.",
+  },
+  {
+    q: "Which BIR returns and deadlines does Takatax cover?",
+    a: "The ones on your COR. Takatax knows every return a COR can list: income tax, percentage tax, VAT, withholding tax and more. Each return you file regularly goes on your calendar with its due date, including old form numbers still printed on older CORs. Amounts are estimated for the main returns (1701Q, 1701 or 1701A, 2551Q, 2550Q, 0619-E and 1601-EQ); for the others you see the deadline and what to have ready.",
+  },
+  {
+    q: "Can I delete a document I uploaded?",
+    a: `Yes, in the Documents tab, and you are asked to confirm first. On Standard, deleting a file also removes the records read from it, so their amounts leave your tracker and tax figures. On Premium${PAYMENTS_LIVE ? "" : " (coming soon)"}, only the file is removed: its records stay until you delete them as a second step. If you upload and read the same document again, its pages count again. A bookkeeper you invited can delete documents too, and it shows in your activity log.`,
+  },
+  {
     q: "Can I find a reliable bookkeeper to help me?",
     a: (
       <>
@@ -269,7 +281,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Is my data private?",
-    a: "Your documents are stored privately. Only you, and a bookkeeper you invite who accepts, can see them. They work with the features of your plan but never see your payments, everything they open or change shows in your activity log, and you can remove their access at any time.",
+    a: "Your documents are stored privately. Only you, and a bookkeeper you invite who accepts, can see them. They work with the features of your plan (Standard or Premium) but never see your payments. Everything they open, change or delete shows in your activity log, and you can remove their access at any time.",
   },
   {
     q: "How much does it cost?",
