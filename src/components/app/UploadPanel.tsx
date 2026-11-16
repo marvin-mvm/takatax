@@ -21,6 +21,7 @@ import {
   FILE_PROBLEM_TEXT,
   type FileProblem,
   MAX_BATCH_BYTES,
+  PAYMENTS_LIVE,
   PRICING,
   batchMessage,
   checkFile,
@@ -272,7 +273,7 @@ export function UploadPanel({
 
   /** Proceed: upload, confirm, price on the server, pay if needed, then read. */
   const proceed = async () => {
-    if (!ready.length || counting || tooBig) return;
+    if (!ready.length || counting || tooBig || quote.blocked) return;
     setStage({ step: "working", message: "Preparing the account…" });
 
     // A partner uploads into their client's account; a taxpayer into their own (created now if
@@ -575,7 +576,7 @@ export function UploadPanel({
           <button
             type="button"
             onClick={() => void proceed()}
-            disabled={busy || counting || tooBig || ready.length === 0}
+            disabled={busy || counting || tooBig || quote.blocked || ready.length === 0}
             className={`${buttonPrimary} mt-4 w-full`}
           >
             {stage.step === "working" ? (
@@ -591,10 +592,13 @@ export function UploadPanel({
             )}
           </button>
           <p className="mt-3 text-[13px]/[18px] text-tk-muted">
-            {clientAccountId
-              ? `Your partner price: ₱${Math.round(PRICING.runPrice * (1 - PRICING.partnerDiscount))} for up to ${PRICING.runPages} pages for this client, then ₱${PRICING.extraPage} a page.`
-              : `Your first ${PRICING.trialPages} pages are free. Then ₱${PRICING.runPrice} reads up to ${PRICING.runPages} pages (Premium: ${PRICING.premiumPages.toLocaleString("en-PH")} a month), then ₱${PRICING.extraPage} a page.`}{" "}
-            Payment goes through our payment partner; the final price is confirmed at checkout.
+            {!PAYMENTS_LIVE
+              ? `Standard runs are free during launch: up to ${PRICING.runPages} pages a run, as often as you need. Extra pages (₱${PRICING.extraPage} each) and Premium are coming soon.`
+              : `${
+                  clientAccountId
+                    ? `Your partner price: ₱${Math.round(PRICING.runPrice * (1 - PRICING.partnerDiscount))} for up to ${PRICING.runPages} pages for this client, then ₱${PRICING.extraPage} a page.`
+                    : `Your first ${PRICING.trialPages} pages are free. Then ₱${PRICING.runPrice} reads up to ${PRICING.runPages} pages (Premium: ${PRICING.premiumPages.toLocaleString("en-PH")} a month), then ₱${PRICING.extraPage} a page.`
+                } Payment goes through Xendit (GCash, Maya or card); the final price is confirmed at checkout.`}
           </p>
         </section>
 
