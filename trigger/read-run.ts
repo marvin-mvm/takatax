@@ -24,11 +24,7 @@ import { AbortTaskRunError, logger, task } from "@trigger.dev/sdk";
 import type { CheckFlag } from "../supabase/functions/_shared/parser/checks.ts";
 import { toLedgerRows } from "../supabase/functions/_shared/parser/ledger.ts";
 import { DEFAULT_READER_MODELS } from "../supabase/functions/_shared/parser/models.ts";
-import {
-  combineReadings,
-  pageGroups,
-  pagesPerCall,
-} from "../supabase/functions/_shared/parser/pages.ts";
+import { combineReadings } from "../supabase/functions/_shared/parser/pages.ts";
 import {
   readWithEscalation,
   type ReadResult,
@@ -42,6 +38,14 @@ import {
   EXTRACTION_JSON_SCHEMA,
   parseExtraction,
 } from "../supabase/functions/_shared/parser/schema.ts";
+import {
+  COR_PAGES,
+  extractionRequest,
+  isPdf as isPdfDocument,
+  parseJsonReply,
+  planReading,
+  REGISTRATION_REQUEST,
+} from "../supabase/functions/_shared/parser/plan.ts";
 import { optionalEnv } from "./lib/env";
 import { chat, documentPart, type ContentPart } from "./lib/openrouter";
 import { extractPages, loadPdf } from "./lib/pdf";
@@ -178,7 +182,7 @@ async function readDocument(
     step,
   });
   const bytes = await getObject(document.storage_key);
-  const isPdf = document.mime_type === "application/pdf";
+  const isPdf = isPdfDocument(document);
 
   // ---- A COR: read once, saved for the owner to check and confirm --------------------------
   if (document.kind === "cor") {
@@ -187,7 +191,7 @@ async function readDocument(
       // A COR is one or two pages; read only the first two.
       const pdf = await loadPdf(bytes);
       part = documentPart(
-        await extractPages(pdf, { from: 1, to: Math.min(pdf.getPageCount(), 2) }),
+        await extractPages(pdf, { from: 1, to: Math.min(pdf.getPageCount(), COR_PAGES) }),
         "application/pdf",
         document.file_name,
       );
@@ -198,12 +202,12 @@ async function readDocument(
         { role: "system", content: REGISTRATION_SYSTEM_PROMPT },
         {
           role: "user",
-          content: [part, { type: "text", text: "Read this COR. Reply with JSON only." }],
+          content: [part, { type: "text", text: REGISTRATION_REQUEST }],
         },
       ],
       spend: spend("settle"),
     });
-    const cor = JSON.parse(reply.replace(/^```json|```$/g, "").trim()) as unknown;
+    const cor = parseJsonReply(reply);
     await admin
       .from("documents")
       .update({ status: "needs_review", reader_path: ["settle"], extracted: cor })
@@ -212,29 +216,25 @@ async function readDocument(
     return { documents: [], path: ["settle"], status: "needs_review", flags: [] };
   }
 
-  // ---- The parts to read: one photo, or groups of PDF pages ---------------------------------
-  const extraFlags: CheckFlag[] = [];
+  // ---- The parts to read: one photo, or groups of PDF pages (see planReading) ------------
   const parts: { part: ContentPart; label: string; pages: number }[] = [];
+  let extraFlags: CheckFlag[] = [];
   if (isPdf) {
     const pdf = await loadPdf(bytes);
-    const actual = pdf.getPageCount();
-    // Read only the pages counted (and paid for) at upload.
-    const paid = Math.min(actual, document.page_count);
-    if (actual > document.page_count) extraFlags.push("pages_not_paid");
-    for (const group of pageGroups(paid, pagesPerCall(document.bytes, actual))) {
+    const plan = planReading(document, pdf.getPageCount());
+    extraFlags = plan.flags;
+    for (const chunk of plan.chunks) {
       parts.push({
-        part: documentPart(await extractPages(pdf, group), "application/pdf", document.file_name),
-        label:
-          group.from === group.to
-            ? `page ${group.from} of this PDF`
-            : `pages ${group.from} to ${group.to} of this PDF`,
-        pages: group.to - group.from + 1,
+        part: documentPart(await extractPages(pdf, chunk), "application/pdf", document.file_name),
+        label: chunk.label,
+        pages: chunk.pages,
       });
     }
   } else {
+    const [chunk] = planReading(document).chunks;
     parts.push({
       part: documentPart(bytes, document.mime_type, document.file_name),
-      label: "this photo",
+      label: chunk?.label ?? "this photo",
       pages: 1,
     });
   }
@@ -247,13 +247,7 @@ async function readDocument(
           { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
           {
             role: "user",
-            content: [
-              part,
-              {
-                type: "text",
-                text: `Read every document in ${label}. Say for each one whether it is a sale, an expense or a Form 2307.`,
-              },
-            ],
+            content: [part, { type: "text", text: extractionRequest(label) }],
           },
         ],
         schema: { name: "documents", schema: EXTRACTION_JSON_SCHEMA },

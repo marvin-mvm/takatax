@@ -44,3 +44,12 @@ export async function objectExists(key: string): Promise<boolean> {
   const response = await client.fetch(`${base}/${key}`, { method: "HEAD" });
   return response.ok;
 }
+
+/** Downloads an object (used by the Supabase reader, read-step). */
+export async function getObject(key: string): Promise<Uint8Array> {
+  const { client, base } = r2();
+  const path = key.split("/").map(encodeURIComponent).join("/");
+  const response = await client.fetch(`${base}/${path}`);
+  if (!response.ok) throw new Error(`R2 ${response.status} for ${key}`);
+  return new Uint8Array(await response.arrayBuffer());
+}
