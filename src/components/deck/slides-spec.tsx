@@ -273,7 +273,7 @@ export function StackSlide() {
               },
               {
                 task: "spec.md",
-                status: "Drafted",
+                status: "Done",
                 note: "Written as a PRD and an MVP spec with acceptance criteria.",
               },
               {
@@ -281,7 +281,7 @@ export function StackSlide() {
                 status: "Done",
                 note: "Project rules for AI coding tools, in the repo.",
               },
-              { task: ".cursorrules", status: "Next", note: "The same rules for Cursor." },
+              { task: "CLAUDE.md", status: "Done", note: "The same rules for Claude Code." },
               {
                 task: "Spec revised after review",
                 status: "Done",
