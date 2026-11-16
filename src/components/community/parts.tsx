@@ -129,15 +129,15 @@ export function PartnerCard({ partner }: { partner: PartnerProfile }) {
   );
 }
 
-/** The rules every community page repeats: anonymous, blurred, public or members-only. */
+/** The rules every community page repeats: privacy, blurred details, public or members-only. */
 export function CommunityRules() {
   return (
     <aside className="rounded-[18px] border border-tk-line bg-tk-surface p-5 text-[15px]">
       <h2 className="font-semibold">How the community works</h2>
       <ul className="mt-3 flex flex-col gap-2.5 text-tk-muted">
         <li>
-          <strong className="font-semibold text-tk-ink">You stay anonymous.</strong> Your name is
-          never shown.
+          <strong className="font-semibold text-tk-ink">Your privacy is protected.</strong> Your
+          name is never shown.
         </li>
         <li>
           <strong className="font-semibold text-tk-ink">Personal details are blurred.</strong> TINs,

@@ -84,13 +84,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Takatax" },
       {
         name: "description",
-        content: "Your BIR figures, straight from your receipts. ₱199 per run, no subscription.",
+        content: "AI for your BIR figures and tax monitoring. ₱199 per run, no subscription.",
       },
       { name: "author", content: "Takatax" },
       { property: "og:title", content: "Takatax" },
       {
         property: "og:description",
-        content: "Your BIR figures, straight from your receipts. ₱199 per run, no subscription.",
+        content: "AI for your BIR figures and tax monitoring. ₱199 per run, no subscription.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -100,7 +100,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      // The Takatax mark (src/components/site/BrandMark.tsx): SVG for current browsers, the
+      // .ico for older ones, and a full-square PNG for phone home screens.
+      { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+      { rel: "icon", href: "/logo.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,

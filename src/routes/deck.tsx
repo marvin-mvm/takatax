@@ -4,7 +4,7 @@ import { Deck } from "@/components/deck/Deck";
 
 const title = "Takatax pitch deck";
 const description =
-  "Idea validation, the one-page PRD, a what-if revenue model, the architecture and the build plan for Takatax: BIR figures straight from your receipts.";
+  "Idea validation, the one-page PRD, a what-if revenue model, the architecture and the build plan for Takatax: AI for your BIR figures and tax monitoring.";
 
 export const Route = createFileRoute("/deck")({
   head: () => ({

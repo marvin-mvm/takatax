@@ -29,7 +29,7 @@ interface Plan {
   summary: string;
   features: string[];
   highlight?: boolean;
-  /** A label shown next to the plan's name, for example "Free during launch". */
+  /** A label shown next to the plan's name, for example "Coming soon". */
   badge?: string;
 }
 
@@ -44,7 +44,6 @@ const PLANS: Plan[] = [
   {
     name: "Parse run",
     price: "₱199",
-    ...(PAYMENTS_LIVE ? {} : { badge: "Free during launch" }),
     unit: "per run",
     summary: "Pay only when you have documents to read.",
     features: [
@@ -70,7 +69,6 @@ const PLANS: Plan[] = [
   {
     name: "For bookkeepers, CPAs and tax lawyers",
     price: "₱149",
-    ...(PAYMENTS_LIVE ? {} : { badge: "Free during launch" }),
     unit: "per client run",
     summary: "25% off every run you do for a client.",
     features: [
@@ -108,8 +106,8 @@ function PricingPage() {
           </p>
           {!PAYMENTS_LIVE ? (
             <p className="mt-6 rounded-[14px] border border-tk-brand/30 bg-tk-brand-soft px-4 py-3 font-medium text-tk-brand text-pretty">
-              Free during launch: every Standard run of up to 250 pages is free, for taxpayers and
-              bookkeepers. Extra pages and Premium are coming soon.
+              For now, every Standard run of up to 250 pages is free, for taxpayers and bookkeepers.
+              Extra pages and Premium are coming soon.
             </p>
           ) : null}
         </div>
@@ -119,18 +117,20 @@ function PricingPage() {
             <li
               key={plan.name}
               className={cn(
-                "flex flex-col rounded-[20px] border bg-tk-surface p-6 sm:p-8",
+                "flex min-w-0 flex-col rounded-[20px] border bg-tk-surface p-6 sm:p-8 xl:p-6",
                 plan.highlight
                   ? "border-tk-brand shadow-[0_8px_24px_rgb(14_122_90/0.12)]"
                   : "border-tk-line",
               )}
             >
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold">{plan.name}</h2>
+              {/* The name and its label wrap onto two lines when the card is narrow, so the
+                  label never sticks out of the card. */}
+              <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                <h2 className="min-w-0 text-xl font-semibold text-balance">{plan.name}</h2>
                 {plan.badge ? (
                   <span
                     className={cn(
-                      "rounded-full px-3 py-1 text-[13px] font-medium whitespace-nowrap",
+                      "shrink-0 rounded-full px-3 py-1 text-[13px] font-medium whitespace-nowrap",
                       plan.badge === "Coming soon"
                         ? "bg-tk-warn-soft text-tk-warn"
                         : "bg-tk-brand-soft text-tk-brand",
@@ -139,12 +139,12 @@ function PricingPage() {
                     {plan.badge}
                   </span>
                 ) : plan.highlight ? (
-                  <span className="rounded-full bg-tk-brand-soft px-3 py-1 text-[13px] font-medium text-tk-brand">
+                  <span className="shrink-0 rounded-full bg-tk-brand-soft px-3 py-1 text-[13px] font-medium whitespace-nowrap text-tk-brand">
                     Most people
                   </span>
                 ) : null}
               </div>
-              <p className="mt-4 flex items-baseline gap-2">
+              <p className="mt-4 flex flex-wrap items-baseline gap-x-2">
                 <span className="font-tk-mono text-[40px]/[44px] font-medium tracking-tight tabular-nums">
                   {plan.price}
                 </span>
