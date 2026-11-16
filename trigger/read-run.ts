@@ -46,6 +46,10 @@ import {
   planReading,
   REGISTRATION_REQUEST,
 } from "../supabase/functions/_shared/parser/plan.ts";
+import {
+  parseRegistration,
+  REGISTRATION_JSON_SCHEMA,
+} from "../supabase/functions/_shared/parser/registration.ts";
 import { optionalEnv } from "./lib/env";
 import { chat, documentPart, type ContentPart } from "./lib/openrouter";
 import { extractPages, loadPdf } from "./lib/pdf";
@@ -101,11 +105,14 @@ export const readRun = task({
       documents = (data ?? []) as DocumentRow[];
       await admin.from("runs").update({ status: "reading" }).eq("id", payload.runId);
     } else if (payload.accountId && payload.documentIds?.length) {
+      // Only documents read-documents claimed (waiting, or being read): a finished document is
+      // never read again.
       const { data, error } = await admin
         .from("documents")
         .select(DOCUMENT_COLUMNS)
         .eq("account_id", payload.accountId)
-        .in("id", payload.documentIds);
+        .in("id", payload.documentIds)
+        .in("status", ["waiting_for_reader", "reading"]);
       if (error) throw error;
       documents = (data ?? []) as DocumentRow[];
     } else {
@@ -139,11 +146,32 @@ export const readRun = task({
         throw new AbortTaskRunError("Daily AI spending cap reached");
       }
 
-      await admin.from("documents").update({ status: "reading" }).eq("id", document.id);
+      // Pages done in this document, saved as it goes for the document's own progress bar (the
+      // same shape as the Supabase reader's: extracted.reading.pagesDone).
+      let documentPages = 0;
+      const saveDocumentProgress = () =>
+        admin
+          .from("documents")
+          .update({
+            extracted: { reading: { pagesDone: documentPages } },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", document.id)
+          .eq("status", "reading");
+      await admin
+        .from("documents")
+        .update({
+          status: "reading",
+          extracted: { reading: { pagesDone: 0 } },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", document.id);
       try {
         const result = await readDocument(document, concurrency, (pages) => {
           pagesRead += pages;
+          documentPages += pages;
           void reportProgress();
+          void saveDocumentProgress();
         });
         if (result.status === "needs_review") needsReview++;
       } catch (error) {
@@ -205,9 +233,10 @@ async function readDocument(
           content: [part, { type: "text", text: REGISTRATION_REQUEST }],
         },
       ],
+      schema: { name: "registration", schema: REGISTRATION_JSON_SCHEMA },
       spend: spend("settle"),
     });
-    const cor = parseJsonReply(reply);
+    const cor = parseRegistration(parseJsonReply(reply));
     await admin
       .from("documents")
       .update({ status: "needs_review", reader_path: ["settle"], extracted: cor })

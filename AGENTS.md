@@ -80,6 +80,12 @@ where they differ.
   the Trigger.dev job; `READER=supabase` uses the `read-step` edge function, which reads a few page
   groups per call and starts itself again for the rest (used while Trigger.dev deployments are
   unavailable). Both use the shared plan in `supabase/functions/_shared/parser/plan.ts`.
+- A document is read once. `read-documents` starts only documents waiting to be read (their
+  reading failed or never started) or whose reading stalled, claiming them in one update so a
+  double click starts nothing twice; finished documents answer 409 `already_read`. Both readers
+  save pages done per document in `documents.extracted.reading.pagesDone` while reading, which
+  feeds the progress bars (`src/components/app/ReadingProgress.tsx`, pacing in
+  `src/lib/reading-progress.ts`).
 - Pricing is per page (a photo is one page, a PDF every page): `quoteRun` in
   `supabase/functions/_shared/uploads/rules.ts`, shared by the upload screen and
   `create-checkout`.

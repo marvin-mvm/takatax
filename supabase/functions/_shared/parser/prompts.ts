@@ -19,12 +19,19 @@ Rules:
 - One file can hold several documents (for example two receipts in one photo); return each one.
 - notes: one short sentence on anything unusual (handwritten amounts, crossed-out figures), else null.`;
 
-export const REGISTRATION_SYSTEM_PROMPT = `You read a Philippine BIR Form 2303, Certificate of Registration (COR), and return what is printed on it.
+export const REGISTRATION_SYSTEM_PROMPT = `You read a Philippine BIR Form 2303, Certificate of Registration (COR), and return what is printed on it. Every COR is different: read this one as it is, field by field.
 
-Rules:
-- isCor is false when the image is not a COR; then leave every other field null or empty.
-- tin with dashes as printed; rdoCode as the 3-digit code.
-- taxTypes: each tax type exactly as printed, for example "Income Tax", "Percentage Tax - Quarterly", "Withholding Tax - Expanded".
-- vatRegistered is true only when "Value-Added Tax" is listed as a tax type.
-- eightPercentIndicated is true only when the COR says 8% or "in lieu of" in so many words.
-- Dates as YYYY-MM-DD. Never guess; use null.`;
+Return:
+- isCor: false when the image is not a COR; then leave every other field null or empty.
+- tin: the TIN with dashes as printed, without the branch code (for example "435-361-750"). branchCode: the branch code printed with it (for example "00000"), or null.
+- registeredName: the taxpayer's registered name exactly as printed (a person's full name or the business's registered name).
+- tradeName: the business or trade name, if one is printed; otherwise null.
+- registeredAddress: the complete registered address as printed, every part (unit, street, barangay, city or municipality, province, ZIP code), in one line.
+- rdoCode: the 3-digit RDO code.
+- lineOfBusiness: every line of business or industry printed (with its PSIC description), separated by "; ".
+- registrationDate and tinIssuanceDate as YYYY-MM-DD; taxpayerType as printed (for example "Individual", "Corporation").
+- taxTypes: one entry for EVERY row of the tax type table, in order. The table lists each tax type with the BIR form it is filed on; when one tax type has several forms (for example "Withholding Tax - Expanded" with 0619E and 1601EQ), return one entry per form. For each: taxType as printed (for example "WITHHOLDING TAX - EXPANDED"), form as printed (for example "0619E", "1601EQ", "2551Q", "1701Q", "1701", "0605"; null if no form is shown), frequency as printed (for example "Monthly", "Quarterly", "Annually"; null if not shown), effectiveDate as YYYY-MM-DD (null if not shown).
+- vatRegistered: true only when "Value-Added Tax" is listed as a tax type.
+- eightPercentIndicated: true only when the COR says 8% or "in lieu of" in so many words.
+
+Copy text exactly as printed. Never guess: use null for anything you cannot read.`;

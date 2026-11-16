@@ -35,6 +35,7 @@ import {
 } from "../_shared/parser/plan.ts";
 import { EXTRACTION_SYSTEM_PROMPT, REGISTRATION_SYSTEM_PROMPT } from "../_shared/parser/prompts.ts";
 import { EXTRACTION_JSON_SCHEMA, parseExtraction } from "../_shared/parser/schema.ts";
+import { parseRegistration, REGISTRATION_JSON_SCHEMA } from "../_shared/parser/registration.ts";
 import { toLedgerRows } from "../_shared/parser/ledger.ts";
 import type { CheckFlag } from "../_shared/parser/checks.ts";
 import { adminClient } from "../_lib/clients.ts";
@@ -202,6 +203,7 @@ async function readPart(admin: SupabaseClient, document: DocumentRow): Promise<v
         { role: "system", content: REGISTRATION_SYSTEM_PROMPT },
         { role: "user", content: [part, { type: "text", text: REGISTRATION_REQUEST }] },
       ],
+      schema: { name: "registration", schema: REGISTRATION_JSON_SCHEMA },
       spend: spend("settle"),
       timeoutMs: CALL_TIMEOUT_MS,
     });
@@ -210,7 +212,7 @@ async function readPart(admin: SupabaseClient, document: DocumentRow): Promise<v
       .update({
         status: "needs_review",
         reader_path: ["settle"],
-        extracted: parseJsonReply(reply),
+        extracted: parseRegistration(parseJsonReply(reply)),
         updated_at: now(),
       })
       .eq("id", document.id);

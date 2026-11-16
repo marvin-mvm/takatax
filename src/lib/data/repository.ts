@@ -15,6 +15,11 @@ import { redactPersonalInfo } from "@shared/community/redact.ts";
 import { PRICING } from "@shared/uploads/rules.ts";
 import type { RunProgress } from "@/lib/services/uploads";
 import type { CheckFlag } from "@shared/parser/checks.ts";
+import {
+  flagsFromTaxTypes,
+  parseRegistration,
+  parseTaxTypes,
+} from "@shared/parser/registration.ts";
 import type { DocumentKind } from "@shared/parser/schema.ts";
 
 import {
@@ -134,10 +139,28 @@ function toProfile(row: Row): TaxProfile | null {
       "graduated_osd") as TaxProfile["incomeTaxOption"],
     businessType: row["business_type"] === "goods" ? "goods" : "services",
     mixedIncome: row["mixed_income"] === true,
+    corTaxTypes: parseTaxTypes(row["cor_tax_types"]),
   };
 }
 
+/** Statuses of a document whose reading has finished: it is never read again. */
+export const READ_FINISHED: DocumentStatus[] = ["accepted", "needs_review", "rejected"];
+
+/**
+ * Pages read so far. While reading, both readers save it in extracted.reading.pagesDone; a
+ * finished document has read every page.
+ */
+function pagesReadOf(row: Row, status: DocumentStatus, pageCount: number): number {
+  if (READ_FINISHED.includes(status)) return pageCount;
+  if (status !== "reading") return 0;
+  const reading = (row["extracted"] as { reading?: { pagesDone?: unknown } } | null)?.reading;
+  const done = Number(reading?.pagesDone ?? 0);
+  return Number.isFinite(done) ? Math.min(Math.max(done, 0), pageCount) : 0;
+}
+
 function toDocument(row: Row): StoredDocument {
+  const status = (text(row["status"]) || "waiting_for_reader") as DocumentStatus;
+  const pageCount = typeof row["page_count"] === "number" ? Math.max(row["page_count"], 1) : 1;
   return {
     id: text(row["id"]),
     accountId: text(row["account_id"]),
@@ -146,7 +169,9 @@ function toDocument(row: Row): StoredDocument {
     mimeType: text(row["mime_type"]),
     bytes: typeof row["bytes"] === "number" ? row["bytes"] : 0,
     uploadedAt: text(row["created_at"]),
-    status: (text(row["status"]) || "waiting_for_reader") as DocumentStatus,
+    status,
+    pageCount,
+    pagesRead: pagesReadOf(row, status, pageCount),
     readerPath: Array.isArray(row["reader_path"]) ? (row["reader_path"] as string[]) : [],
     flags: Array.isArray(row["flags"]) ? (row["flags"] as CheckFlag[]) : [],
     previewUrl: null,
@@ -174,7 +199,7 @@ function toRecord(row: Row): LedgerRecord {
  * billing, which only the owner sees, through my_plan().
  */
 const ACCOUNT_COLUMNS =
-  "id, owner_user_id, tin, registered_name, trade_name, rdo_code, registered_address, line_of_business, registration_date, vat_registered, withholding_agent, income_tax_option, business_type, mixed_income, cor_document_id, created_at, updated_at";
+  "id, owner_user_id, tin, registered_name, trade_name, rdo_code, registered_address, line_of_business, registration_date, vat_registered, withholding_agent, income_tax_option, business_type, mixed_income, cor_document_id, cor_tax_types, created_at, updated_at";
 
 async function loadWorkspaceRows(accountRow: Row): Promise<Workspace> {
   const accountId = text(accountRow["id"]);
@@ -964,19 +989,22 @@ export async function loadCorToConfirm(
     .maybeSingle();
   if (error || !data) return null;
   const row = data as Row;
-  const read = (row["extracted"] ?? {}) as Row;
+  const read = parseRegistration(row["extracted"]);
+  const flags = flagsFromTaxTypes(read.taxTypes);
   return {
     documentId: text(row["id"]),
     read: {
-      tin: text(read["tin"]),
-      registeredName: text(read["registeredName"]),
-      tradeName: text(read["tradeName"]),
-      rdoCode: text(read["rdoCode"]),
-      registeredAddress: text(read["registeredAddress"]),
-      lineOfBusiness: text(read["lineOfBusiness"]),
-      registrationDate: text(read["registrationDate"]),
-      vatRegistered: read["vatRegistered"] === true,
-      incomeTaxOption: read["eightPercentIndicated"] === true ? "eight_percent" : "graduated_osd",
+      tin: read.tin ?? "",
+      registeredName: read.registeredName ?? "",
+      tradeName: read.tradeName ?? "",
+      rdoCode: read.rdoCode ?? "",
+      registeredAddress: read.registeredAddress ?? "",
+      lineOfBusiness: read.lineOfBusiness ?? "",
+      registrationDate: read.registrationDate ?? "",
+      vatRegistered: read.vatRegistered || flags.vatRegistered,
+      withholdingAgent: flags.withholdingAgent,
+      incomeTaxOption: read.eightPercentIndicated ? "eight_percent" : "graduated_osd",
+      taxTypes: read.taxTypes,
     },
   };
 }
@@ -1054,8 +1082,14 @@ export async function loadRunProgress(runId: string): Promise<RunProgress | null
     .eq("id", runId)
     .maybeSingle();
   if (error || !run) return null;
-  const { data: documents } = await db.from("documents").select("status").eq("run_id", runId);
-  const statuses = ((documents ?? []) as Row[]).map((d) => text(d["status"]));
+  // Only the progress number from `extracted`, not the whole reading.
+  const { data: documents } = await db
+    .from("documents")
+    .select("id, file_name, status, page_count, pages_done:extracted->reading->pagesDone")
+    .eq("run_id", runId)
+    .order("created_at", { ascending: true });
+  const rowsOf = (documents ?? []) as Row[];
+  const statuses = rowsOf.map((d) => text(d["status"]));
   const row = run as Row;
   return {
     status: (text(row["status"]) || "paid") as RunProgress["status"],
@@ -1063,5 +1097,20 @@ export async function loadRunProgress(runId: string): Promise<RunProgress | null
     pagesRead: typeof row["pages_read"] === "number" ? row["pages_read"] : 0,
     read: statuses.filter((s) => s === "accepted").length,
     needsReview: statuses.filter((s) => s === "needs_review").length,
+    documents: rowsOf.map((d) => {
+      const status = (text(d["status"]) || "waiting_for_reader") as DocumentStatus;
+      const pages = typeof d["page_count"] === "number" ? Math.max(d["page_count"], 1) : 1;
+      return {
+        id: text(d["id"]),
+        fileName: text(d["file_name"]),
+        status,
+        pages,
+        pagesRead: pagesReadOf(
+          { extracted: { reading: { pagesDone: d["pages_done"] } } },
+          status,
+          pages,
+        ),
+      };
+    }),
   };
 }

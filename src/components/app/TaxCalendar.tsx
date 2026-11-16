@@ -14,6 +14,7 @@ import {
   formatTin,
   taxTypesFor,
 } from "@shared/domain/tax-profile.ts";
+import { FORM_INFO } from "@shared/parser/registration.ts";
 import { peso } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +57,39 @@ export function CorDetails({
         />
       </dl>
     </Card>
+  );
+}
+
+/** The tax types and forms printed on the COR, one row per form, as the owner confirmed them. */
+export function CorFormsList({ profile }: { profile: TaxProfile }) {
+  const rows = profile.corTaxTypes ?? [];
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2">
+      {rows.map((row, index) => {
+        const info = row.form ? FORM_INFO[row.form] : undefined;
+        return (
+          <li
+            key={`${row.form ?? row.taxType}-${index}`}
+            className={cn(
+              "flex gap-4 rounded-[16px] border border-tk-line bg-tk-surface p-4",
+              info?.active === false && "opacity-60",
+            )}
+          >
+            <span className="min-w-16 font-tk-mono text-lg font-semibold text-tk-brand">
+              {row.form ?? "—"}
+            </span>
+            <span>
+              <span className="block font-semibold">{info?.title ?? row.taxType}</span>
+              <span className="block text-sm/5 text-tk-muted">{row.taxType}</span>
+              <span className="mt-1 block text-sm/5 text-tk-muted">
+                {row.frequency ?? info?.frequency ?? ""}
+                {row.effectiveDate ? ` · since ${formatIsoDate(row.effectiveDate)}` : ""}
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

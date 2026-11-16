@@ -11,7 +11,7 @@
  * Each step that needs a key says so plainly when it is missing. See docs/MISSING_PIECES.md.
  */
 
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -43,11 +43,17 @@ import { loadRunProgress } from "@/lib/data/repository";
 import { fileSize, peso } from "@/lib/money";
 import { checkoutRun } from "@/lib/services/payments";
 import { startReading } from "@/lib/services/reader";
-import { confirmUploads, putToStorage, requestUploadSlots } from "@/lib/services/uploads";
+import {
+  type RunDocumentProgress,
+  confirmUploads,
+  putToStorage,
+  requestUploadSlots,
+} from "@/lib/services/uploads";
 import { countPdfPages } from "@/lib/uploads/pdf-pages";
 import { PHOTO_FLAG_TEXT, type PhotoFlag, preparePhoto } from "@/lib/uploads/photo-prep";
 import { cn } from "@/lib/utils";
 
+import { ReadingProgress, RunReadingProgress } from "./ReadingProgress";
 import { useAppUser } from "./app-user";
 import { NotConnectedNotice } from "./ui";
 
@@ -76,11 +82,11 @@ interface QueuedFile {
 type Stage =
   | { step: "idle" }
   | { step: "working"; message: string }
-  | { step: "reading"; pages: number; pagesRead: number }
+  | { step: "reading"; pages: number; pagesRead: number; documents: RunDocumentProgress[] }
   | { step: "storage_not_connected" }
   | { step: "payments_not_connected"; uploaded: number }
   | { step: "reader_not_connected"; uploaded: number }
-  | { step: "done"; read: number; needsReview: number }
+  | { step: "done"; read: number; needsReview: number; documents: RunDocumentProgress[] }
   | { step: "error"; message: string };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -258,12 +264,22 @@ export function UploadPanel({
       const progress = await loadRunProgress(runId);
       if (progress) {
         if (progress.status === "complete" || progress.status === "review") {
-          setStage({ step: "done", read: progress.read, needsReview: progress.needsReview });
+          setStage({
+            step: "done",
+            read: progress.read,
+            needsReview: progress.needsReview,
+            documents: progress.documents,
+          });
           void queryClient.invalidateQueries({ queryKey: ["workspace"] });
           void queryClient.invalidateQueries({ queryKey: ["plan"] });
           return;
         }
-        setStage({ step: "reading", pages: progress.pages, pagesRead: progress.pagesRead });
+        setStage({
+          step: "reading",
+          pages: progress.pages,
+          pagesRead: progress.pagesRead,
+          documents: progress.documents,
+        });
       }
       await wait(3_000);
     }
@@ -569,6 +585,44 @@ export function UploadPanel({
             ))}
           </ul>
         ) : null}
+
+        {(stage.step === "reading" || stage.step === "done") && stage.documents.length > 0 ? (
+          <section aria-labelledby="reading-title" className="flex flex-col gap-2">
+            <h2 id="reading-title" className="font-semibold">
+              {stage.step === "done" ? "Your documents are read" : "Reading your documents"}
+            </h2>
+            <ul className="flex flex-col gap-2">
+              {stage.documents.map((document) => (
+                <li
+                  key={document.id}
+                  className="rounded-[14px] border border-tk-line bg-tk-surface p-3 sm:p-4"
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <FileText aria-hidden className="size-4 shrink-0 text-tk-muted" />
+                    {stage.step === "done" ? (
+                      <Link
+                        to="/app/documents/$documentId"
+                        params={{ documentId: document.id }}
+                        search={clientAccountId ? { account: clientAccountId } : {}}
+                        className="min-w-0 truncate font-medium text-tk-brand hover:underline"
+                      >
+                        {document.fileName}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 truncate font-medium">{document.fileName}</span>
+                    )}
+                  </div>
+                  <ReadingProgress
+                    status={document.status}
+                    pages={document.pages}
+                    pagesRead={document.pagesRead}
+                    fileName={document.fileName}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
 
       <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
@@ -647,19 +701,13 @@ export function UploadPanel({
         </section>
 
         {stage.step === "reading" ? (
-          <div role="status" className="rounded-[12px] bg-tk-brand-soft px-4 py-3 text-tk-brand">
-            <p className="font-medium">
-              Reading {stage.pagesRead.toLocaleString("en-PH")} of{" "}
-              {stage.pages.toLocaleString("en-PH")} pages…
-            </p>
-            <div aria-hidden className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
-              <div
-                className="h-full rounded-full bg-tk-brand transition-[width]"
-                style={{
-                  width: `${stage.pages ? Math.min((stage.pagesRead / stage.pages) * 100, 100) : 5}%`,
-                }}
-              />
-            </div>
+          <div role="status" className="rounded-[12px] bg-tk-brand-soft px-4 py-3">
+            <p className="mb-2 font-medium text-tk-brand">All documents in this run</p>
+            {stage.documents.length ? (
+              <RunReadingProgress documents={stage.documents} />
+            ) : (
+              <ReadingProgress status="reading" pages={stage.pages} pagesRead={stage.pagesRead} />
+            )}
             <p className="mt-2 text-sm text-tk-ink/80">
               You can leave this page. Reading carries on, and results appear in Documents.
             </p>

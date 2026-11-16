@@ -22,15 +22,24 @@ import {
   loadPartnerClients,
   loadPlan,
 } from "./repository";
-import type { AccountRole, PartnerKind } from "./types";
+import type { AccountRole, Loaded, PartnerKind, Workspace } from "./types";
+
+/** While a document is being read, check every 4 seconds so its progress bar keeps moving. */
+const whileReading = (query: { state: { data?: Loaded<Workspace> | undefined } }) =>
+  query.state.data?.data.documents.some((d) => d.status === "reading") ? 4_000 : false;
 
 export const useMyWorkspace = (userId: string) =>
-  useQuery({ queryKey: ["workspace", "mine", userId], queryFn: () => loadMyWorkspace(userId) });
+  useQuery({
+    queryKey: ["workspace", "mine", userId],
+    queryFn: () => loadMyWorkspace(userId),
+    refetchInterval: whileReading,
+  });
 
 export const useClientWorkspace = (accountId: string) =>
   useQuery({
     queryKey: ["workspace", "client", accountId],
     queryFn: () => loadClientWorkspace(accountId),
+    refetchInterval: whileReading,
   });
 
 export const usePartnerClients = (userId: string) =>
