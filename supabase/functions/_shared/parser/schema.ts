@@ -3,6 +3,8 @@
  * The same schema is sent to OpenRouter as `response_format` so the model is held to it.
  */
 
+import { type Conversion, currencyCode } from "./currency.ts";
+
 export type DocumentKind = "sales_invoice" | "expense_receipt" | "form_2307" | "cor" | "unknown";
 
 export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
@@ -13,7 +15,11 @@ export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   unknown: "Not a tax document",
 };
 
-/** One document as read by the AI. Money is in pesos; dates are "YYYY-MM-DD". */
+/**
+ * One document as read by the AI. Dates are "YYYY-MM-DD". The AI transcribes money as printed,
+ * with its currency; the reader then turns foreign amounts into pesos (see currency.ts), so a
+ * saved document's money is in pesos, with what was printed kept in `converted`.
+ */
 export interface ExtractedDocument {
   kind: DocumentKind;
   date: string | null;
@@ -24,6 +30,13 @@ export interface ExtractedDocument {
   recipientTin: string | null;
   totalAmount: number | null;
   vatAmount: number | null;
+  /**
+   * The currency the amounts were printed in, as a 3-letter code ("PHP", "USD"). Null or missing
+   * (readings saved before this field existed) means pesos.
+   */
+  currency?: string | null;
+  /** Set by the reader when the amounts were converted to pesos: what was printed, and the rate. */
+  converted?: Conversion;
   expenseCategory: string | null;
   /** Form 2307 only: the period covered and the totals. */
   periodFrom: string | null;
@@ -63,6 +76,7 @@ export const EXTRACTION_JSON_SCHEMA = {
           "recipientTin",
           "totalAmount",
           "vatAmount",
+          "currency",
           "expenseCategory",
           "periodFrom",
           "periodTo",
@@ -85,6 +99,7 @@ export const EXTRACTION_JSON_SCHEMA = {
           recipientTin: nullable("string"),
           totalAmount: nullable("number"),
           vatAmount: nullable("number"),
+          currency: nullable("string"),
           expenseCategory: nullable("string"),
           periodFrom: nullable("string"),
           periodTo: nullable("string"),
@@ -152,6 +167,7 @@ export function parseExtraction(raw: unknown): ExtractedDocument[] {
         recipientTin: str(doc["recipientTin"]),
         totalAmount: num(doc["totalAmount"]),
         vatAmount: num(doc["vatAmount"]),
+        currency: currencyCode(doc["currency"]),
         expenseCategory: str(doc["expenseCategory"]),
         periodFrom: isoOrNull(doc["periodFrom"]),
         periodTo: isoOrNull(doc["periodTo"]),

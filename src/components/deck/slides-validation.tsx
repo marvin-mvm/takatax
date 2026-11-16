@@ -20,6 +20,7 @@ import { formatNumber } from "@/lib/deck/format";
 import { MICRO_ENTERPRISES } from "@/lib/deck/model";
 import { cn } from "@/lib/utils";
 
+import { PRICE } from "@/lib/pricing-copy";
 import { Block, Cite, Pill, Point, Points, Slide, Stat } from "./primitives";
 
 const PHASE_1 = "Phase 1 · Validate and define";
@@ -34,7 +35,7 @@ export function CoverSlide() {
           AI for your BIR figures and tax monitoring.
         </span>
       }
-      lead="Takatax reads your receipts, invoices, sales records, withholding records, 2307s and COR with AI. A tested tax engine then computes every return, per tax type. ₱199 per run; a subscription is optional."
+      lead={`Takatax reads your receipts, invoices, sales records, withholding records, 2307s and COR with AI. A tested tax engine then computes every return, per tax type. ${PRICE.run} per run; a subscription is optional.`}
       className="lg:min-h-[680px]"
     >
       <div className="grid gap-4 sm:grid-cols-3">
@@ -54,7 +55,10 @@ export function CoverSlide() {
             </>
           }
         />
-        <Stat value="₱199" label="per run of up to 250 pages. Every computed return is free." />
+        <Stat
+          value={PRICE.run}
+          label={`per run of up to ${PRICE.runPages} pages. Every computed return is free.`}
+        />
       </div>
       <div className="mt-8 flex flex-wrap items-center gap-2">
         <a href="#validation" className="rounded-full focus-visible:outline-2">
@@ -386,8 +390,7 @@ const COMPETITORS: { name: string; how: ReactNode; price: ReactNode; highlight?:
   {
     name: "Takatax",
     how: "Upload photos. AI reads them. The engine computes every return.",
-    price:
-      "₱199 per tax compute (up to 250 pages parsed by AI, ₱2 per extra page). A subscription is optional.",
+    price: `${PRICE.run} per tax compute (up to ${PRICE.runPages} pages parsed by AI, ${PRICE.extraPage} per extra page). A subscription is optional.`,
     highlight: true,
   },
 ];
@@ -461,7 +464,7 @@ const EDGES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: Wallet,
     title: "Pay per run",
-    text: "₱199 per run. A monthly plan is optional. No parse, no fee.",
+    text: `${PRICE.run} per run. A monthly plan is optional. No parse, no fee.`,
   },
   {
     icon: Handshake,
@@ -509,7 +512,7 @@ const TEST_MEASURES = [
   "98% of amounts and TINs read exactly",
   "Under 5% of documents need a human check",
   "₱0.32 or less in AI cost per page",
-  "“Would you pay ₱199 for this?”",
+  `“Would you pay ${PRICE.run} for this?”`,
 ];
 
 export function TestSlide() {

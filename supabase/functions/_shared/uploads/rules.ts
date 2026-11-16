@@ -26,13 +26,13 @@ export const ACCEPT_ATTRIBUTE = [...ACCEPTED_TYPES, ".heic", ".heif"].join(",");
 /**
  * The payments switch.
  *
- * false (launch, today): Standard runs of up to 250 pages are free for everyone, taxpayers and
- * partners. Pages over 250 (₱2 each) and Premium (₱800 a month) show "coming soon" and cannot
+ * false (launch, today): Standard runs of up to 80 pages are free for everyone, taxpayers and
+ * partners. Pages over 80 (₱3.50 each) and Premium (₱649 a month) show "coming soon" and cannot
  * be bought, on the screens and on the server.
  *
- * true: the full pricing below applies (trial, ₱199 runs, partner price, ₱2 extra pages,
- * Premium), paid through Xendit (supabase/functions/_lib/payments.ts). Set it once Xendit is
- * connected, then redeploy the site and the edge functions.
+ * true: the full pricing below applies (trial, ₱149 runs, partner price, extra pages, Premium),
+ * paid through Xendit (supabase/functions/_lib/payments.ts). Set it once Xendit is connected,
+ * then redeploy the site and the edge functions.
  */
 export const PAYMENTS_LIVE = false;
 
@@ -41,22 +41,39 @@ export const PAYMENTS_LIVE = false;
  * because the AI reads each page.
  */
 export const PRICING = {
-  runPrice: 199,
+  runPrice: 149,
   /** Pages a Standard run includes. */
-  runPages: 250,
-  /** Each page over a run's (or a Premium month's) limit. */
-  extraPage: 2,
+  runPages: 80,
+  /** Each page over a Standard run's limit. */
+  extraPage: 3.5,
   /** Bookkeepers, CPAs and tax lawyers pay 25% less for their clients' runs. */
   partnerDiscount: 0.25,
   trialPages: 10,
-  premiumMonthly: 800,
+  premiumMonthly: 649,
   /** Pages a Premium month includes. */
-  premiumPages: 1_000,
+  premiumPages: 300,
+  /** Each page over a Premium month's limit. */
+  premiumExtraPage: 2.65,
   premiumStorageGb: 15,
   storageAddOnMonthly: 250,
   storageAddOnGb: 5,
   freeStorageMb: 300,
 } as const;
+
+/** What a bookkeeper, CPA or tax lawyer pays for a client's run, in whole pesos. */
+export const PARTNER_RUN_PRICE = Math.round(PRICING.runPrice * (1 - PRICING.partnerDiscount));
+
+/** An amount of pesos to the centavo, without floating-point leftovers. */
+const toCentavo = (amount: number) => Math.round(amount * 100) / 100;
+
+/** "₱149", "₱3.50", "₱1,234.50": whole pesos stay short, anything else shows its centavos. */
+export function pesoText(amount: number): string {
+  const value = toCentavo(amount);
+  return `₱${value.toLocaleString("en-PH", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 export type FileProblem = "type" | "size" | "empty" | "pdf" | "pages";
 
@@ -83,28 +100,30 @@ export type RunPlan = "free" | "trial" | "premium" | "standard" | "partner";
 export interface RunQuote {
   pages: number;
   plan: RunPlan;
-  /** Pages the plan covers before ₱2 a page applies (250 a run, Premium's pages left). */
+  /** Pages the plan covers before the price per extra page applies (a run's, Premium's left). */
   limit: number;
   /** Pages covered by the trial, the run price or Premium. */
   included: number;
-  /** Pages over the limit, ₱2 each. */
+  /** Pages over the limit. */
   extra: number;
+  /** The price of each page over the limit on this plan. */
+  extraRate: number;
   basePrice: number;
   extraPrice: number;
   total: number;
-  /** One line for the price, for example "₱199 + 12 × ₱2". */
+  /** One line for the price, for example "₱149 + 12 × ₱3.50". */
   summary: string;
-  /** True when the run needs something that is not on sale yet (pages over 250 at launch). */
+  /** True when the run needs something that is not on sale yet (extra pages at launch). */
   blocked: boolean;
 }
 
 /**
  * The price of reading `pages` pages in one run:
  * - free trial: the first 10 pages of an account, once;
- * - Premium: the pages left in the month are included, then ₱2 a page;
- * - Standard (and partner, 25% off the ₱199): 250 pages, then ₱2 a page.
- * While payments are not live (PAYMENTS_LIVE), a Standard run of up to 250 pages is free and
- * anything over 250 pages is blocked as "coming soon".
+ * - Premium: the pages left in the month are included, then ₱2.65 a page;
+ * - Standard (and partner, 25% off the ₱149): 80 pages, then ₱3.50 a page.
+ * While payments are not live (PAYMENTS_LIVE), a Standard run of up to 80 pages is free and
+ * anything over 80 pages is blocked as "coming soon".
  */
 export function quoteRun(
   pages: number,
@@ -124,8 +143,9 @@ export function quoteRun(
       limit: PRICING.runPages,
       included: count - extra,
       extra,
+      extraRate: PRICING.extraPage,
       basePrice: 0,
-      extraPrice: extra * PRICING.extraPage,
+      extraPrice: toCentavo(extra * PRICING.extraPage),
       total: 0,
       summary:
         extra > 0
@@ -141,6 +161,7 @@ export function quoteRun(
       limit: PRICING.trialPages,
       included: count,
       extra: 0,
+      extraRate: PRICING.extraPage,
       basePrice: 0,
       extraPrice: 0,
       total: 0,
@@ -151,38 +172,43 @@ export function quoteRun(
   if (options.premiumRemaining !== undefined) {
     const limit = Math.max(Math.floor(options.premiumRemaining), 0);
     const extra = Math.max(count - limit, 0);
-    const extraPrice = extra * PRICING.extraPage;
+    const extraPrice = toCentavo(extra * PRICING.premiumExtraPage);
     return {
       pages: count,
       plan: "premium",
       limit,
       included: count - extra,
       extra,
+      extraRate: PRICING.premiumExtraPage,
       basePrice: 0,
       extraPrice,
       total: extraPrice,
-      summary: extra > 0 ? `Premium + ${extra} × ₱${PRICING.extraPage}` : "Included in Premium",
+      summary:
+        extra > 0
+          ? `Premium + ${extra} × ${pesoText(PRICING.premiumExtraPage)}`
+          : "Included in Premium",
       blocked: false,
     };
   }
   const discount = options.partner ? 1 - PRICING.partnerDiscount : 1;
   const basePrice = count === 0 ? 0 : Math.round(PRICING.runPrice * discount);
   const extra = Math.max(count - PRICING.runPages, 0);
-  const extraPrice = extra * PRICING.extraPage;
+  const extraPrice = toCentavo(extra * PRICING.extraPage);
   return {
     pages: count,
     plan: options.partner ? "partner" : "standard",
     limit: PRICING.runPages,
     included: Math.min(count, PRICING.runPages),
     extra,
+    extraRate: PRICING.extraPage,
     basePrice,
     extraPrice,
-    total: basePrice + extraPrice,
+    total: toCentavo(basePrice + extraPrice),
     summary:
       count === 0
         ? "No pages yet"
         : extra > 0
-          ? `₱${basePrice} + ${extra} × ₱${PRICING.extraPage}`
+          ? `₱${basePrice} + ${extra} × ${pesoText(PRICING.extraPage)}`
           : `₱${basePrice} for up to ${PRICING.runPages} pages`,
     blocked: false,
   };
@@ -223,7 +249,7 @@ export function batchMessage(counts: BatchCounts, quote: RunQuote): string[] {
   if (quote.plan === "free") {
     if (quote.extra > 0) {
       lines.push(
-        `It exceeded the ${quote.limit.toLocaleString("en-PH")} limit for a Standard run. Extra pages (₱${PRICING.extraPage} each) are coming soon, so for now please remove ${plural(quote.extra, "page")} to keep this run to ${quote.limit.toLocaleString("en-PH")}.`,
+        `It exceeded the ${quote.limit.toLocaleString("en-PH")} limit for a Standard run. Extra pages (${pesoText(quote.extraRate)} each) are coming soon, so for now please remove ${plural(quote.extra, "page")} to keep this run to ${quote.limit.toLocaleString("en-PH")}.`,
       );
     }
   } else if (quote.plan === "trial") {
@@ -234,7 +260,7 @@ export function batchMessage(counts: BatchCounts, quote: RunQuote): string[] {
         ? `the ${quote.limit.toLocaleString("en-PH")} pages left in your Premium month`
         : `the ${quote.limit.toLocaleString("en-PH")} limit for a Standard run`;
     lines.push(
-      `It exceeded ${where}, so ₱${PRICING.extraPage} will be applied for each of the ${plural(quote.extra, "extra page")} (₱${quote.extraPrice.toLocaleString("en-PH")}).`,
+      `It exceeded ${where}, so ${pesoText(quote.extraRate)} will be applied for each of the ${plural(quote.extra, "extra page")} (${pesoText(quote.extraPrice)}).`,
     );
   }
   return lines;

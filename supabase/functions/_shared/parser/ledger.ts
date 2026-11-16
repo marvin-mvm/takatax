@@ -1,8 +1,12 @@
 /**
- * Turns what the reader found in a document into ledger rows (amounts in centavos). Used by the
- * Trigger.dev reader job; kept here so it is unit-tested with the rest of the reader.
+ * Turns what the reader found in a document into ledger rows (amounts in centavos of pesos).
+ * Used by both readers; kept here so it is unit-tested with the rest of the reader.
+ *
+ * A document printed in another currency gets rows only once it has been converted to pesos
+ * (currency.ts); its record says what was printed and the rate used.
  */
 
+import { conversionNote, isUnconverted } from "./currency.ts";
 import type { ExtractedDocument } from "./schema.ts";
 
 export interface LedgerRow {
@@ -28,6 +32,9 @@ export function toLedgerRows(
 ): LedgerRow[] {
   const recordDate = doc.date ?? doc.periodTo;
   if (!recordDate) return [];
+  // Never count a foreign amount as pesos.
+  if (isUnconverted(doc)) return [];
+  const note = conversionNote(doc);
   const base = {
     account_id: accountId,
     document_id: documentId,
@@ -41,7 +48,7 @@ export function toLedgerRows(
         {
           ...base,
           kind: "sale",
-          description: doc.documentNumber ?? "Sale",
+          description: `${doc.documentNumber ?? "Sale"}${note}`,
           amount_centavos: centavos(doc.totalAmount),
           vat_centavos: centavos(doc.vatAmount),
         },
@@ -51,7 +58,7 @@ export function toLedgerRows(
         {
           ...base,
           kind: "expense",
-          description: doc.issuerName ?? "Expense",
+          description: `${doc.issuerName ?? "Expense"}${note}`,
           category: doc.expenseCategory,
           amount_centavos: centavos(doc.totalAmount),
           vat_centavos: centavos(doc.vatAmount),

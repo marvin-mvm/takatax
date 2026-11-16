@@ -14,6 +14,7 @@ Rules:
 - TINs as printed, digits and dashes only (for example 123-456-789-00000).
 - Dates as YYYY-MM-DD. Philippine documents usually print MM/DD/YYYY.
 - totalAmount is the grand total, VAT included. vatAmount is the VAT shown separately, else null.
+- currency: the 3-letter code of the currency the amounts are printed in. PHP for ₱, P, Php or pesos, and for a Philippine document that prints no sign. For a foreign supplier or client use the code printed (USD, EUR, SGD, AUD, JPY and so on); a bare $ on a foreign company's document is USD. Transcribe every amount exactly as printed: never convert it to pesos.
 - expenseCategory: one of cost_of_sales, rent, utilities, communication, supplies, transportation, professional_fees, representation, repairs, taxes_licenses, salaries, equipment, personal, other. Meals with clients are representation; groceries, personal food, clothing and household items are personal; laptops, phones and furniture are equipment.
 - confidence: for amount, tin, date and kind, a number from 0 to 1 for how sure you are that the printed value was read correctly. Use below 0.8 when a figure is smudged, cut off, handwritten or ambiguous.
 - One file can hold several documents (for example two receipts in one photo); return each one.

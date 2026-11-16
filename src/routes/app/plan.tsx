@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Crown, Gift } from "lucide-react";
 import { useState } from "react";
 
-import { PAYMENTS_LIVE, PRICING } from "@shared/uploads/rules.ts";
+import { PAYMENTS_LIVE, PRICING, pesoText } from "@shared/uploads/rules.ts";
 import { useAppUser } from "@/components/app/app-user";
 import {
   Card,
@@ -104,7 +104,8 @@ function PlanPage() {
             </p>
             <p className="text-tk-muted">
               During launch, every run of up to {PRICING.runPages} pages is free, as many times as
-              you need. Pages over {PRICING.runPages} (₱{PRICING.extraPage} each) are coming soon.
+              you need. Pages over {PRICING.runPages} ({pesoText(PRICING.extraPage)} each) are
+              coming soon.
             </p>
             <Tag tone="brand">Free during launch</Tag>
           </Card>
@@ -135,8 +136,9 @@ function PlanPage() {
           </p>
           <p className="text-tk-muted">
             {peso(PRICING.premiumMonthly)} for 30 days: up to{" "}
-            {PRICING.premiumPages.toLocaleString()} pages read (then ₱{PRICING.extraPage} a page)
-            and {PRICING.premiumStorageGb} GB of storage. It does not renew by itself.
+            {PRICING.premiumPages.toLocaleString()} pages read (then{" "}
+            {pesoText(PRICING.premiumExtraPage)} a page) and {PRICING.premiumStorageGb} GB of
+            storage. It does not renew by itself.
           </p>
           {premiumActive ? (
             <p className="flex items-center gap-2 font-medium text-tk-brand">
@@ -196,7 +198,7 @@ function PlanPage() {
                   <tr key={p.id} className="border-t border-tk-line">
                     <td className="px-5 py-3">{longDay(p.createdAt)}</td>
                     <td className="px-5 py-3">
-                      {p.purpose === "premium_month" ? "Premium, 30 days" : "Parse run"}
+                      {p.purpose === "premium_month" ? "Premium, 30 days" : "Standard run"}
                     </td>
                     <td className="px-5 py-3 text-right font-tk-mono tabular-nums">
                       {peso(p.amount, true)}

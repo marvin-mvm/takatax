@@ -6,6 +6,8 @@
  * feasibility study; the adjustable ones are the fields of `ModelInputs`.
  */
 
+import { PRICING } from "@shared/uploads/rules.ts";
+
 /** Operating micro enterprises in the Philippines (PSA 2023 List of Establishments, via DTI). */
 export const MICRO_ENTERPRISES = 1_127_058;
 
@@ -22,11 +24,15 @@ const ESCALATION_SHARE = 0.4;
 const PESOS_PER_USD = 63;
 const MONTHLY_CHURN = 0.02;
 const TRIAL_PAGES = 11; // the COR plus 10 pages
-/** Pages a regular run includes; each page over it costs EXTRA_PAGE_PRICE. */
-export const RUN_PAGE_LIMIT = 250;
-export const EXTRA_PAGE_PRICE = 2;
+// Prices and limits come from the pricing rules the checkout enforces, so the deck and the
+// product cannot drift apart.
+/** Pages a Standard run includes; each page over it costs EXTRA_PAGE_PRICE. */
+export const RUN_PAGE_LIMIT = PRICING.runPages;
+export const EXTRA_PAGE_PRICE = PRICING.extraPage;
+/** Each page over a Premium month's limit. */
+export const PREMIUM_EXTRA_PAGE_PRICE = PRICING.premiumExtraPage;
 const STORAGE_ADDON_SHARE = 50 / 900; // of regular customers
-const PARTNER_DISCOUNT = 0.25;
+const PARTNER_DISCOUNT = PRICING.partnerDiscount;
 const PARTNERS_TARGET = 1_608; // 20% of BIR-accredited tax agents, plus CPAs at half that
 const PARTNERS_TARGET_MONTH = 36;
 /**
@@ -83,22 +89,23 @@ export interface ModelInputs {
   year1SharePct: number;
   /** Share of micro enterprises that are paying customers by the last month, in percent. */
   finalSharePct: number;
-  /** Price of one parse run, in pesos. */
+  /** Price of one Standard run, in pesos. */
   runPrice: number;
   /** Price of one Premium month, in pesos. */
   premiumPrice: number;
   /** Price of one 5 GB storage month, in pesos. */
   storagePrice: number;
-  /** Parse runs a regular customer buys per year. */
+  /** Runs a regular customer buys per year. */
   runsPerYear: number;
-  /** Average pages in a parse run (photos count 1, PDFs every page). Over 250, ₱2 a page. */
+  /** Average pages in a run (photos count 1, PDFs every page). Pages over the run's limit are
+   *  charged EXTRA_PAGE_PRICE each. */
   pagesPerRun: number;
   /** Share of customers on the Premium plan, in percent. */
   premiumSharePct: number;
-  /** Pages a Premium month includes (the plan limit). Over it, ₱2 a page. */
+  /** Pages a Premium month includes (the plan limit). Over it, PREMIUM_EXTRA_PAGE_PRICE a page. */
   premiumPageLimit: number;
   /** How much of that limit an average Premium customer uses each month, in percent. Over 100%
-   *  the extra pages are charged ₱2 each. */
+   *  the extra pages are charged PREMIUM_EXTRA_PAGE_PRICE each. */
   premiumUsagePct: number;
   /** Payment fee: a share of each payment, in percent. */
   paymentFeePct: number;
@@ -128,15 +135,15 @@ export const DEFAULT_INPUTS: ModelInputs = {
   years: 3,
   year1SharePct: 0.1,
   finalSharePct: 1,
-  runPrice: 199,
-  premiumPrice: 800,
-  storagePrice: 250,
+  runPrice: PRICING.runPrice,
+  premiumPrice: PRICING.premiumMonthly,
+  storagePrice: PRICING.storageAddOnMonthly,
   runsPerYear: 6,
   pagesPerRun: 100,
   paymentFeePct: PAYMENT_PRESETS.xendit.pct,
   paymentFeeFixedUsd: PAYMENT_PRESETS.xendit.fixedUsd,
   premiumSharePct: 10,
-  premiumPageLimit: 1_000,
+  premiumPageLimit: PRICING.premiumPages,
   premiumUsagePct: 40,
   reader: "pipeline",
   recheckSharePct: 50,
@@ -247,7 +254,7 @@ export function paymentFee(
   );
 }
 
-/** The ₱2-a-page charge for pages over a limit. */
+/** Pages over a limit, which are charged one by one. */
 const extraPages = (pages: number, limit: number) => Math.max(pages - limit, 0);
 
 /** Paying customers at the end of a month: a straight ramp in year 1, then steady growth. */
@@ -305,10 +312,10 @@ export function runModel(inputs: ModelInputs): ModelResult {
   const extraPerRun = extraPages(pagesPerRun, RUN_PAGE_LIMIT) * EXTRA_PAGE_PRICE;
   // Pages an average Premium customer has read each month: the plan limit times how much of it
   // they use. At 100% every Premium customer reads their whole limit; above 100% the extra
-  // pages are charged ₱2 each.
+  // pages are charged one by one.
   const premiumLimit = Math.max(inputs.premiumPageLimit, 0);
   const premiumPages = premiumLimit * (clamp(inputs.premiumUsagePct, 0, 200) / 100);
-  const premiumExtra = extraPages(premiumPages, premiumLimit) * EXTRA_PAGE_PRICE;
+  const premiumExtra = extraPages(premiumPages, premiumLimit) * PREMIUM_EXTRA_PAGE_PRICE;
   const premiumShare = clamp(inputs.premiumSharePct, 0, 100) / 100;
   const partnerRunPrice = Math.round(inputs.runPrice * (1 - PARTNER_DISCOUNT));
 
@@ -452,7 +459,7 @@ export function runModel(inputs: ModelInputs): ModelResult {
 export interface PremiumMonth {
   /** Pages read in the month: the limit times the share of it used. */
   pages: number;
-  /** ₱2 for each page over the limit. */
+  /** What the pages over the limit bring in. */
   extraRevenue: number;
   aiCost: number;
   jobsCost: number;
@@ -462,7 +469,7 @@ export interface PremiumMonth {
   kept: number;
   /** `kept` as a share of what the customer paid. */
   keptShare: number;
-  /** Pages a month at which costs eat the whole Premium price (before any ₱2 extras). */
+  /** Pages a month at which costs eat the whole Premium price (before any extras). */
   breakEvenPages: number;
 }
 
@@ -471,7 +478,7 @@ export function premiumMonth(inputs: ModelInputs): PremiumMonth {
   const price = Math.max(inputs.premiumPrice, 0);
   const limit = Math.max(inputs.premiumPageLimit, 0);
   const pages = limit * (clamp(inputs.premiumUsagePct, 0, 200) / 100);
-  const extraRevenue = extraPages(pages, limit) * EXTRA_PAGE_PRICE;
+  const extraRevenue = extraPages(pages, limit) * PREMIUM_EXTRA_PAGE_PRICE;
   const paid = price + extraRevenue;
   const aiCost = pages * aiCostPerPage(inputs.reader, inputs.recheckSharePct);
   const jobsCost = pages * jobsCostPerPage(inputs) + JOBS_COST_PER_RUN;
@@ -493,7 +500,7 @@ export function premiumMonth(inputs: ModelInputs): PremiumMonth {
 export interface RunEconomics {
   pages: number;
   basePrice: number;
-  /** ₱2 for each page over 250. */
+  /** What the pages over the run's limit bring in. */
   extraRevenue: number;
   aiCost: number;
   jobsCost: number;

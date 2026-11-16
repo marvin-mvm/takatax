@@ -2,13 +2,13 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowRight, Check } from "lucide-react";
 
 import { PAYMENTS_LIVE } from "@shared/uploads/rules.ts";
+import { PAGE_RULE, PRICE } from "@/lib/pricing-copy";
 import { SiteShell } from "@/components/site/SiteShell";
 import { buttonStart } from "@/components/site/styles";
 import { cn } from "@/lib/utils";
 
 const title = "Pricing | Takatax";
-const description =
-  "Pay only when you run: ₱199 for up to 250 pages. Premium is ₱800 a month for 1,000 pages. Bookkeepers, CPAs and tax lawyers get 25% off. Your first 10 pages are free.";
+const description = `Pay only when you run: ${PRICE.run} for up to ${PRICE.runPages} pages, then ${PRICE.extraPage} a page. Premium is ${PRICE.premium} a month for ${PRICE.premiumPages} pages and ${PRICE.premiumStorage} of storage. Bookkeepers, CPAs and tax lawyers get ${PRICE.partnerDiscount} off. Your first ${PRICE.trialPages} pages are free.`;
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -39,40 +39,45 @@ const PLANS: Plan[] = [
     price: "₱0",
     unit: "once per TIN",
     summary: "See your real figures before you pay.",
-    features: ["Your first 10 pages", "Full results, nothing hidden", "No card needed"],
+    features: [
+      `Your first ${PRICE.trialPages} pages`,
+      "Full results, nothing hidden",
+      "No card needed",
+    ],
   },
   {
-    name: "Parse run",
-    price: "₱199",
+    name: "Standard run",
+    price: PRICE.run,
     unit: "per run",
     summary: "Pay only when you have documents to read.",
     features: [
-      "Up to 250 pages in a run (a photo is one page; a PDF counts each page)",
+      `Up to ${PRICE.runPages} pages in a run (${PAGE_RULE})`,
       "Every return computed from them is free",
-      "₱2 for each page over 250",
+      `${PRICE.extraPage} for each page over ${PRICE.runPages}`,
       "No subscription needed",
     ],
     highlight: true,
   },
   {
     name: "Premium",
-    price: "₱800",
+    price: PRICE.premium,
     ...(PAYMENTS_LIVE ? {} : { badge: "Coming soon" }),
     unit: "per month",
     summary: "For businesses that upload every month.",
     features: [
-      "1,000 pages read each month, then ₱2 a page",
-      "15 GB of document storage",
+      `${PRICE.premiumPages} pages read each month`,
+      `${PRICE.premiumExtraPage} for each page over ${PRICE.premiumPages}, less than on a Standard run`,
+      `${PRICE.premiumStorage} of document storage`,
       "Paid month by month, no auto-renewal",
     ],
   },
   {
     name: "For bookkeepers, CPAs and tax lawyers",
-    price: "₱149",
+    price: PRICE.partnerRun,
     unit: "per client run",
-    summary: "25% off every run you do for a client.",
+    summary: `${PRICE.partnerDiscount} off every run you do for a client.`,
     features: [
-      "Up to 250 pages in a run (a photo is one page; a PDF counts each page)",
+      `Up to ${PRICE.runPages} pages in a run (${PAGE_RULE}), then ${PRICE.extraPage} a page`,
       "All your clients in one dashboard",
       "A verified public profile with reviews",
       "No platform fee: you bill clients directly",
@@ -81,7 +86,10 @@ const PLANS: Plan[] = [
 ];
 
 const EXTRAS: { name: string; text: string }[] = [
-  { name: "More storage", text: "₱250 for 5 GB a month. The first 300 MB is free." },
+  {
+    name: "More storage",
+    text: `${PRICE.storageAddOn}. The first ${PRICE.freeStorage} is free.`,
+  },
   {
     name: "Always free",
     text: "The tax tracker, deadline reminders and the 8% vs OSD calculator.",
@@ -106,8 +114,8 @@ function PricingPage() {
           </p>
           {!PAYMENTS_LIVE ? (
             <p className="mt-6 rounded-[14px] border border-tk-brand/30 bg-tk-brand-soft px-4 py-3 font-medium text-tk-brand text-pretty">
-              For now, every Standard run of up to 250 pages is free, for taxpayers and bookkeepers.
-              Extra pages and Premium are coming soon.
+              For now, every Standard run of up to {PRICE.runPages} pages is free, for taxpayers and
+              bookkeepers. Extra pages and Premium are coming soon.
             </p>
           ) : null}
         </div>

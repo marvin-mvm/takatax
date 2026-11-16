@@ -30,10 +30,12 @@ import {
   FILE_PROBLEM_TEXT,
   type FileProblem,
   MAX_BATCH_BYTES,
+  PARTNER_RUN_PRICE,
   PAYMENTS_LIVE,
   PRICING,
   batchMessage,
   checkFile,
+  pesoText,
   quoteRun,
 } from "@shared/uploads/rules.ts";
 import { buttonOutline, buttonPrimary } from "@/components/site/styles";
@@ -657,7 +659,7 @@ export function UploadPanel({
                   <dt className="text-tk-muted">Total</dt>
                   <dd className="text-right">
                     <span className="font-tk-mono text-lg font-medium tabular-nums">
-                      {peso(quote.total)}
+                      {pesoText(quote.total)}
                     </span>
                     <span className="block text-sm text-tk-muted">{quote.summary}</span>
                   </dd>
@@ -691,11 +693,11 @@ export function UploadPanel({
           </button>
           <p className="mt-3 text-[13px]/[18px] text-tk-muted">
             {!PAYMENTS_LIVE
-              ? `Standard runs are free during launch: up to ${PRICING.runPages} pages a run, as often as you need. Extra pages (₱${PRICING.extraPage} each) and Premium are coming soon.`
+              ? `Standard runs are free during launch: up to ${PRICING.runPages} pages a run, as often as you need. Extra pages (${pesoText(PRICING.extraPage)} each) and Premium are coming soon.`
               : `${
                   clientAccountId
-                    ? `Your partner price: ₱${Math.round(PRICING.runPrice * (1 - PRICING.partnerDiscount))} for up to ${PRICING.runPages} pages for this client, then ₱${PRICING.extraPage} a page.`
-                    : `Your first ${PRICING.trialPages} pages are free. Then ₱${PRICING.runPrice} reads up to ${PRICING.runPages} pages (Premium: ${PRICING.premiumPages.toLocaleString("en-PH")} a month), then ₱${PRICING.extraPage} a page.`
+                    ? `Your partner price: ${pesoText(PARTNER_RUN_PRICE)} for up to ${PRICING.runPages} pages for this client, then ${pesoText(PRICING.extraPage)} a page.`
+                    : `Your first ${PRICING.trialPages} pages are free. Then ${pesoText(PRICING.runPrice)} reads up to ${PRICING.runPages} pages, then ${pesoText(PRICING.extraPage)} a page. Premium covers ${PRICING.premiumPages.toLocaleString("en-PH")} pages a month, then ${pesoText(PRICING.premiumExtraPage)} a page.`
                 } Payment goes through Xendit (GCash, Maya or card); the final price is confirmed at checkout.`}
           </p>
         </section>

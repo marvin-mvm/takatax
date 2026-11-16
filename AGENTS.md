@@ -95,7 +95,7 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
 - File storage: Cloudflare R2 (private buckets, signed upload links), not Supabase Storage.
   R2 keys live in Supabase Edge Function secrets.
 - Payments: Xendit, switched off for launch by `PAYMENTS_LIVE` in
-  `supabase/functions/_shared/uploads/rules.ts` (Standard runs up to 250 pages are free; extra
+  `supabase/functions/_shared/uploads/rules.ts` (Standard runs up to 80 pages are free; extra
   pages and Premium are "coming soon" on the screens and in `create-checkout`). The provider code
   is in `supabase/functions/_lib/payments.ts`; `payments-webhook` (JWT check off in
   `supabase/config.toml`; it checks Xendit's callback token) marks runs and Premium months paid.

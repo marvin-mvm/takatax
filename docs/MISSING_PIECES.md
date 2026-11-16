@@ -129,10 +129,15 @@ the `tr_dev_…` key).
 Payments are switched off for launch with one constant, `PAYMENTS_LIVE = false` in
 `supabase/functions/_shared/uploads/rules.ts`. While it is off:
 
-- every **Standard run of up to 250 pages is free**, for taxpayers and partners, as often as
+- every **Standard run of up to 80 pages is free**, for taxpayers and partners, as often as
   they like;
-- **pages over 250 (₱2 each)** and **Premium (₱800 a month)** show "coming soon" and cannot be
+- **pages over 80 (₱3.50 each)** and **Premium (₱649 a month)** show "coming soon" and cannot be
   bought, on the screens and on the server (`create-checkout` answers `coming_soon`).
+
+The price list is `PRICING` in the same file: a Standard run is ₱149 for up to 80 pages, then
+₱3.50 a page; Premium is ₱649 a month for 300 pages and 15 GB of storage, then ₱2.65 a page;
+partners pay 25% less for a client's run. The site, the app and the deck read their figures from
+it, so change a price there and redeploy the site and the edge functions.
 
 To switch payments on (Xendit: GCash, Maya, cards):
 
@@ -145,7 +150,7 @@ To switch payments on (Xendit: GCash, Maya, cards):
       `supabase/functions/_lib/payments.ts`; confirm its request and webhook fields against
       Xendit's current docs.
 - [ ] Set `PAYMENTS_LIVE = true`, then redeploy the site (merge to `main`) and the edge functions.
-      The full pricing (free trial, ₱199 runs, 25% partner price, ₱2 extra pages, Premium) then
+      The full pricing (free trial, ₱149 runs, 25% partner price, extra pages, Premium) then
       applies.
 
 ## 5. Optional settings (sensible defaults already apply)

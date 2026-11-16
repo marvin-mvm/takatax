@@ -3,6 +3,7 @@
 import { Link } from "@tanstack/react-router";
 import { CalendarClock, CheckCircle2, FileText } from "lucide-react";
 
+import { FORM_PAYMENT_TEXT } from "@shared/domain/bir-forms.ts";
 import { daysBetween, formatIsoDate } from "@shared/domain/dates.ts";
 import type { Filing } from "@shared/domain/deadlines.ts";
 import type { LedgerRecord } from "@shared/domain/records.ts";
@@ -176,12 +177,12 @@ export function DeadlineList({
               <div className="rounded-[12px] bg-tk-bg p-3">
                 <p className="text-sm text-tk-muted">Expected to pay</p>
                 <p className={cn("font-tk-mono text-xl font-medium tabular-nums")}>
-                  {peso(estimate.payable, true)}
+                  {filing.payment === "estimated" ? peso(estimate.payable, true) : "—"}
                 </p>
                 <p className="mt-1 text-[13px]/[18px] text-tk-muted">
-                  {estimate.credits > 0
+                  {filing.payment === "estimated" && estimate.credits > 0
                     ? `${peso(estimate.taxDue)} tax less ${peso(estimate.credits)} already withheld`
-                    : "From the records read so far"}
+                    : FORM_PAYMENT_TEXT[filing.payment]}
                 </p>
               </div>
             </div>

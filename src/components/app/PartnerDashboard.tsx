@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { daysBetween, formatIsoDate } from "@shared/domain/dates.ts";
 import { TAX_TYPES, maskTin } from "@shared/domain/tax-profile.ts";
 import { PAYMENTS_LIVE } from "@shared/uploads/rules.ts";
+import { PRICE } from "@/lib/pricing-copy";
 import { useMyInvitations, usePartnerClients } from "@/lib/data/queries";
 import { invitationProblem, respondToInvite, todayInManila } from "@/lib/data/repository";
 import { PARTNER_KIND_LABEL, type PartnerInvitation, type PartnerKind } from "@/lib/data/types";
@@ -158,14 +159,16 @@ export function PartnerDashboard() {
           <p className="text-tk-muted">
             {PAYMENTS_LIVE ? (
               <>
-                <strong className="font-semibold text-tk-ink">25% off every client run.</strong> You
-                pay ₱149 instead of ₱199 for up to 250 pages.
+                <strong className="font-semibold text-tk-ink">
+                  {PRICE.partnerDiscount} off every client run.
+                </strong>{" "}
+                You pay {PRICE.partnerRun} instead of {PRICE.run} for up to {PRICE.runPages} pages.
               </>
             ) : (
               <>
                 <strong className="font-semibold text-tk-ink">Free during launch.</strong> Client
-                runs of up to 250 pages are free; your 25% partner price applies once payments
-                start.
+                runs of up to {PRICE.runPages} pages are free; your {PRICE.partnerDiscount} partner
+                price applies once payments start.
               </>
             )}
           </p>

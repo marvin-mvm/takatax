@@ -17,6 +17,7 @@
 // "waiting to be read" and the run to "paid", so starting it again resumes.
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
+import { convertReading } from "../_shared/parser/currency.ts";
 import { DEFAULT_READER_MODELS } from "../_shared/parser/models.ts";
 import { combineReadings } from "../_shared/parser/pages.ts";
 import {
@@ -39,6 +40,7 @@ import { parseRegistration, REGISTRATION_JSON_SCHEMA } from "../_shared/parser/r
 import { toLedgerRows } from "../_shared/parser/ledger.ts";
 import type { CheckFlag } from "../_shared/parser/checks.ts";
 import { adminClient } from "../_lib/clients.ts";
+import { pesoRate } from "../_lib/fx.ts";
 import { json, serve } from "../_lib/http.ts";
 import { chat, type ContentPart, documentPart } from "../_lib/openrouter.ts";
 import { extractPages, loadPdf } from "../_lib/pdf.ts";
@@ -247,7 +249,11 @@ async function readPart(admin: SupabaseClient, document: DocumentRow): Promise<v
   }
 
   // ---- Done: the document, then its ledger rows (replacing any from an earlier reading) -----
-  const result = combineReadings(done.results, plan.flags as CheckFlag[]);
+  // Amounts printed in another currency become pesos at the rate of the document's date.
+  const result = await convertReading(
+    combineReadings(done.results, plan.flags as CheckFlag[]),
+    pesoRate,
+  );
   const first = result.documents[0];
   const { error: documentError } = await admin
     .from("documents")
