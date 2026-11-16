@@ -22,7 +22,7 @@ export interface TaxProfile {
   registrationDate: IsoDate;
   /** Registered for VAT (gross sales above ₱3M, or by choice). */
   vatRegistered: boolean;
-  /** Withholds tax on rent or contractor payments, so files 0619-E and 1601-EQ. */
+  /** Withholds tax on rent or contractor payments, so files 0619-E, 1601-EQ and 1604-E. */
   withholdingAgent: boolean;
   incomeTaxOption: IncomeTaxOption;
   businessType: "services" | "goods";
@@ -64,7 +64,7 @@ export const TAX_TYPES: Record<TaxTypeId, TaxTypeInfo> = {
     id: "withholding",
     label: "Withholding tax",
     description: "Tax you hold back when you pay rent or contractors, paid to the BIR for them.",
-    forms: ["0619-E", "1601-EQ"],
+    forms: ["0619-E", "1601-EQ", "1604-E"],
   },
 };
 
