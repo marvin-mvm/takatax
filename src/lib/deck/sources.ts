@@ -181,4 +181,11 @@ export const SOURCES: Source[] = [
     note: "Background jobs that read each page: $0.0000338 a second of compute on the default machine, $0.000025 a job, and the $50 Pro plan with $50 of usage included.",
     url: "https://trigger.dev/pricing",
   },
+  {
+    id: 25,
+    publisher: "Dodo Payments",
+    title: "Pricing",
+    note: "Merchant of record fees used for the payment preset: 4% + $0.40 a payment, plus 1.5% for cards outside the US.",
+    url: "https://dodopayments.com/pricing",
+  },
 ];
