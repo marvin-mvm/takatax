@@ -36,7 +36,7 @@ const STEPS: { icon: LucideIcon; title: string; text: string; actions: ReactNode
   {
     icon: Upload,
     title: "Upload receipts, sales collections, withholding, etc.",
-    text: "Start with your COR (BIR Form 2303): it sets your tax types and deadlines. Then add receipts, sales invoices and 2307s, as photos or PDFs. Your first 10 documents are free.",
+    text: "Start with your COR (BIR Form 2303): it sets your tax types and deadlines. Then add receipts, sales invoices and 2307s, as photos or PDFs. Your first 10 pages are free.",
     actions: (
       <>
         <Link to="/app/upload" search={{ kind: "cor" }} className={buttonPrimary}>

@@ -227,7 +227,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string; status: Status 
 const FAQ: { q: string; a: ReactNode }[] = [
   {
     q: "How do I use Takatax?",
-    a: "Create a free account, upload your COR (BIR Form 2303), then upload your receipts, sales invoices and 2307s. AI reads them, and your tracker and return figures fill in. Your first 10 documents are free.",
+    a: "Create a free account, upload your COR (BIR Form 2303), then upload your receipts, sales invoices and 2307s. AI reads them, and your tracker and return figures fill in. Your first 10 pages are free.",
   },
   {
     q: "Who files my tax return?",
@@ -274,8 +274,9 @@ const FAQ: { q: string; a: ReactNode }[] = [
     q: "How much does it cost?",
     a: (
       <>
-        Your first 10 documents are free. After that, ₱199 reads up to 250 documents, and every
-        return computed from them is free. Premium is ₱800 a month for 1,000 documents.{" "}
+        Your first 10 pages are free. After that, ₱199 reads up to 250 pages (a photo is one page; a
+        PDF counts each page), then ₱2 a page, and every return computed from them is free. Premium
+        is ₱800 a month for 1,000 pages.{" "}
         <Link to="/pricing" className={textLink}>
           See pricing
         </Link>
@@ -314,7 +315,7 @@ function LandingPage() {
           <StartButton />
         </div>
         <p className="mt-5 text-tk-muted">
-          Your first 10 documents are free.{" "}
+          Your first 10 pages are free.{" "}
           <Link to="/login" className={textLink}>
             Log in
           </Link>{" "}
@@ -526,9 +527,13 @@ function LandingPage() {
       >
         <ul className="grid gap-4 md:grid-cols-3">
           {[
-            ["Free trial", "₱0", "Your first 10 documents, full results."],
-            ["Parse run", "₱199", "Up to 250 documents. Every return computed from them is free."],
-            ["Premium", "₱800 / month", "1,000 documents a month and 15 GB of storage."],
+            ["Free trial", "₱0", "Your first 10 pages, full results."],
+            [
+              "Parse run",
+              "₱199",
+              "Up to 250 pages, then ₱2 a page. Every return computed is free.",
+            ],
+            ["Premium", "₱800 / month", "1,000 pages a month and 15 GB of storage."],
           ].map(([name, price, text]) => (
             <li key={name} className="rounded-[18px] border border-tk-line bg-tk-surface p-6">
               <p className="font-semibold">{name}</p>
@@ -566,7 +571,7 @@ function LandingPage() {
       {/* Closing call to action. */}
       <section className="mx-auto max-w-[860px] px-4 pb-24 text-center sm:px-6">
         <h2 className="text-[30px]/[36px] font-bold tracking-tight text-balance sm:text-[38px]/[44px]">
-          Start with your first 10 documents, free.
+          Start with your first 10 pages, free.
         </h2>
         <p className="mt-3 text-lg text-tk-muted">No card needed. Takes a few minutes.</p>
         <div className="mt-8">

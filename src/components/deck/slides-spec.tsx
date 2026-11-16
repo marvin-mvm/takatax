@@ -68,28 +68,31 @@ export function ArchitectureSlide() {
       title="Architecture: AI reads, code computes."
       lead="The model only reads documents. A rules engine does the tax math, so every number can be reproduced and explained."
     >
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
         <Node
           title="Browser"
           subtitle="TanStack Start app on Netlify"
-          items={["Upload photos and PDFs", "Photo check before upload", "Review and results"]}
+          items={["Upload photos and PDFs", "Counts pages before reading", "Review and results"]}
         />
         <FlowArrow />
         <Node
           title="Supabase Edge Functions"
-          subtitle="TypeScript on the server"
-          items={[
-            "Checks every input and payment",
-            "Signs upload links",
-            "Calls the AI, holds the keys",
-          ]}
+          subtitle="Short calls, TypeScript"
+          items={["Signs upload links", "Checks every payment", "Starts the reading job"]}
+          highlight
+        />
+        <FlowArrow />
+        <Node
+          title="Trigger.dev"
+          subtitle="Background jobs, no time limit"
+          items={["Reads page by page", "Long PDFs in groups", "Retries and progress"]}
           highlight
         />
         <FlowArrow />
         <Node
           title="OpenRouter"
           subtitle="One API for the AI models"
-          items={["Reads images and PDFs", "Gemini Flash and Pro", "Claude Haiku"]}
+          items={["Reads every page itself, no OCR", "Gemini Flash and Pro", "Claude Haiku"]}
         />
       </div>
       <ArrowDown aria-hidden className="mx-auto mt-3 size-5 rotate-0 text-tk-muted" />
@@ -115,11 +118,13 @@ export function ArchitectureSlide() {
           AI runs only for a paid run or the one free trial.
         </Point>
         <Point title="Files go straight to R2.">
-          The browser uploads with a short-lived signed link. The edge function reads each file back
-          and sends it to OpenRouter.
+          The browser uploads with a short-lived signed link, up to 5 GB a batch. A Trigger.dev job
+          reads each photo, and each PDF a few pages at a time, so long PDFs never hit the edge
+          function's 150 to 400 second limit.
         </Point>
         <Point title="No secrets in the repo or the browser.">
-          The OpenRouter and R2 keys live in Supabase Edge Function secrets.
+          Each key lives where it is used: the OpenRouter key and a read-only R2 key in Trigger.dev;
+          the upload-link R2 key, PayMongo and the Trigger.dev key in Supabase.
         </Point>
       </Points>
     </Slide>
@@ -185,10 +190,10 @@ export function ReaderSlide() {
         ))}
       </ol>
       <p className="mt-6 text-[15px]/[22px] text-tk-muted">
-        <strong className="font-semibold text-tk-ink">₱0.23 to ₱0.32 per document</strong> once
-        blended: Gemini Flash, then Claude Haiku, then Gemini Pro, all through OpenRouter{" "}
-        <Cite source="Takatax" refs={[21, 19, 20, 22]} />. A full 250-document run costs at most ₱80
-        in AI against a ₱199 price.
+        <strong className="font-semibold text-tk-ink">₱0.23 to ₱0.32 per page</strong> once blended:
+        Gemini Flash, then Claude Haiku, then Gemini Pro, all through OpenRouter{" "}
+        <Cite source="Takatax" refs={[21, 19, 20, 22]} />. A full 250-page run costs at most ₱80 in
+        AI against a ₱199 price.
       </p>
     </Slide>
   );
@@ -199,6 +204,7 @@ const STACK: { layer: string; choice: string }[] = [
   { layer: "Interface", choice: "Tailwind CSS 4, shadcn/ui on Radix, Recharts" },
   { layer: "Validation", choice: "Zod with React Hook Form" },
   { layer: "Backend", choice: "Supabase Edge Functions, TypeScript" },
+  { layer: "Background jobs", choice: "Trigger.dev: reads pages with retries, no time limit" },
   { layer: "Data", choice: "Supabase: Postgres, Auth, row-level security" },
   { layer: "Storage", choice: "Cloudflare R2, private, with signed upload links" },
   { layer: "AI", choice: "OpenRouter: Gemini Flash and Pro, Claude Haiku, server-side only" },

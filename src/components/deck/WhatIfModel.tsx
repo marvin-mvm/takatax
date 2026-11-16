@@ -7,11 +7,16 @@ import { Switch } from "@/components/ui/switch";
 import { formatNumber, formatPercent, formatPesos, formatPesosCompact } from "@/lib/deck/format";
 import {
   DEFAULT_INPUTS,
+  EXTRA_PAGE_PRICE,
   MICRO_ENTERPRISES,
+  RUN_PAGE_LIMIT,
+  TRIGGER,
   compareLimits,
+  runEconomics,
   runModel,
   type ModelInputs,
   type ReaderMode,
+  type YearResult,
 } from "@/lib/deck/model";
 import { cn } from "@/lib/utils";
 
@@ -214,11 +219,134 @@ function Kpi({
   );
 }
 
+/** The example the owner asked about: 0.1% of businesses, each running 250 pages a month. */
+const EXAMPLE_INPUTS: Partial<ModelInputs> = {
+  year1SharePct: 0.1,
+  runsPerYear: 12,
+  pagesPerRun: 250,
+  premiumSharePct: 0,
+};
+
+/**
+ * One run from start to finish at the current sliders (regular and partner price): what the
+ * customer pays, what the AI and Trigger.dev cost, and what is left. Below it, the Trigger.dev
+ * bill for a month at the end of year 1 and at the end of the plan.
+ */
+function RunEconomicsPanel({
+  inputs,
+  years,
+  onExample,
+}: {
+  inputs: ModelInputs;
+  years: YearResult[];
+  onExample: () => void;
+}) {
+  const regular = runEconomics(inputs);
+  const partner = runEconomics(inputs, true);
+  const firstYear = years[0];
+  const lastYear = years.at(-1);
+  const columns = [
+    { label: "Customer", run: regular },
+    { label: "Partner (25% off)", run: partner },
+  ];
+  const rows: { label: string; value: (run: typeof regular) => number; minus?: boolean }[] = [
+    { label: `Price, up to ${RUN_PAGE_LIMIT} pages`, value: (run) => run.basePrice },
+    {
+      label: `Pages over ${RUN_PAGE_LIMIT}, ₱${EXTRA_PAGE_PRICE} each`,
+      value: (run) => run.extraRevenue,
+    },
+    { label: "AI (OpenRouter)", value: (run) => run.aiCost, minus: true },
+    { label: "Background jobs (Trigger.dev)", value: (run) => run.jobsCost, minus: true },
+    { label: "Payment fee, 2.5%", value: (run) => run.paymentFee, minus: true },
+  ];
+  const usd = (pesos: number) => `$${(pesos / 63).toFixed(2)}`;
+
+  return (
+    <section
+      aria-labelledby="run-economics-title"
+      className="rounded-[18px] border border-tk-line bg-tk-surface/80 p-4 sm:p-5"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 id="run-economics-title" className="font-semibold">
+            One run of {formatNumber(inputs.pagesPerRun)} pages
+          </h3>
+          <p className="mt-1 text-[13px]/[18px] text-tk-muted text-pretty">
+            Each photo is one page; a PDF counts every page. Trigger.dev reads them in the
+            background: one model call per photo, one per {TRIGGER.pdfPagesPerCall} PDF pages.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onExample}
+          className="inline-flex min-h-9 items-center rounded-[10px] border border-tk-line px-3 text-[13px] font-medium text-tk-brand hover:border-tk-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tk-brand"
+        >
+          Example: 0.1% of businesses, 250 pages a month
+        </button>
+      </div>
+      <div className="relative mt-3 overflow-x-auto">
+        <table className="w-full min-w-[460px] border-collapse text-right text-sm/5">
+          <caption className="sr-only">One run, start to finish</caption>
+          <thead>
+            <tr className="text-[13px] text-tk-muted">
+              <th className="py-2 pr-3 text-left font-medium">Per run</th>
+              {columns.map((c) => (
+                <th key={c.label} className="px-3 py-2 font-medium">
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="font-tk-mono tabular-nums">
+            {rows.map((row) => (
+              <tr key={row.label} className="border-t border-tk-line">
+                <th scope="row" className="py-2 pr-3 text-left font-tk-sans font-normal">
+                  {row.label}
+                </th>
+                {columns.map((c) => (
+                  <td key={c.label} className="px-3 py-2">
+                    {row.minus ? "−" : ""}
+                    {formatPesos(row.value(c.run))}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr className="border-t-2 border-tk-line font-medium">
+              <th scope="row" className="py-2 pr-3 text-left font-tk-sans font-semibold">
+                Left for Takatax
+              </th>
+              {columns.map((c) => (
+                <td key={c.label} className={cn("px-3 py-2", c.run.kept < 0 && "text-tk-danger")}>
+                  {formatPesos(c.run.kept)} ({formatPercent(c.run.keptShare)})
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-[13px]/[18px] text-tk-muted text-pretty">
+        Trigger.dev bill:{" "}
+        <span className="font-tk-mono text-tk-ink">
+          {formatPesos((firstYear?.costs.jobs ?? 0) / 12)}
+        </span>{" "}
+        ({usd((firstYear?.costs.jobs ?? 0) / 12)}) a month on average in year 1, and{" "}
+        <span className="font-tk-mono text-tk-ink">
+          {formatPesos((lastYear?.costs.jobs ?? 0) / 12)}
+        </span>{" "}
+        ({usd((lastYear?.costs.jobs ?? 0) / 12)}) in year {lastYear?.year}. The Pro plan costs $
+        {TRIGGER.planUsdMonthly} a month including ${TRIGGER.planUsdMonthly} of usage; usage is $
+        {TRIGGER.usdPerSecond} a second of compute plus ${TRIGGER.usdPerRun} a job. “Left” is before
+        cloud, team, marketing and taxes.
+      </p>
+    </section>
+  );
+}
+
 /** Premium limits to compare: the old plan (300) and the new one (1,000). */
 const COMPARED_LIMITS = [300, 1_000];
 
 /**
- * Premium limit check: the old 300 and the new 1,000 documents a month side by side, plus the
+ * Premium limit check: the old 300 and the new 1,000 pages a month side by side, plus the
  * slider's own value when it is different. Every other input comes from the sliders, so the
  * comparison moves with them. "Use" buttons set the limit slider.
  */
@@ -230,13 +358,13 @@ function PremiumLimitCheck({
   onPick: (limit: number) => void;
 }) {
   const rows = useMemo(() => {
-    const limits = COMPARED_LIMITS.includes(inputs.premiumDocLimit)
+    const limits = COMPARED_LIMITS.includes(inputs.premiumPageLimit)
       ? COMPARED_LIMITS
-      : [...COMPARED_LIMITS, inputs.premiumDocLimit].sort((a, b) => a - b);
+      : [...COMPARED_LIMITS, inputs.premiumPageLimit].sort((a, b) => a - b);
     return compareLimits(inputs, limits);
   }, [inputs]);
-  const current = rows.find((row) => row.limit === inputs.premiumDocLimit) ?? rows[0];
-  const breakEven = current ? Math.round(current.month.breakEvenDocuments) : 0;
+  const current = rows.find((row) => row.limit === inputs.premiumPageLimit) ?? rows[0];
+  const breakEven = current ? Math.round(current.month.breakEvenPages) : 0;
 
   return (
     <section
@@ -244,13 +372,14 @@ function PremiumLimitCheck({
       className="rounded-[18px] border border-tk-line bg-tk-surface/80 p-4 sm:p-5"
     >
       <h3 id="premium-check-title" className="font-semibold">
-        Premium limit: 300 vs 1,000 documents a month
+        Premium limit: 300 vs 1,000 pages a month
       </h3>
       <p className="mt-1 text-[13px]/[18px] text-tk-muted text-pretty">
         Same price (₱{inputs.premiumPrice}), same customers. A bigger limit earns nothing more and
-        costs more AI only for customers who use it. At your settings a Premium customer uses{" "}
-        {inputs.premiumUsagePct}% of the limit, and one Premium month breaks even at about{" "}
-        {Number.isFinite(breakEven) ? formatNumber(breakEven) : "any number of"} documents.
+        costs more AI only for customers who use it; pages over the limit are ₱{EXTRA_PAGE_PRICE}{" "}
+        each. At your settings a Premium customer uses {inputs.premiumUsagePct}% of the limit, and
+        one Premium month breaks even at about{" "}
+        {Number.isFinite(breakEven) ? formatNumber(breakEven) : "any number of"} pages.
       </p>
       <div className="relative mt-3 overflow-x-auto">
         <table className="w-full min-w-[620px] border-collapse text-right text-sm/5">
@@ -259,7 +388,7 @@ function PremiumLimitCheck({
             <tr className="text-[13px] text-tk-muted">
               <th className="py-2 pr-3 text-left font-medium">Limit</th>
               <th className="px-3 py-2 font-medium">Read a month</th>
-              <th className="px-3 py-2 font-medium">AI a month</th>
+              <th className="px-3 py-2 font-medium">AI + jobs a month</th>
               <th className="px-3 py-2 font-medium">Kept a month</th>
               <th className="px-3 py-2 font-medium">Net profit, plan</th>
               <th className="px-3 py-2 font-medium">If all use 100%</th>
@@ -270,7 +399,7 @@ function PremiumLimitCheck({
           </thead>
           <tbody className="font-tk-mono tabular-nums">
             {rows.map((row) => {
-              const chosen = row.limit === inputs.premiumDocLimit;
+              const chosen = row.limit === inputs.premiumPageLimit;
               return (
                 <tr
                   key={row.limit}
@@ -280,13 +409,15 @@ function PremiumLimitCheck({
                     scope="row"
                     className="py-2 pr-3 text-left font-tk-sans font-medium whitespace-nowrap"
                   >
-                    {formatNumber(row.limit)} docs
+                    {formatNumber(row.limit)} pages
                     {chosen ? (
                       <span className="ml-1.5 text-[12px] text-tk-brand">yours</span>
                     ) : null}
                   </th>
-                  <td className="px-3 py-2">{formatNumber(row.month.documents)}</td>
-                  <td className="px-3 py-2">{formatPesos(row.month.aiCost)}</td>
+                  <td className="px-3 py-2">{formatNumber(row.month.pages)}</td>
+                  <td className="px-3 py-2">
+                    {formatPesos(row.month.aiCost + row.month.jobsCost)}
+                  </td>
                   <td className={cn("px-3 py-2", row.month.kept < 0 && "text-tk-danger")}>
                     {formatPesos(row.month.kept)} ({formatPercent(row.month.keptShare)})
                   </td>
@@ -313,8 +444,9 @@ function PremiumLimitCheck({
         </table>
       </div>
       <p className="mt-2 text-[13px]/[18px] text-tk-muted text-pretty">
-        “Kept” is the Premium price less the 2.5% payment fee and AI cost, before cloud, team and
-        marketing. Try the reader and the share of the limit used to see the worst cases.
+        “Kept” is what the customer paid less the 2.5% payment fee, AI and Trigger.dev, before
+        cloud, team and marketing. Try the reader and the share of the limit used to see the worst
+        cases.
       </p>
     </section>
   );
@@ -334,6 +466,7 @@ export function WhatIfModel() {
   const customersAt = (sharePct: number) => formatNumber((MICRO_ENTERPRISES * sharePct) / 100);
   const { totals, years } = result;
   const aiCost = years.reduce((sum, year) => sum + year.costs.ai, 0);
+  const jobsCost = years.reduce((sum, year) => sum + year.costs.jobs, 0);
   const firstProfitableYear = years.find((year) => year.netProfit > 0)?.year;
 
   return (
@@ -423,7 +556,7 @@ export function WhatIfModel() {
             <ControlGroup
               value="usage"
               title="Usage"
-              summary={`${inputs.runsPerYear} runs a year of ${inputs.docsPerRun} documents; ${inputs.premiumSharePct}% on Premium, using ${inputs.premiumUsagePct}% of ${formatNumber(inputs.premiumDocLimit)}`}
+              summary={`${inputs.runsPerYear} runs a year of ${inputs.pagesPerRun} pages; ${inputs.premiumSharePct}% on Premium, using ${inputs.premiumUsagePct}% of ${formatNumber(inputs.premiumPageLimit)}`}
             >
               <SliderRow
                 label="Runs per customer, per year"
@@ -435,13 +568,17 @@ export function WhatIfModel() {
                 onChange={(value) => set("runsPerYear", value)}
               />
               <SliderRow
-                label="Documents per run"
-                display={String(inputs.docsPerRun)}
-                value={inputs.docsPerRun}
+                label="Pages per run"
+                display={
+                  inputs.pagesPerRun > RUN_PAGE_LIMIT
+                    ? `${inputs.pagesPerRun} · +₱${(inputs.pagesPerRun - RUN_PAGE_LIMIT) * EXTRA_PAGE_PRICE}`
+                    : String(inputs.pagesPerRun)
+                }
+                value={inputs.pagesPerRun}
                 min={20}
-                max={250}
+                max={600}
                 step={10}
-                onChange={(value) => set("docsPerRun", value)}
+                onChange={(value) => set("pagesPerRun", value)}
               />
               <SliderRow
                 label="Customers on Premium"
@@ -453,20 +590,20 @@ export function WhatIfModel() {
                 onChange={(value) => set("premiumSharePct", value)}
               />
               <SliderRow
-                label="Premium limit, documents a month"
-                display={formatNumber(inputs.premiumDocLimit)}
-                value={inputs.premiumDocLimit}
+                label="Premium limit, pages a month"
+                display={formatNumber(inputs.premiumPageLimit)}
+                value={inputs.premiumPageLimit}
                 min={300}
                 max={2_000}
                 step={50}
-                onChange={(value) => set("premiumDocLimit", value)}
+                onChange={(value) => set("premiumPageLimit", value)}
               />
               <SliderRow
                 label="Share of the Premium limit used"
-                display={`${inputs.premiumUsagePct}% · ${formatNumber((inputs.premiumDocLimit * inputs.premiumUsagePct) / 100)} docs`}
+                display={`${inputs.premiumUsagePct}% · ${formatNumber((inputs.premiumPageLimit * inputs.premiumUsagePct) / 100)} pages`}
                 value={inputs.premiumUsagePct}
                 min={10}
-                max={100}
+                max={200}
                 step={5}
                 onChange={(value) => set("premiumUsagePct", value)}
               />
@@ -474,7 +611,7 @@ export function WhatIfModel() {
             <ControlGroup
               value="reader"
               title="AI model"
-              summary={`${READER_SUMMARY[inputs.reader]}, ₱${result.aiCostPerDoc.toFixed(2)} a document`}
+              summary={`${READER_SUMMARY[inputs.reader]}, ₱${result.aiCostPerPage.toFixed(2)} a page`}
             >
               <Segmented
                 label="Who reads the documents"
@@ -484,7 +621,7 @@ export function WhatIfModel() {
               />
               {inputs.reader === "pipeline" ? (
                 <SliderRow
-                  label="Documents needing a second read"
+                  label="Pages needing a second read"
                   display={`${inputs.recheckSharePct}%`}
                   value={inputs.recheckSharePct}
                   min={10}
@@ -496,9 +633,40 @@ export function WhatIfModel() {
               <p className="text-[13px]/[18px] text-tk-muted">
                 {READER_SUMMARY[inputs.reader]}:{" "}
                 <span className="font-tk-mono font-medium text-tk-ink">
-                  ₱{result.aiCostPerDoc.toFixed(2)}
+                  ₱{result.aiCostPerPage.toFixed(2)}
                 </span>{" "}
-                per document.
+                per page.
+              </p>
+            </ControlGroup>
+            <ControlGroup
+              value="jobs"
+              title="Background jobs"
+              summary={`Trigger.dev, ₱${result.jobsCostPerPage.toFixed(3)} a page`}
+            >
+              <SliderRow
+                label="Pages that come from PDFs"
+                display={`${inputs.pdfPageSharePct}%`}
+                value={inputs.pdfPageSharePct}
+                min={0}
+                max={100}
+                step={10}
+                onChange={(value) => set("pdfPageSharePct", value)}
+              />
+              <SliderRow
+                label="Seconds billed per AI call"
+                display={`${inputs.jobSecondsPerCall} s`}
+                value={inputs.jobSecondsPerCall}
+                min={3}
+                max={30}
+                step={1}
+                onChange={(value) => set("jobSecondsPerCall", value)}
+              />
+              <p className="text-[13px]/[18px] text-tk-muted">
+                Trigger.dev:{" "}
+                <span className="font-tk-mono font-medium text-tk-ink">
+                  ₱{result.jobsCostPerPage.toFixed(3)}
+                </span>{" "}
+                per page, at least ${TRIGGER.planUsdMonthly} a month for the plan.
               </p>
             </ControlGroup>
             <ControlGroup
@@ -583,8 +751,8 @@ export function WhatIfModel() {
             />
             <Kpi
               label="AI cost"
-              value={`₱${result.aiCostPerDoc.toFixed(2)}`}
-              detail={`per document, ${formatPercent(totals.revenue.total > 0 ? aiCost / totals.revenue.total : 0)} of revenue`}
+              value={`₱${result.aiCostPerPage.toFixed(2)}`}
+              detail={`per page, ${formatPercent(totals.revenue.total > 0 ? aiCost / totals.revenue.total : 0)} of revenue`}
             />
           </div>
 
@@ -593,10 +761,15 @@ export function WhatIfModel() {
         </div>
       </div>
 
-      <PremiumLimitCheck inputs={inputs} onPick={(limit) => set("premiumDocLimit", limit)} />
+      <RunEconomicsPanel
+        inputs={inputs}
+        years={years}
+        onExample={() => setInputs({ ...DEFAULT_INPUTS, ...EXAMPLE_INPUTS })}
+      />
+      <PremiumLimitCheck inputs={inputs} onPick={(limit) => set("premiumPageLimit", limit)} />
 
       <div className="relative overflow-x-auto">
-        <table className="w-full min-w-[560px] border-collapse text-right text-sm/5">
+        <table className="w-full min-w-[660px] border-collapse text-right text-sm/5">
           <caption className="sr-only">Projection by year</caption>
           <thead>
             <tr className="text-[13px] text-tk-muted">
@@ -604,6 +777,7 @@ export function WhatIfModel() {
               <th className="px-3 py-2 font-medium">Customers</th>
               <th className="px-3 py-2 font-medium">Revenue</th>
               <th className="px-3 py-2 font-medium">AI</th>
+              <th className="px-3 py-2 font-medium">Trigger.dev</th>
               <th className="px-3 py-2 font-medium">Other costs</th>
               <th className="px-3 py-2 font-medium">Taxes</th>
               <th className="py-2 pl-3 font-medium">Net profit</th>
@@ -621,7 +795,10 @@ export function WhatIfModel() {
                 <td className="px-3 py-2">{formatNumber(year.customers)}</td>
                 <td className="px-3 py-2">{formatPesos(year.revenue.total)}</td>
                 <td className="px-3 py-2">{formatPesos(year.costs.ai)}</td>
-                <td className="px-3 py-2">{formatPesos(year.costs.total - year.costs.ai)}</td>
+                <td className="px-3 py-2">{formatPesos(year.costs.jobs)}</td>
+                <td className="px-3 py-2">
+                  {formatPesos(year.costs.total - year.costs.ai - year.costs.jobs)}
+                </td>
                 <td className="px-3 py-2">{formatPesos(year.businessTax + year.incomeTax)}</td>
                 <td className={cn("py-2 pl-3 font-medium", year.netProfit < 0 && "text-tk-danger")}>
                   {formatPesos(year.netProfit)}
@@ -635,7 +812,8 @@ export function WhatIfModel() {
               <td className="px-3 py-2">{formatNumber(totals.customers)}</td>
               <td className="px-3 py-2">{formatPesos(totals.revenue.total)}</td>
               <td className="px-3 py-2">{formatPesos(aiCost)}</td>
-              <td className="px-3 py-2">{formatPesos(totals.costs - aiCost)}</td>
+              <td className="px-3 py-2">{formatPesos(jobsCost)}</td>
+              <td className="px-3 py-2">{formatPesos(totals.costs - aiCost - jobsCost)}</td>
               <td className="px-3 py-2">{formatPesos(totals.taxes)}</td>
               <td className={cn("py-2 pl-3", totals.netProfit < 0 && "text-tk-danger")}>
                 {formatPesos(totals.netProfit)}
@@ -648,10 +826,12 @@ export function WhatIfModel() {
       <p className="text-[13px]/[18px] text-tk-muted text-pretty">
         Fixed assumptions: {formatNumber(MICRO_ENTERPRISES)} micro enterprises{" "}
         <Cite source="DTI" refs={[1, 2]} />; 2% monthly churn; partners grow to 1,608 by month 36
-        with one client each; 1 in 18 regular customers buys storage; 2.5% payment fees; 3%
-        percentage tax up to ₱3M of yearly revenue, VAT above it; income tax of 20% or 25%. Unit
-        costs from <Cite source="Takatax" refs={[21]} />, <Cite source="Google" refs={[19]} /> and{" "}
-        <Cite source="Anthropic" refs={[20]} />. A projection, not a forecast.
+        with one client each; 1 in 18 regular customers buys storage; 2.5% payment fees; ₱2 for each
+        page over a run's or Premium's limit; Trigger.dev Pro at $50 a month including $50 of usage;
+        3% percentage tax up to ₱3M of yearly revenue, VAT above it; income tax of 20% or 25%. Unit
+        costs from <Cite source="Takatax" refs={[21]} />, <Cite source="Google" refs={[19]} />,{" "}
+        <Cite source="Anthropic" refs={[20]} /> and <Cite source="Trigger.dev" refs={[24]} />. A
+        projection, not a forecast.
       </p>
     </div>
   );

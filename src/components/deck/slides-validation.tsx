@@ -54,7 +54,7 @@ export function CoverSlide() {
             </>
           }
         />
-        <Stat value="₱199" label="per run of up to 250 documents. Every computed return is free." />
+        <Stat value="₱199" label="per run of up to 250 pages. Every computed return is free." />
       </div>
       <div className="mt-8 flex flex-wrap items-center gap-2">
         <a href="#validation" className="rounded-full focus-visible:outline-2">
@@ -386,7 +386,8 @@ const COMPETITORS: { name: string; how: ReactNode; price: ReactNode; highlight?:
   {
     name: "Takatax",
     how: "Upload photos. AI reads them. The engine computes every return.",
-    price: "₱199 per tax compute (up to 250 documents parsed by AI). A subscription is optional.",
+    price:
+      "₱199 per tax compute (up to 250 pages parsed by AI, ₱2 per extra page). A subscription is optional.",
     highlight: true,
   },
 ];
@@ -507,7 +508,7 @@ const TEST_STEPS = [
 const TEST_MEASURES = [
   "98% of amounts and TINs read exactly",
   "Under 5% of documents need a human check",
-  "₱0.32 or less in AI cost per document",
+  "₱0.32 or less in AI cost per page",
   "“Would you pay ₱199 for this?”",
 ];
 

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const title = "Pricing | Takatax";
 const description =
-  "Pay only when you run: ₱199 for up to 250 documents. Premium is ₱800 a month for 1,000 documents. Bookkeepers, CPAs and tax lawyers get 25% off. Your first 10 documents are free.";
+  "Pay only when you run: ₱199 for up to 250 pages. Premium is ₱800 a month for 1,000 pages. Bookkeepers, CPAs and tax lawyers get 25% off. Your first 10 pages are free.";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -36,7 +36,7 @@ const PLANS: Plan[] = [
     price: "₱0",
     unit: "once per TIN",
     summary: "See your real figures before you pay.",
-    features: ["Your first 10 documents", "Full results, nothing hidden", "No card needed"],
+    features: ["Your first 10 pages", "Full results, nothing hidden", "No card needed"],
   },
   {
     name: "Parse run",
@@ -44,9 +44,9 @@ const PLANS: Plan[] = [
     unit: "per run",
     summary: "Pay only when you have documents to read.",
     features: [
-      "Up to 250 documents in a run",
+      "Up to 250 pages in a run (a photo is one page; a PDF counts each page)",
       "Every return computed from them is free",
-      "₱2 for each extra document",
+      "₱2 for each page over 250",
       "No subscription needed",
     ],
     highlight: true,
@@ -57,7 +57,7 @@ const PLANS: Plan[] = [
     unit: "per month",
     summary: "For businesses that upload every month.",
     features: [
-      "1,000 documents read each month",
+      "1,000 pages read each month, then ₱2 a page",
       "15 GB of document storage",
       "Paid month by month, no auto-renewal",
     ],
@@ -68,7 +68,7 @@ const PLANS: Plan[] = [
     unit: "per client run",
     summary: "25% off every run you do for a client.",
     features: [
-      "Up to 250 documents in a run",
+      "Up to 250 pages in a run (a photo is one page; a PDF counts each page)",
       "All your clients in one dashboard",
       "A verified public profile with reviews",
       "No platform fee: you bill clients directly",

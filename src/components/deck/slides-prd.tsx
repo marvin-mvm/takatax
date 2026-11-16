@@ -83,7 +83,7 @@ export function PrdSlide() {
             items={[
               "Parsing accuracy: 98% exact match on amounts and TINs",
               "Under 5% of documents sent to user review",
-              "AI cost of ₱0.32 or less per document",
+              "AI cost of ₱0.32 or less per page",
               "User feedback: 4 of 5 or better after a run",
               "1 in 4 trial users buys a run",
               "1,127 paying customers by month 12",
@@ -125,9 +125,9 @@ const STREAMS: Stream[] = [
     name: "Parser",
     when: "From day one",
     prices: [
-      "₱199 per run, up to 250 documents",
-      "₱800 a month Premium, 1,000 documents",
-      "₱2 per extra document",
+      "₱199 per run, up to 250 pages",
+      "₱800 a month Premium, 1,000 pages",
+      "₱2 per extra page",
     ],
   },
   {

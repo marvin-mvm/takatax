@@ -153,7 +153,7 @@ export function PartnerDashboard() {
           <BadgePercent aria-hidden className="mt-0.5 size-5 shrink-0 text-tk-brand" />
           <p className="text-tk-muted">
             <strong className="font-semibold text-tk-ink">25% off every client run.</strong> You pay
-            ₱149 instead of ₱199 for up to 250 documents.
+            ₱149 instead of ₱199 for up to 250 pages.
           </p>
         </Card>
         <Card as="div" className="flex gap-3">
