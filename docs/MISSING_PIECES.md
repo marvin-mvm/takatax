@@ -107,9 +107,8 @@ always matches the SDK (4.8.4 or later is needed for trusted publishing).
 1. Trigger.dev dashboard → switch to **Production** → GitHub → Trusted publishing: add the
    `marvin-mvm/takatax` repository (done).
 2. Do not set a `TRIGGER_ACCESS_TOKEN` repository secret: the workflow does not read one, and
-   the CLI would use a key instead of trusted publishing if one were set. A secret with that name
-   was added on 2026-11-16. It does nothing today; delete it under GitHub → Settings → Secrets and
-   variables → Actions.
+   the CLI would use a key instead of trusted publishing if one were set. (One added on
+   2026-11-16 was deleted the same day.)
 3. Merge to `main` (or run the workflow from the Actions tab once it is on `main`). The dashboard's
    Production environment then lists `read-run` and `ping`; run `ping` from its Test page.
 4. Set Supabase's `TRIGGER_SECRET_KEY` to the regular Production secret key (`tr_prod_…`). A
