@@ -2,9 +2,9 @@
  * Trigger.dev: the background jobs that read documents (see trigger/read-run.ts) and a `ping`
  * task to check the connection.
  *
- * Local test: `npx trigger.dev@4.8.3 login`, then `npx trigger.dev@4.8.3 dev`.
- * Production: `npx trigger.dev@4.8.3 deploy`.
- * The CLI version matches the SDK in package.json (4.8.3).
+ * Local test: `npx trigger.dev@4.8.5 login`, then `npx trigger.dev@4.8.5 dev`.
+ * Production: `npx trigger.dev@4.8.5 deploy`.
+ * The CLI version matches the SDK in package.json (4.8.5).
  */
 
 import { defineConfig } from "@trigger.dev/sdk";
