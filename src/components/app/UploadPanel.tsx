@@ -6,7 +6,8 @@
  *
  * Steps after Proceed: ensure the account -> signed upload links -> PUT each file to R2 ->
  * confirm-upload -> create-checkout (free: read now; paid: the payment provider, then back here with ?run=)
- * -> read-documents, which starts a Trigger.dev job -> progress from the run's row.
+ * -> read-documents, which starts the reader (Supabase or Trigger.dev, by the READER secret)
+ * -> progress from the run's row.
  * Each step that needs a key says so plainly when it is missing. See docs/MISSING_PIECES.md.
  */
 
@@ -240,7 +241,7 @@ export function UploadPanel({
       await wait(3_000);
     }
 
-    // The job runs on Trigger.dev and writes its progress to the run. Follow it while this
+    // The reader (Supabase or Trigger.dev) writes its progress to the run. Follow it while this
     // screen is open; leaving is fine, reading carries on.
     while (mounted.current) {
       const progress = await loadRunProgress(runId);

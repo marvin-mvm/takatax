@@ -76,6 +76,10 @@ where they differ.
   (`read-documents`) and answer the short records-assistant chat. Keys live in Trigger.dev's
   environment variables and Supabase Edge Function secrets, never in the repo or the browser.
   This replaces the Lovable AI gateway rule above.
+- Reader switch: the Supabase secret `READER` picks the reader. `READER=trigger` (default) starts
+  the Trigger.dev job; `READER=supabase` uses the `read-step` edge function, which reads a few page
+  groups per call and starts itself again for the rest (used while Trigger.dev deployments are
+  unavailable). Both use the shared plan in `supabase/functions/_shared/parser/plan.ts`.
 - Pricing is per page (a photo is one page, a PDF every page): `quoteRun` in
   `supabase/functions/_shared/uploads/rules.ts`, shared by the upload screen and
   `create-checkout`.
