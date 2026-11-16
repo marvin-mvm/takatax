@@ -73,8 +73,9 @@ const STEPS: { icon: LucideIcon; title: string; text: string; actions: ReactNode
 /** Who can see the account: always visible on the home screen, so nobody is surprised. */
 function AccessSummary({ userId }: { userId: string }) {
   const query = useMyAccess(userId);
-  const active = (query.data?.data ?? []).filter((g) => !g.revokedAt);
-  const names = active.map((g) => g.partnerName);
+  const grants = query.data?.data ?? [];
+  const names = grants.filter((g) => g.status === "active").map((g) => g.partnerName);
+  const waiting = grants.filter((g) => g.status === "pending").length;
   return (
     <Link
       to="/app/access"
@@ -91,6 +92,9 @@ function AccessSummary({ userId }: { userId: string }) {
             : names.length === 0
               ? "Only you."
               : `You and ${names.length === 1 ? names[0] : `${names.length} professionals: ${names.join(", ")}`}.`}
+          {waiting > 0
+            ? ` ${waiting === 1 ? "1 invitation is" : `${waiting} invitations are`} waiting for an answer.`
+            : ""}
         </span>
       </span>
       <ArrowRight aria-hidden className="size-4 shrink-0 text-tk-brand" />

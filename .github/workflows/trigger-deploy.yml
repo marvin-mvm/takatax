@@ -1,0 +1,54 @@
+name: Deploy Trigger.dev tasks
+
+# Deploys the reader (trigger/read-run.ts) and the ping task to Trigger.dev Production on every
+# push to main, and on demand from the Actions tab ("Run workflow").
+#
+# Uses Trigger.dev trusted publishing: no stored key. The job asks GitHub for an OIDC token
+# (permissions: id-token: write) and Trigger.dev accepts it because this repository is listed
+# under the project's Production environment -> GitHub -> Trusted publishing.
+# Needs Trigger.dev CLI 4.8.4 or later; the CLI version is read from package.json.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: trigger-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy to Trigger.dev Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The CLI must match @trigger.dev/sdk exactly (the deploy fails on a mismatch), so its
+      # version is read from package.json. --auth-method oidc uses trusted publishing; no
+      # TRIGGER_ACCESS_TOKEN may be set, or the CLI would use that instead. --external-id tags
+      # the deployment with this commit.
+      - name: Deploy
+        run: |
+          version=$(node -p "require('./package.json').dependencies['@trigger.dev/sdk']")
+          echo "Trigger.dev CLI and SDK version: $version"
+          npx -y "trigger.dev@$version" deploy --env prod --auth-method oidc --external-id "${{ github.sha }}"

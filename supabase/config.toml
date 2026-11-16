@@ -1,5 +1,11 @@
 project_id = "thiznrxojzrxkjwqhtjt"
 
-# PayMongo calls this webhook without a Supabase login; the function checks its signature.
-[functions.paymongo-webhook]
+# The payment provider calls this webhook without a Supabase login; the function checks its
+# signature instead.
+[functions.payments-webhook]
+verify_jwt = false
+
+# The Supabase reader is called only by read-documents and by itself, with the service role key
+# (checked in the function).
+[functions.read-step]
 verify_jwt = false

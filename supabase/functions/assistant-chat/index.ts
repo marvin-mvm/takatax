@@ -2,10 +2,12 @@
 // -> { reply }
 //
 // Answers questions about the user's own records. The figures come from the database here,
-// never from the browser, and the model only explains them; it does not give tax advice.
+// never from the browser, and the model only explains them; it does not give tax advice. A
+// professional's questions about a client go in the client's activity log (that they asked,
+// not what).
 // Answers 429 over the daily AI spending cap, and 503 { code: "not_configured" } until
 // OPENROUTER_API_KEY is set.
-import { adminClient, authorize } from "../_lib/clients.ts";
+import { adminClient, authorize, logAccess } from "../_lib/clients.ts";
 import { HttpError, json, requireEnv, serve } from "../_lib/http.ts";
 import { chat } from "../_lib/openrouter.ts";
 import { assertUnderDailyCap } from "../_lib/spend.ts";
@@ -34,6 +36,7 @@ serve(async (request) => {
   }
   const { client } = await authorize(request, scope.accountId);
   requireEnv("OPENROUTER_API_KEY");
+  await logAccess(client, scope.accountId, "asked_assistant");
   const admin = adminClient();
   await assertUnderDailyCap(admin);
 

@@ -7,8 +7,10 @@ import {
   getPost,
   isAdmin,
   isMyPost,
+  listAccessEvents,
   listConversations,
   listMyAccess,
+  listMyInvitations,
   listPartners,
   listPartnersForReview,
   listPosts,
@@ -55,6 +57,18 @@ export const useIsMyPost = (postId: string, signedIn: boolean) =>
 /** Who can see the signed-in taxpayer's account. */
 export const useMyAccess = (userId: string, enabled = true) =>
   useQuery({ queryKey: ["access", userId], queryFn: () => listMyAccess(userId), enabled });
+
+/** The signed-in taxpayer's activity log (invitations, and what professionals did inside). */
+export const useAccessEvents = (userId: string) =>
+  useQuery({ queryKey: ["access-events", userId], queryFn: () => listAccessEvents(userId) });
+
+/** Invitations waiting for the signed-in professional. Refreshes every minute. */
+export const useMyInvitations = (userId: string) =>
+  useQuery({
+    queryKey: ["invitations", userId],
+    queryFn: listMyInvitations,
+    refetchInterval: 60_000,
+  });
 
 /** The conversation list. Refreshes every 20 seconds for the unread badges. */
 export const useConversations = (userId: string, role: AccountRole) =>

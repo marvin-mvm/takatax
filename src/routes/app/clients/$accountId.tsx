@@ -1,7 +1,7 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Upload, UserX } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { parseIso } from "@shared/domain/dates.ts";
 import { upcomingFilings } from "@shared/domain/deadlines.ts";
@@ -26,7 +26,12 @@ import {
 } from "@/components/app/ui";
 import { buttonOutline, buttonPrimary } from "@/components/site/styles";
 import { useClientWorkspace } from "@/lib/data/queries";
-import { NotConnectedError, leaveClient, todayInManila } from "@/lib/data/repository";
+import {
+  NotConnectedError,
+  leaveClient,
+  logAccessEvent,
+  todayInManila,
+} from "@/lib/data/repository";
 
 export const Route = createFileRoute("/app/clients/$accountId")({
   component: ClientView,
@@ -34,8 +39,10 @@ export const Route = createFileRoute("/app/clients/$accountId")({
 
 /**
  * A partner's view of one client's profile: what they need to pay next, their tracker, tax
- * types, COR and documents. The partner can message the client, upload documents for them, or
- * stop working on the account. Row-level security checks the access on every read.
+ * types, COR and documents (never the client's plan, payments or access settings). The partner
+ * can message the client, upload documents for them, or stop working on the account.
+ * Row-level security checks the access on every read, and the client's activity log records
+ * what the partner opens and changes.
  */
 function ClientView() {
   const { accountId } = Route.useParams();
@@ -45,12 +52,16 @@ function ClientView() {
   const [problem, setProblem] = useState<string | null>(null);
   const today = todayInManila();
   const { year, month } = parseIso(today);
+  // Opening a client's account goes in their activity log (once per visit).
+  useEffect(() => {
+    void logAccessEvent(accountId, "opened_account");
+  }, [accountId]);
 
   if (query.isPending) return <LoadingBlock label="Loading client…" />;
   if (query.isError || !query.data) {
     return (
       <EmptyState title="We could not open this client.">
-        They may have removed your access.
+        They may have removed your access, or you have not accepted their invitation yet.
       </EmptyState>
     );
   }

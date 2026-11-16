@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { PAYMENTS_LIVE } from "@shared/uploads/rules.ts";
 import { SiteShell } from "@/components/site/SiteShell";
 import { buttonOutline, buttonStart, textLink } from "@/components/site/styles";
 
@@ -207,7 +208,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string; status: Status 
   {
     icon: KeyRound,
     title: "You choose who sees your account",
-    text: "Give a professional access in one tap, see everyone who can open your records, and remove them at any time.",
+    text: "Invite a professional in one tap. They see your records only after they accept, every file they open or figure they change shows in your activity log, and you can remove them at any time.",
     status: "Ready",
   },
   {
@@ -268,15 +269,17 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Is my data private?",
-    a: "Your documents are stored privately and only you, and any bookkeeper you give access to, can see them. You can remove a bookkeeper's access or delete your files at any time.",
+    a: "Your documents are stored privately. Only you, and a bookkeeper you invite who accepts, can see them. They never see your plan or payments, everything they open or change shows in your activity log, and you can remove their access at any time.",
   },
   {
     q: "How much does it cost?",
     a: (
       <>
-        Your first 10 pages are free. After that, ₱199 reads up to 250 pages (a photo is one page; a
-        PDF counts each page), then ₱2 a page, and every return computed from them is free. Premium
-        is ₱800 a month for 1,000 pages.{" "}
+        {PAYMENTS_LIVE
+          ? "Your first 10 pages are free. "
+          : "During launch, every run of up to 250 pages is free; extra pages and Premium are coming soon. After launch: "}
+        ₱199 reads up to 250 pages (a photo is one page; a PDF counts each page), then ₱2 a page,
+        and every return computed from them is free. Premium is ₱800 a month for 1,000 pages.{" "}
         <Link to="/pricing" className={textLink}>
           See pricing
         </Link>
@@ -309,13 +312,16 @@ function LandingPage() {
         <p className="mt-6 max-w-[58ch] text-lg/7 text-tk-muted text-pretty sm:text-xl/8">
           Upload your receipts, sales invoices and 2307s. AI reads each one and Takatax computes
           your tax returns, line by line. Verified bookkeepers and an anonymous community help you
-          file. ₱199 per run; a subscription is optional.
+          file.{" "}
+          {PAYMENTS_LIVE
+            ? "₱199 per run; a subscription is optional."
+            : "Free during launch: up to 250 pages a run."}
         </p>
         <div className="mt-10">
           <StartButton />
         </div>
         <p className="mt-5 text-tk-muted">
-          Your first 10 pages are free.{" "}
+          {PAYMENTS_LIVE ? "Your first 10 pages are free." : "Free during launch."}{" "}
           <Link to="/login" className={textLink}>
             Log in
           </Link>{" "}
@@ -523,6 +529,11 @@ function LandingPage() {
         id="pricing"
         eyebrow="Pricing"
         title="Pay only when you run."
+        intro={
+          PAYMENTS_LIVE
+            ? undefined
+            : "During launch, every Standard run of up to 250 pages is free. Extra pages and Premium are coming soon."
+        }
         className="bg-tk-surface/70"
       >
         <ul className="grid gap-4 md:grid-cols-3">
@@ -571,7 +582,9 @@ function LandingPage() {
       {/* Closing call to action. */}
       <section className="mx-auto max-w-[860px] px-4 pb-24 text-center sm:px-6">
         <h2 className="text-[30px]/[36px] font-bold tracking-tight text-balance sm:text-[38px]/[44px]">
-          Start with your first 10 pages, free.
+          {PAYMENTS_LIVE
+            ? "Start with your first 10 pages, free."
+            : "Start free: up to 250 pages a run during launch."}
         </h2>
         <p className="mt-3 text-lg text-tk-muted">No card needed. Takes a few minutes.</p>
         <div className="mt-8">

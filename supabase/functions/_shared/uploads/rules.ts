@@ -24,6 +24,19 @@ export const ACCEPTED_TYPES = [
 export const ACCEPT_ATTRIBUTE = [...ACCEPTED_TYPES, ".heic", ".heif"].join(",");
 
 /**
+ * The payments switch.
+ *
+ * false (launch, today): Standard runs of up to 250 pages are free for everyone, taxpayers and
+ * partners. Pages over 250 (₱2 each) and Premium (₱800 a month) show "coming soon" and cannot
+ * be bought, on the screens and on the server.
+ *
+ * true: the full pricing below applies (trial, ₱199 runs, partner price, ₱2 extra pages,
+ * Premium), paid through Xendit (supabase/functions/_lib/payments.ts). Set it once Xendit is
+ * connected, then redeploy the site and the edge functions.
+ */
+export const PAYMENTS_LIVE = false;
+
+/**
  * Prices in pesos. Runs are counted in pages: a photo is one page and a PDF counts every page,
  * because the AI reads each page.
  */
@@ -65,7 +78,7 @@ export function checkFile(file: { name: string; type: string; size: number }): F
   return accepted ? null : "type";
 }
 
-export type RunPlan = "trial" | "premium" | "standard" | "partner";
+export type RunPlan = "free" | "trial" | "premium" | "standard" | "partner";
 
 export interface RunQuote {
   pages: number;
@@ -81,6 +94,8 @@ export interface RunQuote {
   total: number;
   /** One line for the price, for example "₱199 + 12 × ₱2". */
   summary: string;
+  /** True when the run needs something that is not on sale yet (pages over 250 at launch). */
+  blocked: boolean;
 }
 
 /**
@@ -88,12 +103,37 @@ export interface RunQuote {
  * - free trial: the first 10 pages of an account, once;
  * - Premium: the pages left in the month are included, then ₱2 a page;
  * - Standard (and partner, 25% off the ₱199): 250 pages, then ₱2 a page.
+ * While payments are not live (PAYMENTS_LIVE), a Standard run of up to 250 pages is free and
+ * anything over 250 pages is blocked as "coming soon".
  */
 export function quoteRun(
   pages: number,
-  options: { partner?: boolean; trialAvailable?: boolean; premiumRemaining?: number } = {},
+  options: {
+    partner?: boolean;
+    trialAvailable?: boolean;
+    premiumRemaining?: number;
+    paymentsLive?: boolean;
+  } = {},
 ): RunQuote {
   const count = Math.max(Math.floor(pages), 0);
+  if (!(options.paymentsLive ?? PAYMENTS_LIVE)) {
+    const extra = Math.max(count - PRICING.runPages, 0);
+    return {
+      pages: count,
+      plan: "free",
+      limit: PRICING.runPages,
+      included: count - extra,
+      extra,
+      basePrice: 0,
+      extraPrice: extra * PRICING.extraPage,
+      total: 0,
+      summary:
+        extra > 0
+          ? `Free up to ${PRICING.runPages} pages; extra pages coming soon`
+          : "Free during launch",
+      blocked: extra > 0,
+    };
+  }
   if (options.trialAvailable && count > 0 && count <= PRICING.trialPages) {
     return {
       pages: count,
@@ -105,6 +145,7 @@ export function quoteRun(
       extraPrice: 0,
       total: 0,
       summary: "Free trial",
+      blocked: false,
     };
   }
   if (options.premiumRemaining !== undefined) {
@@ -121,6 +162,7 @@ export function quoteRun(
       extraPrice,
       total: extraPrice,
       summary: extra > 0 ? `Premium + ${extra} × ₱${PRICING.extraPage}` : "Included in Premium",
+      blocked: false,
     };
   }
   const discount = options.partner ? 1 - PRICING.partnerDiscount : 1;
@@ -142,6 +184,7 @@ export function quoteRun(
         : extra > 0
           ? `₱${basePrice} + ${extra} × ₱${PRICING.extraPage}`
           : `₱${basePrice} for up to ${PRICING.runPages} pages`,
+    blocked: false,
   };
 }
 
@@ -177,7 +220,13 @@ export function batchMessage(counts: BatchCounts, quote: RunQuote): string[] {
   const lines = [
     `You uploaded ${parts.join(" and ")} with ${plural(total, "total combined page", "total combined pages")}.`,
   ];
-  if (quote.plan === "trial") {
+  if (quote.plan === "free") {
+    if (quote.extra > 0) {
+      lines.push(
+        `It exceeded the ${quote.limit.toLocaleString("en-PH")} limit for a Standard run. Extra pages (₱${PRICING.extraPage} each) are coming soon, so for now please remove ${plural(quote.extra, "page")} to keep this run to ${quote.limit.toLocaleString("en-PH")}.`,
+      );
+    }
+  } else if (quote.plan === "trial") {
     lines.push("Your free trial covers them.");
   } else if (quote.extra > 0) {
     const where =

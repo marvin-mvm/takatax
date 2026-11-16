@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowRight, Check } from "lucide-react";
 
+import { PAYMENTS_LIVE } from "@shared/uploads/rules.ts";
 import { SiteShell } from "@/components/site/SiteShell";
 import { buttonStart } from "@/components/site/styles";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,8 @@ interface Plan {
   summary: string;
   features: string[];
   highlight?: boolean;
+  /** A label shown next to the plan's name, for example "Free during launch". */
+  badge?: string;
 }
 
 const PLANS: Plan[] = [
@@ -41,6 +44,7 @@ const PLANS: Plan[] = [
   {
     name: "Parse run",
     price: "₱199",
+    ...(PAYMENTS_LIVE ? {} : { badge: "Free during launch" }),
     unit: "per run",
     summary: "Pay only when you have documents to read.",
     features: [
@@ -54,6 +58,7 @@ const PLANS: Plan[] = [
   {
     name: "Premium",
     price: "₱800",
+    ...(PAYMENTS_LIVE ? {} : { badge: "Coming soon" }),
     unit: "per month",
     summary: "For businesses that upload every month.",
     features: [
@@ -65,6 +70,7 @@ const PLANS: Plan[] = [
   {
     name: "For bookkeepers, CPAs and tax lawyers",
     price: "₱149",
+    ...(PAYMENTS_LIVE ? {} : { badge: "Free during launch" }),
     unit: "per client run",
     summary: "25% off every run you do for a client.",
     features: [
@@ -100,6 +106,12 @@ function PricingPage() {
             No parse, no fee. Computing your returns from documents we have already read is always
             free.
           </p>
+          {!PAYMENTS_LIVE ? (
+            <p className="mt-6 rounded-[14px] border border-tk-brand/30 bg-tk-brand-soft px-4 py-3 font-medium text-tk-brand text-pretty">
+              Free during launch: every Standard run of up to 250 pages is free, for taxpayers and
+              bookkeepers. Extra pages and Premium are coming soon.
+            </p>
+          ) : null}
         </div>
 
         <ul className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -115,7 +127,18 @@ function PricingPage() {
             >
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold">{plan.name}</h2>
-                {plan.highlight ? (
+                {plan.badge ? (
+                  <span
+                    className={cn(
+                      "rounded-full px-3 py-1 text-[13px] font-medium whitespace-nowrap",
+                      plan.badge === "Coming soon"
+                        ? "bg-tk-warn-soft text-tk-warn"
+                        : "bg-tk-brand-soft text-tk-brand",
+                    )}
+                  >
+                    {plan.badge}
+                  </span>
+                ) : plan.highlight ? (
                   <span className="rounded-full bg-tk-brand-soft px-3 py-1 text-[13px] font-medium text-tk-brand">
                     Most people
                   </span>
@@ -159,7 +182,9 @@ function PricingPage() {
             <ArrowRight aria-hidden className="size-6" />
           </Link>
           <p className="mt-5 max-w-[52ch] text-tk-muted text-pretty">
-            Online payment is not switched on yet. You can create your account today.
+            {PAYMENTS_LIVE
+              ? "Pay by GCash, Maya or card through Xendit."
+              : "Online payment (Xendit) is coming soon. Create your account and start today."}
           </p>
         </div>
       </section>

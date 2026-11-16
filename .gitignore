@@ -33,3 +33,6 @@ dist-ssr
 
 # Netlify
 .netlify/
+
+# Trigger.dev (local build output)
+.trigger

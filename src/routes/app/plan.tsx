@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Crown, Gift } from "lucide-react";
 import { useState } from "react";
 
-import { PRICING } from "@shared/uploads/rules.ts";
+import { PAYMENTS_LIVE, PRICING } from "@shared/uploads/rules.ts";
 import { useAppUser } from "@/components/app/app-user";
 import {
   Card,
@@ -21,7 +21,7 @@ import { checkoutPremiumMonth, checkoutUnpaidRun } from "@/lib/services/payments
 import { longDay } from "@/lib/time";
 
 export const Route = createFileRoute("/app/plan")({
-  // `paid` is set when PayMongo sends the browser back after a payment.
+  // `paid` is set when the payment page sends the browser back after a payment.
   validateSearch: (search: Record<string, unknown>): { paid?: string } =>
     typeof search["paid"] === "string" ? { paid: search["paid"] } : {},
   component: PlanPage,
@@ -83,7 +83,11 @@ function PlanPage() {
     <div className="flex flex-col gap-8">
       <PageHeader
         title="Plan and payments"
-        subtitle="Pay per run, or take Premium for a busy month. No subscription renews by itself."
+        subtitle={
+          PAYMENTS_LIVE
+            ? "Pay per run, or take Premium for a busy month. No subscription renews by itself."
+            : "Standard runs are free during launch. Paid extras and Premium are coming soon."
+        }
       />
       <SampleDataNotice source={query.data.source} what="an example plan" />
       {paid ? (
@@ -93,27 +97,41 @@ function PlanPage() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="flex flex-col gap-3">
-          <p className="flex items-center gap-2 font-semibold">
-            <Gift aria-hidden className="size-5 text-tk-brand" /> Free trial
-          </p>
-          {plan.trialUsed ? (
-            <p className="text-tk-muted">
-              Used. Your first {PRICING.trialPages} pages were read free.
+        {!PAYMENTS_LIVE ? (
+          <Card className="flex flex-col gap-3">
+            <p className="flex items-center gap-2 font-semibold">
+              <Gift aria-hidden className="size-5 text-tk-brand" /> Standard runs: free for now
             </p>
-          ) : (
             <p className="text-tk-muted">
-              Your first {PRICING.trialPages} pages are read free, with full results.
+              During launch, every run of up to {PRICING.runPages} pages is free, as many times as
+              you need. Pages over {PRICING.runPages} (₱{PRICING.extraPage} each) are coming soon.
             </p>
-          )}
-          <Tag tone={plan.trialUsed ? "neutral" : "brand"}>
-            {plan.trialUsed ? "Used" : "Available"}
-          </Tag>
-        </Card>
+            <Tag tone="brand">Free during launch</Tag>
+          </Card>
+        ) : (
+          <Card className="flex flex-col gap-3">
+            <p className="flex items-center gap-2 font-semibold">
+              <Gift aria-hidden className="size-5 text-tk-brand" /> Free trial
+            </p>
+            {plan.trialUsed ? (
+              <p className="text-tk-muted">
+                Used. Your first {PRICING.trialPages} pages were read free.
+              </p>
+            ) : (
+              <p className="text-tk-muted">
+                Your first {PRICING.trialPages} pages are read free, with full results.
+              </p>
+            )}
+            <Tag tone={plan.trialUsed ? "neutral" : "brand"}>
+              {plan.trialUsed ? "Used" : "Available"}
+            </Tag>
+          </Card>
+        )}
 
         <Card className="flex flex-col gap-3">
           <p className="flex items-center gap-2 font-semibold">
             <Crown aria-hidden className="size-5 text-tk-accent" /> Premium
+            {!PAYMENTS_LIVE ? <Tag tone="warn">Coming soon</Tag> : null}
           </p>
           <p className="text-tk-muted">
             {peso(PRICING.premiumMonthly)} for 30 days: up to{" "}
@@ -129,18 +147,20 @@ function PlanPage() {
           <button
             type="button"
             onClick={() => void buyPremium()}
-            disabled={state === "working"}
+            disabled={!PAYMENTS_LIVE || state === "working"}
             className={`${buttonPrimary} self-start`}
           >
-            {state === "working"
-              ? "Opening checkout…"
-              : premiumActive
-                ? `Add 30 days for ${peso(PRICING.premiumMonthly)}`
-                : `Get Premium for ${peso(PRICING.premiumMonthly)}`}
+            {!PAYMENTS_LIVE
+              ? "Coming soon"
+              : state === "working"
+                ? "Opening checkout…"
+                : premiumActive
+                  ? `Add 30 days for ${peso(PRICING.premiumMonthly)}`
+                  : `Get Premium for ${peso(PRICING.premiumMonthly)}`}
           </button>
           {state === "not_connected" ? (
             <NotConnectedNotice title="Payments are not connected yet">
-              Premium can be bought once Takatax adds its PayMongo keys.
+              Premium can be bought once Takatax connects payments.
             </NotConnectedNotice>
           ) : null}
           {state === "error" ? (
@@ -213,8 +233,10 @@ function PlanPage() {
           </div>
         )}
         <p className="text-[13px] text-tk-muted">
-          Payments go through PayMongo (GCash, Maya and cards). Takatax never sees your card
-          details. Payments to your bookkeeper are between you and them.
+          {PAYMENTS_LIVE
+            ? "Payments go through Xendit (GCash, Maya or card), which handles your card details; Takatax never sees them."
+            : "Online payment (Xendit: GCash, Maya or card) is coming soon."}{" "}
+          Payments to your bookkeeper are between you and them.
         </p>
       </section>
     </div>

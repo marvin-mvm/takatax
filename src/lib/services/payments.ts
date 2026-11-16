@@ -1,10 +1,11 @@
 /**
  * Paying for a run or a Premium month. The `create-checkout` edge function works out the price
  * on the server (free trial, Premium allowance, partner discount), creates the run, and, when
- * there is something to pay, opens a PayMongo checkout (GCash, Maya, cards). PayMongo then
- * tells the `paymongo-webhook` function that the payment went through.
+ * there is something to pay, opens a checkout with the payment provider (a merchant of record,
+ * still to be chosen). The provider then tells the `payments-webhook` function the payment
+ * went through.
  *
- * MISSING: the PayMongo keys (see docs/MISSING_PIECES.md). Without them, free runs (trial and
+ * MISSING: the payment provider (see docs/MISSING_PIECES.md). Without it, free runs (trial and
  * Premium) still work and paid ones answer `not_connected`.
  */
 

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_FILE_BYTES, batchMessage, checkFile, quoteRun } from "./rules.ts";
+import { MAX_FILE_BYTES, batchMessage, checkFile, quoteRun as quote } from "./rules.ts";
+
+type QuoteOptions = Parameters<typeof quote>[1];
+/** Prices with payments live (the full pricing). */
+const quoteRun = (pages: number, options: QuoteOptions = {}) =>
+  quote(pages, { paymentsLive: true, ...options });
+/** Prices at launch, while payments are not live yet. */
+const quoteAtLaunch = (pages: number, options: QuoteOptions = {}) =>
+  quote(pages, { ...options, paymentsLive: false });
 
 describe("checkFile", () => {
   it("accepts photos and PDFs up to 200 MB", () => {
@@ -94,5 +102,28 @@ describe("batchMessage", () => {
         quoteRun(3, { trialAvailable: true }),
       ),
     ).toEqual(["You uploaded 3 JPG with 3 total combined pages.", "Your free trial covers them."]);
+  });
+});
+
+describe("launch pricing (payments not live yet)", () => {
+  it("makes a Standard run of up to 250 pages free, for taxpayers and partners", () => {
+    expect(quoteAtLaunch(250)).toMatchObject({ plan: "free", total: 0, blocked: false });
+    expect(quoteAtLaunch(40, { partner: true })).toMatchObject({ total: 0, blocked: false });
+  });
+
+  it("blocks pages over 250 as coming soon, whatever else is set", () => {
+    expect(quoteAtLaunch(300)).toMatchObject({ extra: 50, total: 0, blocked: true });
+    expect(quoteAtLaunch(1_200, { premiumRemaining: 1_000 }).blocked).toBe(true);
+  });
+
+  it("asks people to remove the extra pages for now", () => {
+    const counts = { images: 100, allJpeg: true, pdfs: 5, pdfPages: 200 };
+    expect(batchMessage(counts, quoteAtLaunch(300))).toEqual([
+      "You uploaded 100 JPG and 5 PDF files with 300 total combined pages.",
+      "It exceeded the 250 limit for a Standard run. Extra pages (₱2 each) are coming soon, so for now please remove 50 pages to keep this run to 250.",
+    ]);
+    expect(
+      batchMessage({ ...counts, images: 10, pdfs: 2, pdfPages: 40 }, quoteAtLaunch(50)),
+    ).toEqual(["You uploaded 10 JPG and 2 PDF files with 50 total combined pages."]);
   });
 });

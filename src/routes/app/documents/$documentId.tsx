@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, ImageOff, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { formatIsoDate } from "@shared/domain/dates.ts";
 import { EXPENSE_CATEGORY_LABEL, RECORD_KIND_LABEL } from "@shared/domain/records.ts";
@@ -21,6 +21,7 @@ import {
 } from "@/components/app/ui";
 import { buttonOutline } from "@/components/site/styles";
 import { useClientWorkspace, useMyWorkspace } from "@/lib/data/queries";
+import { logAccessEvent } from "@/lib/data/repository";
 import { fileSize, peso } from "@/lib/money";
 import { startReading } from "@/lib/services/reader";
 import { getDocumentLink } from "@/lib/services/uploads";
@@ -47,6 +48,10 @@ function DocumentPage() {
   const client = useClientWorkspace(account ?? "");
   const query = account ? client : mine;
   const [rereadMessage, setRereadMessage] = useState<string | null>(null);
+  // A professional opening a client's document goes in the client's activity log.
+  useEffect(() => {
+    if (account) void logAccessEvent(account, "opened_document", documentId);
+  }, [account, documentId]);
 
   if (query.isPending) return <LoadingBlock />;
   if (query.isError)

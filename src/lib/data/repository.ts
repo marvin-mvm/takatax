@@ -21,14 +21,19 @@ import {
   SAMPLE_PARTNERS,
   SAMPLE_POSTS,
   sampleAccess,
+  sampleAccessEvents,
   sampleConversationWith,
   sampleConversations,
+  sampleInvitations,
   samplePartnerClients,
   sampleThread,
   sampleWorkspace,
 } from "./sample";
 import type {
+  AccessEvent,
+  AccessEventAction,
   AccessGrant,
+  AccessStatus,
   AccountRole,
   ChatMessageRecord,
   CommunityAnswer,
@@ -42,6 +47,7 @@ import type {
   DocumentStatus,
   Loaded,
   PartnerClientSummary,
+  PartnerInvitation,
   PartnerKind,
   PartnerProfile,
   PostVisibility,
@@ -163,6 +169,13 @@ function toRecord(row: Row): LedgerRecord {
   };
 }
 
+/**
+ * The account columns a browser may read: the COR details. The free trial and Premium dates are
+ * billing, which only the owner sees, through my_plan().
+ */
+const ACCOUNT_COLUMNS =
+  "id, owner_user_id, tin, registered_name, trade_name, rdo_code, registered_address, line_of_business, registration_date, vat_registered, withholding_agent, income_tax_option, business_type, mixed_income, cor_document_id, created_at, updated_at";
+
 async function loadWorkspaceRows(accountRow: Row): Promise<Workspace> {
   const accountId = text(accountRow["id"]);
   const ownerUserId = text(accountRow["owner_user_id"]);
@@ -207,7 +220,7 @@ export function loadMyWorkspace(userId: string): Promise<Loaded<Workspace>> {
   return liveOrSample(
     async () => {
       const account = rows<Row | null>(
-        await db.from("accounts").select("*").eq("owner_user_id", userId).maybeSingle(),
+        await db.from("accounts").select(ACCOUNT_COLUMNS).eq("owner_user_id", userId).maybeSingle(),
       );
       if (!account) {
         return {
@@ -229,12 +242,16 @@ export function loadMyWorkspace(userId: string): Promise<Loaded<Workspace>> {
   );
 }
 
-/** One client's workspace, for a partner with access. Row-level security enforces the access. */
+/**
+ * One client's workspace, for a partner whose invitation the client sent and they accepted.
+ * Row-level security enforces the access: receipts, sales, Forms 2307 and the COR, never the
+ * client's plan or payments.
+ */
 export function loadClientWorkspace(accountId: string): Promise<Loaded<Workspace>> {
   return liveOrSample(
     async () => {
       const account = rows<Row | null>(
-        await db.from("accounts").select("*").eq("id", accountId).maybeSingle(),
+        await db.from("accounts").select(ACCOUNT_COLUMNS).eq("id", accountId).maybeSingle(),
       );
       if (!account) throw Object.assign(new Error("Client not found"), { code: "not_found" });
       return loadWorkspaceRows(account);
@@ -254,9 +271,9 @@ export function loadPartnerClients(partnerUserId: string): Promise<Loaded<Partne
       const grants = rows<Row[]>(
         await db
           .from("partner_access")
-          .select("granted_at, accounts(*)")
+          .select(`granted_at, accounts(${ACCOUNT_COLUMNS})`)
           .eq("partner_user_id", partnerUserId)
-          .is("revoked_at", null),
+          .eq("status", "active"),
       );
       return Promise.all(
         grants.map(async (grant) => {
@@ -357,16 +374,26 @@ async function rpc<T = unknown>(name: string, args: Record<string, unknown>, wha
 }
 
 /**
- * Lets a verified partner work inside the signed-in taxpayer's account (or lets them back in).
- * Creates the taxpayer's account first if they have none.
+ * Invites a verified professional into the signed-in taxpayer's account. They see nothing until
+ * they accept. Creates the taxpayer's account first if they have none.
  */
-export async function grantPartnerAccess(partnerUserId: string): Promise<void> {
-  await rpc("grant_partner_access", { partner: partnerUserId }, "Bookkeeper access");
+export async function invitePartner(partnerUserId: string): Promise<void> {
+  await rpc("invite_partner", { partner: partnerUserId }, "Invitations");
 }
 
-/** Removes a partner's access to the signed-in taxpayer's account, at once. */
+/** Withdraws an invitation the professional has not answered yet. */
+export async function cancelPartnerInvite(partnerUserId: string): Promise<void> {
+  await rpc("cancel_partner_invite", { partner: partnerUserId }, "Invitations");
+}
+
+/** Removes a professional's access to the signed-in taxpayer's account, at once. */
 export async function revokePartnerAccess(partnerUserId: string): Promise<void> {
   await rpc("revoke_partner_access", { partner: partnerUserId }, "Bookkeeper access");
+}
+
+/** The signed-in professional accepts or declines a taxpayer's invitation. */
+export async function respondToInvite(accountId: string, accept: boolean): Promise<void> {
+  await rpc("respond_to_invite", { account: accountId, accept }, "Invitations");
 }
 
 /** A partner stops working on a client's account. */
@@ -374,7 +401,25 @@ export async function leaveClient(accountId: string): Promise<void> {
   await rpc("leave_client", { account: accountId }, "Client access");
 }
 
-/** Everyone who has, or had, access to the signed-in taxpayer's account, newest first. */
+/** A short, friendly reason when an invitation step is refused by the database. */
+export function invitationProblem(error: unknown): string {
+  if (error instanceof NotConnectedError) return `${error.message} Nothing was changed.`;
+  const code = (error as { code?: string } | null)?.code;
+  if (code === "P0002") return "That invitation was already answered or withdrawn.";
+  if (code === "23505") return "They already have access to your account.";
+  return "That did not work. Please try again.";
+}
+
+const ACCESS_STATUSES: AccessStatus[] = [
+  "pending",
+  "active",
+  "declined",
+  "cancelled",
+  "revoked",
+  "left",
+];
+
+/** Everyone the signed-in taxpayer invited, now or before, newest first. */
 export function listMyAccess(userId: string): Promise<Loaded<AccessGrant[]>> {
   return liveOrSample(
     async () => {
@@ -386,13 +431,14 @@ export function listMyAccess(userId: string): Promise<Loaded<AccessGrant[]>> {
         await db
           .from("partner_access")
           .select(
-            "granted_at, revoked_at, partner_user_id, partner_profiles(display_name, kind, city, rating_avg, rating_count)",
+            "status, invited_at, granted_at, ended_at, partner_user_id, partner_profiles(display_name, kind, city, rating_avg, rating_count)",
           )
           .eq("account_id", text(account["id"]))
-          .order("granted_at", { ascending: false }),
+          .order("invited_at", { ascending: false }),
       );
       return grants.map((grant): AccessGrant => {
         const partner = (grant["partner_profiles"] ?? {}) as Row;
+        const status = text(grant["status"]) as AccessStatus;
         return {
           partnerId: text(grant["partner_user_id"]),
           partnerName: text(partner["display_name"]) || "A professional",
@@ -400,13 +446,92 @@ export function listMyAccess(userId: string): Promise<Loaded<AccessGrant[]>> {
           city: text(partner["city"]),
           rating: typeof partner["rating_avg"] === "number" ? partner["rating_avg"] : 0,
           reviewCount: typeof partner["rating_count"] === "number" ? partner["rating_count"] : 0,
-          grantedAt: text(grant["granted_at"]),
-          revokedAt: text(grant["revoked_at"]) || null,
+          status: ACCESS_STATUSES.includes(status) ? status : "revoked",
+          invitedAt: text(grant["invited_at"]),
+          grantedAt: text(grant["granted_at"]) || null,
+          endedAt: text(grant["ended_at"]) || null,
         };
       });
     },
     () => sampleAccess(todayInManila()),
   );
+}
+
+/** Invitations waiting for the signed-in professional's answer, newest first. */
+export function listMyInvitations(): Promise<Loaded<PartnerInvitation[]>> {
+  return liveOrSample(
+    async () =>
+      rows<Row[]>(await db.rpc("my_invitations")).map((row) => ({
+        accountId: text(row["account_id"]),
+        taxpayerUserId: text(row["taxpayer_user_id"]),
+        taxpayerName: text(row["taxpayer_name"]),
+        businessName: text(row["business_name"]),
+        invitedAt: text(row["invited_at"]),
+      })),
+    () => sampleInvitations(todayInManila()),
+  );
+}
+
+/**
+ * The signed-in taxpayer's activity log: invitations, and what professionals opened and changed
+ * in their account, newest first. Only the owner can read it.
+ */
+export function listAccessEvents(userId: string): Promise<Loaded<AccessEvent[]>> {
+  return liveOrSample(
+    async () =>
+      rows<Row[]>(
+        await db
+          .from("access_events")
+          .select("id, action, partner_user_id, actor_user_id, target_id, details, created_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
+      ).map((row): AccessEvent => {
+        const details =
+          row["details"] && typeof row["details"] === "object"
+            ? (row["details"] as Record<string, unknown>)
+            : {};
+        return {
+          id: text(row["id"]),
+          action: text(row["action"]) as AccessEventAction,
+          partnerId: text(row["partner_user_id"]) || null,
+          partnerName: text(details["partnerName"]),
+          byOwner: text(row["actor_user_id"]) === userId,
+          targetId: text(row["target_id"]) || null,
+          details,
+          createdAt: text(row["created_at"]),
+        };
+      }),
+    () => sampleAccessEvents(todayInManila()),
+  );
+}
+
+const recentLogs = new Map<string, number>();
+
+/**
+ * Adds "a professional opened this" to the client's activity log. The database ignores the
+ * owner's own visits and repeats within ten minutes. Never throws: the log must not stop anyone
+ * from working.
+ */
+export async function logAccessEvent(
+  accountId: string,
+  activity: "opened_account" | "opened_document",
+  targetId?: string,
+): Promise<void> {
+  if (!accountId || accountId.startsWith("sample-")) return;
+  // One call per visit, even when a screen mounts twice (the database also merges repeats).
+  const key = `${accountId}:${activity}:${targetId ?? ""}`;
+  const last = recentLogs.get(key) ?? 0;
+  if (Date.now() - last < 60_000) return;
+  recentLogs.set(key, Date.now());
+  try {
+    await db.rpc("log_access_event", {
+      account: accountId,
+      activity,
+      target: targetId ?? null,
+    });
+  } catch {
+    // Best effort.
+  }
 }
 
 /** A review from a client the partner has worked with (checked by row-level security). */
@@ -865,13 +990,9 @@ export async function confirmCor(documentId: string, details: CorDetails): Promi
 export function loadPlan(userId: string): Promise<Loaded<PlanStatus>> {
   return liveOrSample(
     async () => {
-      const account = rows<Row | null>(
-        await db
-          .from("accounts")
-          .select("id, trial_used, premium_started_at, premium_until")
-          .eq("owner_user_id", userId)
-          .maybeSingle(),
-      );
+      // Billing columns are not readable from the table; my_plan() returns the owner's only.
+      const plan = rows<Row[]>(await db.rpc("my_plan"))[0];
+      const account: Row | null = plan ? { ...plan, id: plan["account_id"] } : null;
       // Pages Premium still covers this month (the same window create-checkout uses).
       let premiumPagesLeft: number | null = null;
       const until = text(account?.["premium_until"]);

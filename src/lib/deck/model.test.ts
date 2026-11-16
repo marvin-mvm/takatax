@@ -5,10 +5,12 @@ import {
   MICRO_ENTERPRISES,
   aiCostPerPage,
   JOBS_COST_PER_RUN,
+  PAYMENT_PRESETS,
   TRIGGER,
   compareLimits,
   customersAtMonth,
   jobsCostPerPage,
+  paymentFee,
   premiumMonth,
   runEconomics,
   runModel,
@@ -19,6 +21,13 @@ const withInputs = (changes: Partial<ModelInputs>): ModelInputs => ({
   ...DEFAULT_INPUTS,
   ...changes,
 });
+
+/** A 2.5% fee and nothing fixed, for hand-checkable figures. */
+const GATEWAY = { paymentFeePct: 2.5, paymentFeeFixedUsd: 0 };
+const MOR = {
+  paymentFeePct: PAYMENT_PRESETS.mor.pct,
+  paymentFeeFixedUsd: PAYMENT_PRESETS.mor.fixedUsd,
+};
 
 describe("aiCostPerPage", () => {
   it("matches the feasibility study for the three-step reader", () => {
@@ -186,7 +195,9 @@ describe("runModel", () => {
 
 describe("premiumMonth", () => {
   it("prices a fully used 1,000-page month on the three-step reader", () => {
-    const month = premiumMonth(withInputs({ premiumPageLimit: 1_000, premiumUsagePct: 100 }));
+    const month = premiumMonth(
+      withInputs({ ...GATEWAY, premiumPageLimit: 1_000, premiumUsagePct: 100 }),
+    );
     expect(month.pages).toBe(1_000);
     expect(month.extraRevenue).toBe(0);
     expect(month.aiCost).toBeCloseTo(319, 6);
@@ -243,7 +254,7 @@ describe("Trigger.dev jobs", () => {
 
 describe("runEconomics", () => {
   it("adds ₱2 for each page over 250", () => {
-    const run = runEconomics(withInputs({ pagesPerRun: 300 }));
+    const run = runEconomics(withInputs({ ...GATEWAY, pagesPerRun: 300 }));
     expect(run.basePrice).toBe(199);
     expect(run.extraRevenue).toBe(100);
     expect(run.paymentFee).toBeCloseTo(0.025 * 299, 9);
@@ -276,5 +287,31 @@ describe("compareLimits", () => {
     expect(large?.planNetProfit).toBeLessThan(small?.planNetProfit ?? 0);
     expect(large?.planNetProfitFullUse).toBeLessThan(large?.planNetProfit ?? 0);
     expect(large?.planNetProfit).toBeCloseTo(runModel(DEFAULT_INPUTS).totals.netProfit, 4);
+  });
+});
+
+describe("payment fees", () => {
+  it("uses Xendit's GCash rate by default", () => {
+    expect(paymentFee(DEFAULT_INPUTS, 199)).toBeCloseTo(0.023 * 199, 9);
+  });
+
+  it("charges a merchant of record its share plus $0.40 a payment", () => {
+    const mor = { paymentFeePct: 5.5, paymentFeeFixedUsd: 0.4 };
+    expect(paymentFee(mor, 199)).toBeCloseTo(0.055 * 199 + 0.4 * 63, 9);
+    expect(paymentFee(mor, 0)).toBe(0);
+  });
+
+  it("leaves less of a ₱199 run with a merchant of record than with a local gateway", () => {
+    const mor = runEconomics(withInputs({ ...MOR, pagesPerRun: 250 }));
+    const gateway = runEconomics(withInputs({ ...GATEWAY, pagesPerRun: 250 }));
+    expect(mor.paymentFee).toBeGreaterThan(30);
+    expect(gateway.paymentFee).toBeCloseTo(4.975, 9);
+    expect(mor.kept).toBeLessThan(gateway.kept);
+  });
+
+  it("costs the plan more with a fixed fee per payment", () => {
+    const withFixed = runModel(withInputs(MOR)).totals.netProfit;
+    const noFixed = runModel(withInputs({ ...MOR, paymentFeeFixedUsd: 0 })).totals.netProfit;
+    expect(withFixed).toBeLessThan(noFixed);
   });
 });
