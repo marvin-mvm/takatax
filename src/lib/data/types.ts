@@ -6,7 +6,7 @@ import type { FilingEstimate } from "@shared/domain/tax-estimates.ts";
 import type { TaxProfile, TaxTypeId } from "@shared/domain/tax-profile.ts";
 import type { CorTaxType } from "@shared/parser/registration.ts";
 import type { CheckFlag } from "@shared/parser/checks.ts";
-import type { DocumentKind } from "@shared/parser/schema.ts";
+import type { DocumentKind, ExtractedDocument } from "@shared/parser/schema.ts";
 
 /** Who a signed-in user is. Partners see clients; taxpayers see their own books. */
 export type AccountRole = "taxpayer" | "bookkeeper" | "cpa" | "tax_lawyer";
@@ -63,6 +63,11 @@ export interface StoredDocument {
   previewUrl: string | null;
   /** True when the file was deleted and only its records were kept (Premium). */
   fileDeleted: boolean;
+  /**
+   * What was read from the file, one entry per document found in it: the AI's reading, or the
+   * person's corrections once it was checked. Empty for a COR and until the file is read.
+   */
+  readings: ExtractedDocument[];
 }
 
 export interface TaxpayerAccount {
@@ -221,7 +226,8 @@ export type AccessEventAction =
   | "started_reading"
   | "edited_record"
   | "confirmed_cor"
-  | "deleted_document";
+  | "deleted_document"
+  | "checked_document";
 
 /** One entry in the taxpayer's activity log. Entries can never be changed. */
 export interface AccessEvent {

@@ -43,6 +43,28 @@ describe("describeAccessEvent", () => {
     expect(ACTION_GROUP.deleted_document).toBe("changed");
   });
 
+  it("says what a professional checked, and what that put in the tracker", () => {
+    const checked = describeAccessEvent(
+      event("checked_document", "2026-11-17T03:00:00Z", {
+        fileName: "photo.jpg",
+        documentKind: "expense_receipt",
+        records: 1,
+      }),
+    );
+    expect(checked.title).toBe("Liza Mendoza checked photo.jpg");
+    expect(checked.lines).toEqual(["Receipt or purchase invoice, 1 record saved to your tracker"]);
+    expect(ACTION_GROUP.checked_document).toBe("changed");
+
+    const notCounted = describeAccessEvent(
+      event("checked_document", "2026-11-17T03:05:00Z", {
+        fileName: "selfie.jpg",
+        documentKind: "unknown",
+        records: 0,
+      }),
+    );
+    expect(notCounted.lines).toEqual(["marked as not a tax document, so nothing is counted"]);
+  });
+
   it("tells a kept-records deletion apart from deleting the file only", () => {
     const fileOnly = describeAccessEvent(
       event("deleted_document", "2026-11-17T01:00:00Z", {
