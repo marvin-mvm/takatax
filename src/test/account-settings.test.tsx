@@ -48,8 +48,9 @@ const usage: AccountUsage = {
   accountId: "11111111-1111-4111-8111-111111111111",
   tier: "standard",
   premiumUntil: null,
-  pagesUsed: 75,
-  pagesReadInAll: 90,
+  standard: { added: 80, used: 75 },
+  trialAvailable: false,
+  premiumPagesUsed: 0,
   storageBytes: 240_000_000,
   files: 61,
 };

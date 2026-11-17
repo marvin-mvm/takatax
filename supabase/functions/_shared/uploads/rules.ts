@@ -26,9 +26,10 @@ export const ACCEPT_ATTRIBUTE = [...ACCEPTED_TYPES, ".heic", ".heif"].join(",");
 /**
  * The payments switch.
  *
- * false (launch, today): Standard runs of up to 80 pages are free for everyone, taxpayers and
- * partners. Pages over 80 (₱3.50 each) and Premium (₱649 a month) show "coming soon" and cannot
- * be bought, on the screens and on the server.
+ * false (launch, today): every account's first Standard run, 80 pages, is free. The pages are
+ * counted across uploads (a photo is one page, a PDF every page) until the 80 are used. More
+ * pages (₱3.50 each) and Premium (₱649 a month) show "coming soon" and cannot be bought, on the
+ * screens and on the server.
  *
  * true: the full pricing below applies (trial, ₱149 runs, partner price, extra pages, Premium),
  * paid through Xendit (supabase/functions/_lib/payments.ts). Set it once Xendit is connected,
@@ -97,12 +98,43 @@ export function checkFile(file: { name: string; type: string; size: number }): F
 
 export type RunPlan = "free" | "trial" | "premium" | "standard" | "partner";
 
+/**
+ * An account's Standard pages so far. A run adds pages (80 for each run, 10 for the free trial,
+ * each extra page bought) and every page sent for reading uses one, across uploads: pages a run
+ * did not use stay for the next upload. Premium's pages are counted by the month instead.
+ */
+export interface StandardPages {
+  /** Pages the account's runs have added. */
+  added: number;
+  /** Pages already sent for reading against them. */
+  used: number;
+}
+
+/**
+ * How many Standard pages an account has and has left.
+ * - Launch: the first run is free and adds 80 pages, so an account that has none yet has 80.
+ * - Payments live: what its runs added, plus the free trial's 10 pages while they are unused.
+ */
+export function pagesLeft(
+  standard: StandardPages | undefined,
+  options: { trialAvailable?: boolean; paymentsLive?: boolean } = {},
+): { limit: number; used: number; left: number } {
+  const added = Math.max(Math.floor(standard?.added ?? 0), 0);
+  const used = Math.max(Math.floor(standard?.used ?? 0), 0);
+  const limit = !(options.paymentsLive ?? PAYMENTS_LIVE)
+    ? added > 0
+      ? added
+      : PRICING.runPages
+    : added + (options.trialAvailable ? PRICING.trialPages : 0);
+  return { limit, used, left: Math.max(limit - used, 0) };
+}
+
 export interface RunQuote {
   pages: number;
   plan: RunPlan;
-  /** Pages the plan covers before the price per extra page applies (a run's, Premium's left). */
+  /** Pages this run can read before the price per extra page applies. */
   limit: number;
-  /** Pages covered by the trial, the run price or Premium. */
+  /** Pages covered by the pages left, the trial, the run price or Premium. */
   included: number;
   /** Pages over the limit. */
   extra: number;
@@ -115,15 +147,24 @@ export interface RunQuote {
   summary: string;
   /** True when the run needs something that is not on sale yet (extra pages at launch). */
   blocked: boolean;
+  /** Standard pages this run adds to the account: a run's 80, the trial's 10, extra pages. */
+  pagesAdded: number;
+  /** True when this run takes the account's free trial. */
+  usesTrial: boolean;
+  /** The pages the run is counted against: the account's Standard pages, or Premium's month. */
+  allowance: number;
+  /** Pages left on the account once this run is read. */
+  leftAfter: number;
 }
 
 /**
- * The price of reading `pages` pages in one run:
- * - free trial: the first 10 pages of an account, once;
- * - Premium: the pages left in the month are included, then ₱2.65 a page;
- * - Standard (and partner, 25% off the ₱149): 80 pages, then ₱3.50 a page.
- * While payments are not live (PAYMENTS_LIVE), a Standard run of up to 80 pages is free and
- * anything over 80 pages is blocked as "coming soon".
+ * The price of reading `pages` pages, counted against the account's pages:
+ * - Launch (PAYMENTS_LIVE false): the first Standard run of 80 pages is free. Pages are used
+ *   across uploads; when they run out, more pages are "coming soon" and the run is blocked.
+ * - Premium: the pages left in the month are included, then ₱2.65 a page.
+ * - Standard (and partner, 25% off the ₱149): pages left from earlier runs are used first, then
+ *   the free trial's 10 pages (once, not for partners); when more are needed, a new run of 80
+ *   pages for ₱149, then ₱3.50 a page. Pages a run does not use stay on the account.
  */
 export function quoteRun(
   pages: number,
@@ -132,15 +173,21 @@ export function quoteRun(
     trialAvailable?: boolean;
     premiumRemaining?: number;
     paymentsLive?: boolean;
+    /** The account's Standard pages so far. Left out, the account is taken as new. */
+    standard?: StandardPages;
   } = {},
 ): RunQuote {
   const count = Math.max(Math.floor(pages), 0);
+  const added = Math.max(Math.floor(options.standard?.added ?? 0), 0);
+  const used = Math.max(Math.floor(options.standard?.used ?? 0), 0);
+
   if (!(options.paymentsLive ?? PAYMENTS_LIVE)) {
-    const extra = Math.max(count - PRICING.runPages, 0);
+    const { limit, left } = pagesLeft({ added, used }, { paymentsLive: false });
+    const extra = Math.max(count - left, 0);
     return {
       pages: count,
       plan: "free",
-      limit: PRICING.runPages,
+      limit: left,
       included: count - extra,
       extra,
       extraRate: PRICING.extraPage,
@@ -149,26 +196,19 @@ export function quoteRun(
       total: 0,
       summary:
         extra > 0
-          ? `Free up to ${PRICING.runPages} pages; extra pages coming soon`
+          ? left > 0
+            ? `${left.toLocaleString("en-PH")} free pages left; extra pages coming soon`
+            : `Your ${limit.toLocaleString("en-PH")} free pages are used; extra pages coming soon`
           : "Free during launch",
       blocked: extra > 0,
+      // The free run of 80 pages is given with the account's first run.
+      pagesAdded: added > 0 || count === 0 || extra > 0 ? 0 : PRICING.runPages,
+      usesTrial: false,
+      allowance: limit,
+      leftAfter: Math.max(left - count, 0),
     };
   }
-  if (options.trialAvailable && count > 0 && count <= PRICING.trialPages) {
-    return {
-      pages: count,
-      plan: "trial",
-      limit: PRICING.trialPages,
-      included: count,
-      extra: 0,
-      extraRate: PRICING.extraPage,
-      basePrice: 0,
-      extraPrice: 0,
-      total: 0,
-      summary: "Free trial",
-      blocked: false,
-    };
-  }
+
   if (options.premiumRemaining !== undefined) {
     const limit = Math.max(Math.floor(options.premiumRemaining), 0);
     const extra = Math.max(count - limit, 0);
@@ -188,17 +228,38 @@ export function quoteRun(
           ? `Premium + ${extra} × ${pesoText(PRICING.premiumExtraPage)}`
           : "Included in Premium",
       blocked: false,
+      pagesAdded: 0,
+      usesTrial: false,
+      allowance: PRICING.premiumPages,
+      leftAfter: Math.max(limit - count, 0),
     };
   }
+
+  // Standard: the pages left first, then the free trial, then a new run.
+  const left = Math.max(added - used, 0);
+  const trial = options.trialAvailable && !options.partner ? PRICING.trialPages : 0;
+  const usesTrial = trial > 0 && count > left;
+  const free = left + (usesTrial ? trial : 0);
+  const need = Math.max(count - free, 0);
+  const buys = need > 0;
   const discount = options.partner ? 1 - PRICING.partnerDiscount : 1;
-  const basePrice = count === 0 ? 0 : Math.round(PRICING.runPrice * discount);
-  const extra = Math.max(count - PRICING.runPages, 0);
+  const basePrice = buys ? Math.round(PRICING.runPrice * discount) : 0;
+  const extra = buys ? Math.max(need - PRICING.runPages, 0) : 0;
   const extraPrice = toCentavo(extra * PRICING.extraPage);
+  const pagesAdded = (usesTrial ? trial : 0) + (buys ? PRICING.runPages + extra : 0);
   return {
     pages: count,
-    plan: options.partner ? "partner" : "standard",
-    limit: PRICING.runPages,
-    included: Math.min(count, PRICING.runPages),
+    plan: buys
+      ? options.partner
+        ? "partner"
+        : "standard"
+      : usesTrial
+        ? "trial"
+        : options.partner
+          ? "partner"
+          : "standard",
+    limit: buys ? free + PRICING.runPages : free,
+    included: count - extra,
     extra,
     extraRate: PRICING.extraPage,
     basePrice,
@@ -207,10 +268,18 @@ export function quoteRun(
     summary:
       count === 0
         ? "No pages yet"
-        : extra > 0
-          ? `₱${basePrice} + ${extra} × ${pesoText(PRICING.extraPage)}`
-          : `₱${basePrice} for up to ${PRICING.runPages} pages`,
+        : !buys
+          ? usesTrial
+            ? "Free trial"
+            : "Covered by your pages left"
+          : extra > 0
+            ? `₱${basePrice} + ${extra} × ${pesoText(PRICING.extraPage)}`
+            : `₱${basePrice} for up to ${PRICING.runPages} pages`,
     blocked: false,
+    pagesAdded,
+    usesTrial,
+    allowance: added + pagesAdded,
+    leftAfter: Math.max(added + pagesAdded - used - count, 0),
   };
 }
 
@@ -230,7 +299,8 @@ const plural = (count: number, one: string, many = `${one}s`) =>
 
 /**
  * The message shown before reading starts, for example "You uploaded 10 JPG and 2 PDF files
- * with 50 total combined pages." and, over the limit, which limit and what the extra pages cost.
+ * with 50 total combined pages." and, when the pages left do not cover them, what is missing
+ * and what it costs.
  */
 export function batchMessage(counts: BatchCounts, quote: RunQuote): string[] {
   const parts: string[] = [];
@@ -246,10 +316,13 @@ export function batchMessage(counts: BatchCounts, quote: RunQuote): string[] {
   const lines = [
     `You uploaded ${parts.join(" and ")} with ${plural(total, "total combined page", "total combined pages")}.`,
   ];
+  const soon = `Extra pages (${pesoText(quote.extraRate)} each) are coming soon`;
   if (quote.plan === "free") {
     if (quote.extra > 0) {
       lines.push(
-        `It exceeded the ${quote.limit.toLocaleString("en-PH")} limit for a Standard run. Extra pages (${pesoText(quote.extraRate)} each) are coming soon, so for now please remove ${plural(quote.extra, "page")} to keep this run to ${quote.limit.toLocaleString("en-PH")}.`,
+        quote.limit > 0
+          ? `You have ${plural(quote.limit, "page")} left of your ${quote.allowance.toLocaleString("en-PH")} free pages. ${soon}, so for now please remove ${plural(quote.extra, "page")}.`
+          : `You have used your ${quote.allowance.toLocaleString("en-PH")} free pages. ${soon}.`,
       );
     }
   } else if (quote.plan === "trial") {
@@ -258,10 +331,14 @@ export function batchMessage(counts: BatchCounts, quote: RunQuote): string[] {
     const where =
       quote.plan === "premium"
         ? `the ${quote.limit.toLocaleString("en-PH")} pages left in your Premium month`
-        : `the ${quote.limit.toLocaleString("en-PH")} limit for a Standard run`;
+        : quote.limit === PRICING.runPages
+          ? `the ${quote.limit.toLocaleString("en-PH")} limit for a Standard run`
+          : `the ${quote.limit.toLocaleString("en-PH")} pages your pages left and a new run cover`;
     lines.push(
       `It exceeded ${where}, so ${pesoText(quote.extraRate)} will be applied for each of the ${plural(quote.extra, "extra page")} (${pesoText(quote.extraPrice)}).`,
     );
+  } else if (quote.total === 0 && quote.pages > 0 && quote.plan !== "premium") {
+    lines.push("Your pages left cover them.");
   }
   return lines;
 }

@@ -43,6 +43,7 @@ export const ACTION_GROUP: Record<AccessEventAction, "access" | "viewed" | "chan
   confirmed_cor: "changed",
   deleted_document: "changed",
   checked_document: "changed",
+  tagged_documents: "changed",
 };
 
 const FIELD_LABEL: Record<string, string> = {
@@ -183,6 +184,21 @@ export function describeAccessEvent(event: AccessEvent): { title: string; lines:
       return {
         title: `${who} deleted ${fileLabel(d)}`,
         lines: [[kind, outcome].filter(Boolean).join(", ")].filter(Boolean),
+      };
+    }
+    case "tagged_documents": {
+      const files = count(d["documents"]);
+      const list = (value: unknown) =>
+        Array.isArray(value)
+          ? value.filter((tag) => typeof tag === "string" && tag).join(", ")
+          : "";
+      const added = list(d["added"]);
+      const removed = list(d["removed"]);
+      return {
+        title: `${who} changed the tags of ${plural(files, "file")}`,
+        lines: [added ? `Added: ${added}` : "", removed ? `Removed: ${removed}` : ""].filter(
+          Boolean,
+        ),
       };
     }
     case "checked_document": {

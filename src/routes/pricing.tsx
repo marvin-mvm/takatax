@@ -51,7 +51,8 @@ const PLANS: Plan[] = [
     unit: "per run",
     summary: "Pay only when you have documents to read.",
     features: [
-      `Up to ${PRICE.runPages} pages in a run (${PAGE_RULE})`,
+      `${PRICE.runPages} pages in a run (${PAGE_RULE})`,
+      "Pages you do not use stay for your next upload",
       "Every return computed from them is free",
       `${PRICE.extraPage} for each page over ${PRICE.runPages}`,
       "No subscription needed",
@@ -114,8 +115,8 @@ function PricingPage() {
           </p>
           {!PAYMENTS_LIVE ? (
             <p className="mt-6 rounded-[14px] border border-tk-brand/30 bg-tk-brand-soft px-4 py-3 font-medium text-tk-brand text-pretty">
-              For now, every Standard run of up to {PRICE.runPages} pages is free, for taxpayers and
-              bookkeepers. Extra pages and Premium are coming soon.
+              For now, every account's first {PRICE.runPages} pages are read free, for taxpayers and
+              for the clients of bookkeepers. More pages and Premium are coming soon.
             </p>
           ) : null}
         </div>

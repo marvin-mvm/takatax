@@ -3,10 +3,11 @@
  * The Documents tab and the account settings page show both as "used / limit". Every limit
  * comes from PRICING, so a change there shows on the screens too.
  *
- * - Standard: a run reads up to 80 pages, and every upload starts a new run, so the pages
- *   counted are the latest run's. Storage: 300 MB.
+ * - Standard: the pages of its runs, counted across uploads (`pagesLeft` in rules.ts): 80 for
+ *   each run, used one for every page sent for reading. Storage: 300 MB.
  * - Premium: 300 pages in the Premium month (the window create-checkout prices by). Storage:
  *   15 GB.
+ * Storage is what the files still stored take; an upload that does not fit is refused.
  */
 
 import { PRICING } from "./rules.ts";
@@ -45,6 +46,20 @@ export function pageLimit(tier: Tier): number {
 /** The storage that comes with a tier, in bytes. */
 export function storageLimit(tier: Tier): number {
   return tier === "premium" ? PRICING.premiumStorageGb * GB : PRICING.freeStorageMb * MB;
+}
+
+/**
+ * Whether `addingBytes` more fit in the tier's storage. The upload screen shows this before
+ * anything is sent, and `create-upload-urls` refuses the upload when it does not fit.
+ */
+export function storageRoom(
+  tier: Tier,
+  usedBytes: number,
+  addingBytes: number,
+): { ok: boolean; limit: number; free: number } {
+  const limit = storageLimit(tier);
+  const free = Math.max(limit - Math.max(usedBytes, 0), 0);
+  return { ok: Math.max(addingBytes, 0) <= free, limit, free };
 }
 
 export interface Meter {

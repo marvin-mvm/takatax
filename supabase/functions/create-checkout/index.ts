@@ -4,15 +4,19 @@
 //   -> { runId, free, checkoutUrl, total, summary }
 //
 // Works out the price on the server with the same rules the upload screen shows (quoteRun),
-// counted in pages (a photo is one page, a PDF every page): the free trial (first 10 pages,
-// once), Premium's pages left this month (then ₱2.65 a page), ₱149 for up to 80 pages (then
-// ₱3.50 a page), and the 25% partner price when a bookkeeper, CPA or tax lawyer runs a client's
-// pages. The figures live in PRICING (_shared/uploads/rules.ts).
+// counted in pages (a photo is one page, a PDF every page) against the account's pages:
+// Premium's pages left this month (then ₱2.65 a page), or the account's Standard pages, which
+// last across uploads: the pages left from earlier runs first, then the free trial's 10 pages
+// (once), then a new run of 80 pages for ₱149 (then ₱3.50 a page), with the 25% partner price
+// when a bookkeeper, CPA or tax lawyer runs a client's pages. The figures live in PRICING
+// (_shared/uploads/rules.ts); the account's pages come from account_usage() in the database.
+// The run is opened by open_run(), which checks that the account's pages did not change since
+// the price was worked out, so two uploads at once cannot both use the same pages left.
 // Free runs are marked paid at once. Paid ones get a Xendit checkout (_lib/payments.ts);
 // payments-webhook marks them paid.
 //
-// LAUNCH ("coming soon"): while PAYMENTS_LIVE is false, Standard runs of up to 80 pages are
-// free for everyone and marked paid at once; Premium and runs over 80 pages answer
+// LAUNCH ("coming soon"): while PAYMENTS_LIVE is false, every account's first 80 pages are
+// free and its runs are marked paid at once; Premium, and pages beyond the 80, answer
 // 409 { code: "coming_soon" }.
 //
 // With payments live, answers 503 { code: "not_configured" } for paid checkouts until Xendit's
@@ -34,7 +38,7 @@ serve(async (request) => {
   if (!body.accountId || (body.purpose !== "run" && body.purpose !== "premium_month")) {
     throw new HttpError(400, "bad_request", "Send a purpose and an account");
   }
-  const { userId } = await authorize(request, body.accountId);
+  const { userId, client } = await authorize(request, body.accountId);
   const admin = adminClient();
   // Where the payment provider sends the browser back: the site that called us.
   const origin = request.headers.get("origin") ?? Deno.env.get("SITE_URL") ?? "";
@@ -113,91 +117,104 @@ serve(async (request) => {
     summary = "Standard run";
   } else {
     const ids = Array.isArray(body.documentIds) ? body.documentIds : [];
-    const { data: documents, error } = await admin
-      .from("documents")
-      .select("id, page_count")
-      .eq("account_id", account.id)
-      .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"])
-      .eq("status", "waiting_for_reader")
-      .is("run_id", null);
-    if (error) throw error;
-    if (!documents?.length) {
-      throw new HttpError(400, "nothing_to_read", "These documents are not waiting to be read");
-    }
-
-    const pages = documents.reduce((sum, d) => sum + (d.page_count ?? 1), 0);
-
-    // Premium covers pages read inside the current 30-day window, up to the allowance.
-    let premiumRemaining: number | undefined;
-    const now = Date.now();
-    if (!partner && account.premium_until && Date.parse(account.premium_until) > now) {
-      const windowStart = new Date(
-        Math.max(
-          Date.parse(account.premium_started_at ?? account.premium_until) || 0,
-          now - 30 * DAY,
-        ),
-      ).toISOString();
-      const { data: used } = await admin
-        .from("runs")
-        .select("page_count")
+    let opened: string | null = null;
+    let quoted = { total: 0, summary: "" };
+    // Priced, then opened in one step that checks nothing changed meanwhile; if another upload
+    // got in first, the price is worked out again from the pages now left.
+    for (let attempt = 0; attempt < 3 && !opened; attempt++) {
+      const { data: documents, error } = await admin
+        .from("documents")
+        .select("id, page_count")
         .eq("account_id", account.id)
-        .eq("kind", "premium_month")
-        .gte("created_at", windowStart);
-      const usedPages = (used ?? []).reduce((sum, r) => sum + r.page_count, 0);
-      premiumRemaining = Math.max(PRICING.premiumPages - usedPages, 0);
-    }
+        .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"])
+        .eq("status", "waiting_for_reader")
+        .is("run_id", null);
+      if (error) throw error;
+      if (!documents?.length) {
+        throw new HttpError(400, "nothing_to_read", "These documents are not waiting to be read");
+      }
+      const pages = documents.reduce((sum, d) => sum + (d.page_count ?? 1), 0);
 
-    const quote = quoteRun(pages, {
-      partner,
-      trialAvailable: !partner && !account.trial_used,
-      ...(premiumRemaining !== undefined ? { premiumRemaining } : {}),
-    });
-    if (quote.blocked) {
+      // The account's Standard pages so far: what its runs added and what was read against them.
+      const { data: usageRows, error: usageError } = await client.rpc("account_usage", {
+        account: account.id,
+      });
+      if (usageError) throw usageError;
+      const usage = (usageRows ?? [])[0] as { pages_added: number; pages_used: number } | undefined;
+      if (!usage) throw new HttpError(403, "forbidden", "You do not have access to this account");
+      const standard = { added: usage.pages_added, used: usage.pages_used };
+
+      // Premium covers pages read inside the current 30-day window, up to the allowance.
+      let premiumRemaining: number | undefined;
+      const now = Date.now();
+      if (!partner && account.premium_until && Date.parse(account.premium_until) > now) {
+        const windowStart = new Date(
+          Math.max(
+            Date.parse(account.premium_started_at ?? account.premium_until) || 0,
+            now - 30 * DAY,
+          ),
+        ).toISOString();
+        const { data: used } = await admin
+          .from("runs")
+          .select("page_count")
+          .eq("account_id", account.id)
+          .eq("kind", "premium_month")
+          .gte("created_at", windowStart);
+        const usedPages = (used ?? []).reduce((sum, r) => sum + r.page_count, 0);
+        premiumRemaining = Math.max(PRICING.premiumPages - usedPages, 0);
+      }
+
+      const quote = quoteRun(pages, {
+        partner,
+        trialAvailable: !partner && !account.trial_used,
+        standard,
+        ...(premiumRemaining !== undefined ? { premiumRemaining } : {}),
+      });
+      if (quote.blocked) {
+        throw new HttpError(
+          409,
+          "coming_soon",
+          quote.limit > 0
+            ? `This account has ${quote.limit} of its ${quote.allowance} free pages left and these documents have ${pages}. Extra pages are coming soon; remove ${quote.extra} pages for now`
+            : `This account has used its ${quote.allowance} free pages. Extra pages are coming soon`,
+        );
+      }
+      // Check the keys before creating anything, so a missing key leaves no unpaid run behind.
+      if (quote.total > 0) assertPaymentsConfigured();
+
+      const kind = {
+        free: partner ? "partner" : "regular",
+        trial: "trial",
+        premium: "premium_month",
+        partner: "partner",
+        standard: "regular",
+      }[quote.plan];
+      const { data: run, error: runError } = await admin.rpc("open_run", {
+        account: account.id,
+        actor: userId,
+        document_ids: documents.map((d) => d.id),
+        run_kind: kind,
+        pages,
+        price: Math.round(quote.total * 100),
+        added: quote.pagesAdded,
+        expected_added: standard.added,
+        expected_used: standard.used,
+        uses_trial: quote.usesTrial,
+      });
+      if (runError) throw runError;
+      opened = typeof run === "string" ? run : null;
+      quoted = { total: quote.total, summary: quote.summary };
+    }
+    if (!opened) {
       throw new HttpError(
         409,
-        "coming_soon",
-        `Runs over ${PRICING.runPages} pages are coming soon; remove ${quote.extra} pages for now`,
+        "try_again",
+        "The account's documents changed while this was being priced. Please try again",
       );
     }
-    total = quote.total;
-    summary = quote.summary;
-    // Check the keys before creating anything, so a missing key leaves no unpaid run behind.
-    if (total > 0) assertPaymentsConfigured();
-
-    const kind = {
-      free: partner ? "partner" : "regular",
-      trial: "trial",
-      premium: "premium_month",
-      partner: "partner",
-      standard: "regular",
-    }[quote.plan];
-    const { data: run, error: runError } = await admin
-      .from("runs")
-      .insert({
-        account_id: account.id,
-        kind,
-        document_count: documents.length,
-        page_count: pages,
-        price_centavos: Math.round(total * 100),
-        status: total === 0 ? "paid" : "awaiting_payment",
-        paid_at: total === 0 ? new Date().toISOString() : null,
-        created_by: userId,
-      })
-      .select("id")
-      .single();
-    if (runError) throw runError;
-    runId = run.id;
-    const { error: linkError } = await admin
-      .from("documents")
-      .update({ run_id: runId })
-      .in(
-        "id",
-        documents.map((d) => d.id),
-      );
-    if (linkError) throw linkError;
-    if (kind === "trial") {
-      await admin.from("accounts").update({ trial_used: true }).eq("id", account.id);
-    }
+    runId = opened;
+    total = quoted.total;
+    summary = quoted.summary;
     if (total === 0) return json({ runId, free: true, checkoutUrl: null, total: 0, summary });
   }
 

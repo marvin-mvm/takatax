@@ -148,9 +148,11 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
   Premium. Their own runs stay Standard with the partner discount. Premium is not on sale yet
   (`PAYMENTS_LIVE = false`), but its features are built behind that switch.
 - Pricing by pages (a photo is 1 page, a PDF every page). Every figure is in `PRICING` in
-  `supabase/functions/_shared/uploads/rules.ts`: a Standard run is ₱149 for up to 80 pages, then
+  `supabase/functions/_shared/uploads/rules.ts`: a Standard run is ₱149 for 80 pages, then
   ₱3.50 a page; Premium is ₱649 a month for 300 pages and 15 GB of storage, then ₱2.65 a page;
-  bookkeepers, CPAs and tax lawyers pay 25% less for a client's run (₱112). The site, the app
+  bookkeepers, CPAs and tax lawyers pay 25% less for a client's run (₱112). Pages are counted
+  on the account, across uploads: what a run did not use stays for the next upload, and the
+  database (`account_usage()`, `open_run()`) keeps the count so a limit cannot be passed. The site, the app
   and the deck take their figures from `PRICING` (through `src/lib/pricing-copy.ts`), so a price
   changes in one place.
 - Checking a document by hand. A document the reader was not sure of ("Please check") opens on
@@ -163,16 +165,24 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
   `supabase/functions/_shared/parser/review.ts`, `src/components/app/ReadingReview.tsx`,
   `review_document()` in migration 6.
 - Usage and account settings. The Documents tab shows two meters, "AI doc parsing" and "Doc
-  storage", as used / limit ("75 / 80 pages", "240 MB / 300 MB"). Standard counts the latest
-  run's pages out of 80, because every upload starts a new run; Premium counts the pages of its
-  month out of 300. Storage is what the stored files take, out of 300 MB or 15 GB. "Hi [first
-  name]" in the header (in place of Log out) opens `/app/settings`: the user's details and Log
-  out, the current tier, the same meters, Premium and the transaction history. The Plan tab is
-  gone; `/app/plan` redirects to the settings page. On a phone the green header scrolls away with
+  storage", as used / limit ("11 / 80 pages", "240 MB / 300 MB"). Standard shows the pages used
+  out of the pages the account has, counted across every upload (a photo is 1 page, a PDF every
+  page); Premium the pages of its month out of 300. Storage is what the stored files take, out
+  of 300 MB or 15 GB, and an upload that does not fit is refused. "Hi [first name]" in the
+  header opens `/app/settings`: the user's details and Log out, the current tier, the same
+  meters, Premium and the transaction history. On a phone the green header scrolls away with
   the page. Code: `supabase/functions/_shared/uploads/usage.ts`, `src/lib/account/`,
   `src/components/app/UsageMeters.tsx`, `src/routes/app/settings.tsx`.
-- Launch mode: `PAYMENTS_LIVE = false` in the same file. Standard runs up to 80 pages are free;
-  extra pages and Premium show "coming soon". Payments provider: Xendit, built but switched off.
+- Uploading in two steps. "Proceed" on a file saves that file only: it is stored and waits to
+  be read, with its own "Read" button. "Proceed All" saves every file picked and reads
+  everything saved and not read yet. Code: `src/components/app/UploadPanel.tsx`.
+- Search and tags on the Documents tab. The search box finds a document by its file name, by the
+  names and numbers read from it, and by its tags. Files are ticked and tagged ("Exp Q1 2026")
+  from a bar above the table, and the list can be narrowed to one tag. Code:
+  `src/lib/documents/tags.ts`, `src/components/app/DocumentTable.tsx`, `tag_documents()`.
+- Launch mode: `PAYMENTS_LIVE = false` in the same file. An account's first 80 pages are read
+  free; when they are used, reading stops: more pages and Premium show "coming soon". To give
+  an account more pages by hand, raise `pages_added` on one of its runs. Payments provider: Xendit, built but switched off.
 
 ---
 
@@ -236,7 +246,9 @@ after each merge. Netlify serves `main`. Every row below was checked against the
 | Migration 4 `20261116150000_cor_tax_types.sql`        | Applied: the column, its grant, `confirm_cor` and `log_account_change` match the migration                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Migration 5 `20261117090000_document_delete.sql`      | Applied on 2026-11-16, after its rolled-back dry run: `documents.file_deleted_at`, the `deleted_document` log entry, `delete_document()` and `account_tier()`                                                                                                                                                                                                                                                                                                                                                                                            |
 | Migration 6 `20261117150000_document_review.sql`      | Applied on 2026-11-16, after its rolled-back dry run: `review_document()` (signed-in users may call it, visitors may not) and the `checked_document` log entry. Existing rows untouched                                                                                                                                                                                                                                                                                                                                                                  |
-| Edge functions                                        | All nine are deployed and match the code file by file (checked on 2026-11-16 after `read-step` was deployed from `v0.002` at `90d12f8`, the commit that sends a file with nothing found in it to review; `main` has the same files once that PR is merged): `create-upload-urls`, `confirm-upload`, `document-link`, `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`                                                                                                                           |
+| Migration 7 `20261117190000_pages_storage_tags.sql`   | Applied on 2026-11-17 (Manila), after its rolled-back dry run: `runs.pages_added` (the first run of each account was given its 80 pages), `account_usage()`, `open_run()`, `documents.tags`, `tag_documents()` and the `tagged_documents` log entry. Existing rows untouched                                                                                                                                                                                                                                                                             |
+| Edge functions                                        | All nine are deployed and match the code file by file (checked on 2026-11-17, Manila, after `create-checkout`, `create-upload-urls`, `read-step` and `payments-webhook` were deployed from `v0.002` at `6bc74f6`; `main` has the same files once that PR is merged): `create-upload-urls`, `confirm-upload`, `document-link`, `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout`, `payments-webhook`                                                                                                                  |
+| End-to-end check                                      | On 2026-11-17 (Manila) a throwaway account ran the whole path on the live project, 27 checks: sign-up, upload of a 3-page PDF, a photo and an 80-page PDF, storage and page counts, the storage and page limits refused, reading (three receipts read into the ledger), a photo with no document sent to "Please check", checking by hand, tags and deleting. The account and its files were removed afterwards. The script is not in the repo; it can be written again from this list                                                                   |
 | Database                                              | 16 tables, all with row-level security; 26 policies. A visitor without a login sees none of the rows in `profiles`, `documents`, `ledger_records` and `runs`, and is refused on `accounts`                                                                                                                                                                                                                                                                                                                                                               |
 | Trigger.dev deploys                                   | **Blocked by Trigger.dev**: "Deployments are not available for this organization", after the sign-in and the upload work (all 16 runs of the workflow up to 2026-11-16). Their support said on 2026-11-16 that deployments for the organization are blocked by their risk-based automated account restrictions, tightened after a security incident, and that they will tell the owner when deployments are available. Nothing to change in the repository (`docs/MISSING_PIECES.md`, section 3). Trusted publishing is set up and the workflow is ready |
 | `READER` secret                                       | `supabase`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -268,7 +280,8 @@ Applying a migration (only with the owner's go-ahead): first a dry run that send
 `begin;` + the migration + `supabase/tests/20_behaviour_api.sql` + `30_invitations.sql` +
 `40_cor_tax_types.sql` + `50_document_delete.sql` + `60_document_review.sql` + `rollback;` and
 must run without an error (each file ends with a "PASSED" line); then the migration alone. Give
-each check file its own test emails: the dry run loads them all in one transaction. The test files only look at their own test users, so they are safe on the live project.
+each check file its own test emails: the dry run loads them all in one transaction. The newest
+check file is `70_pages_storage_tags.sql`; add it to the list. The test files only look at their own test users, so they are safe on the live project.
 Deploy functions with
 `supabase functions deploy <name> --project-ref thiznrxojzrxkjwqhtjt --use-api`
 (`payments-webhook` and `read-step` keep `verify_jwt = false`, from `supabase/config.toml`).
@@ -285,21 +298,20 @@ tax calendar on 2026-11-16), and each repeating return a COR names is put on the
 form numbers on old CORs are swapped for today's forms, and retired ones such as 0605 never
 show. Documents can be deleted, and a professional's features follow the client's tier.
 
-1. **Two decisions for the owner about the usage meters** (asked on 2026-11-16, not answered
-   yet). Nothing is broken while they wait.
-   - Should the pages of a Standard run carry over? Today every upload is its own run of up to 80
-     pages, so the meter shows the latest run and the pages it did not use are not kept. If the
-     owner wants ₱149 to buy 80 pages that last across uploads ("75 of 80 used, 5 left"), that is
-     a change to the pricing rules in `create-checkout` and `quoteRun`, not to the meter alone.
-   - Should uploads be refused when storage is full? The meter shows the limit (300 MB, or 15 GB
-     on Premium) but `create-upload-urls` does not check it. On Standard, deleting a file to
-     make room also deletes its records, and more storage cannot be bought yet.
+1. **Decided by the owner on 2026-11-17: pages are counted across uploads, and storage is
+   enforced.** Both are built (see section 2). One thing follows from it and is worth the
+   owner's eye before real users arrive: at launch an account gets 80 free pages in all, and
+   reading stops there until payments are on (the owner's own account had used 13 by then). If
+   that is too tight for launch, the rule is `pagesLeft()` in
+   `supabase/functions/_shared/uploads/rules.ts`; a single account can be topped up by raising
+   `pages_added` on one of its runs. With payments live, a new run of 80 pages is sold when the
+   pages left do not cover an upload; pages not used carry over. The owner has not yet said
+   whether that is the intended paid rule, so confirm it before setting `PAYMENTS_LIVE`.
 
    The records assistant is done: the owner confirmed on 2026-11-16 that the chat on the Tracker
    answers (Gemini Flash-Lite, `google/gemini-3.5-flash-lite`; the fix for the month's last day
    is in `supabase/functions/_shared/assistant/period.ts`). It sees the period's figures only,
-   which is enough for now. Migration 5 is applied, and deleting and the US dollar conversion
-   work on the live site.
+   which is enough for now.
 
 2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff

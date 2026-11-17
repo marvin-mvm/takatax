@@ -7,6 +7,7 @@ import type { TaxProfile, TaxTypeId } from "@shared/domain/tax-profile.ts";
 import type { CorTaxType } from "@shared/parser/registration.ts";
 import type { CheckFlag } from "@shared/parser/checks.ts";
 import type { DocumentKind, ExtractedDocument } from "@shared/parser/schema.ts";
+import type { StandardPages } from "@shared/uploads/rules.ts";
 
 /** Who a signed-in user is. Partners see clients; taxpayers see their own books. */
 export type AccountRole = "taxpayer" | "bookkeeper" | "cpa" | "tax_lawyer";
@@ -63,6 +64,13 @@ export interface StoredDocument {
   previewUrl: string | null;
   /** True when the file was deleted and only its records were kept (Premium). */
   fileDeleted: boolean;
+  /**
+   * True once the document was sent for reading (it is in a run, and its pages are counted).
+   * A file that is saved but was never sent for reading is false.
+   */
+  inRun: boolean;
+  /** Short labels the person put on the file to find it again, for example "Exp Q1 2026". */
+  tags: string[];
   /**
    * What was read from the file, one entry per document found in it: the AI's reading, or the
    * person's corrections once it was checked. Empty for a COR and until the file is read.
@@ -227,7 +235,8 @@ export type AccessEventAction =
   | "edited_record"
   | "confirmed_cor"
   | "deleted_document"
-  | "checked_document";
+  | "checked_document"
+  | "tagged_documents";
 
 /** One entry in the taxpayer's activity log. Entries can never be changed. */
 export interface AccessEvent {
@@ -301,18 +310,25 @@ export interface PlanStatus {
 }
 
 /**
- * What the account has used of its tier: pages read by the AI and file storage. The limits are
- * in `@shared/uploads/usage.ts`.
+ * What an account has used of its tier: pages read by the AI and file storage. The counting is
+ * done in the database (`account_usage()`); the limits are in `@shared/uploads/rules.ts` and
+ * `@shared/uploads/usage.ts`.
  */
 export interface AccountUsage {
   /** Empty until the account exists (first upload). */
   accountId: string;
   tier: "standard" | "premium";
+  /** The owner's Premium end date. Null on Standard, and always for a client's account. */
   premiumUntil: string | null;
-  /** Standard: pages in the latest run. Premium: pages read in the current Premium month. */
-  pagesUsed: number;
-  /** Pages read since the account opened, the pages of deleted files included. */
-  pagesReadInAll: number;
+  /**
+   * Standard pages, counted across uploads: what the account's runs added (80 for each run) and
+   * what was sent for reading against them (a photo is 1, a PDF every page).
+   */
+  standard: StandardPages;
+  /** True while the free trial's pages are unused (only matters once payments are live). */
+  trialAvailable: boolean;
+  /** Premium: pages read in the current Premium month. */
+  premiumPagesUsed: number;
   /** Bytes of the files in storage. A deleted file no longer counts. */
   storageBytes: number;
   /** Files in storage. */

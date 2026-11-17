@@ -289,11 +289,11 @@ const FAQ: { q: string; a: ReactNode }[] = [
       <>
         {PAYMENTS_LIVE
           ? `Your first ${PRICE.trialPages} pages are free. `
-          : `During launch, every run of up to ${PRICE.runPages} pages is free; extra pages and Premium are coming soon. After launch: `}
-        {PRICE.run} reads up to {PRICE.runPages} pages ({PAGE_RULE}), then {PRICE.extraPage} a page,
-        and every return computed from them is free. Premium is {PRICE.premium} a month for{" "}
-        {PRICE.premiumPages} pages and {PRICE.premiumStorage} of storage, then{" "}
-        {PRICE.premiumExtraPage} a page.{" "}
+          : `During launch, your first ${PRICE.runPages} pages are read free; more pages and Premium are coming soon. After launch: `}
+        {PRICE.run} buys a run of {PRICE.runPages} pages ({PAGE_RULE}) that you can use across
+        uploads, then {PRICE.extraPage} a page, and every return computed from them is free. Premium
+        is {PRICE.premium} a month for {PRICE.premiumPages} pages and {PRICE.premiumStorage} of
+        storage, then {PRICE.premiumExtraPage} a page.{" "}
         <Link to="/pricing" className={textLink}>
           See pricing
         </Link>
@@ -328,7 +328,7 @@ function LandingPage() {
           your tax returns, line by line. Verified bookkeepers and a community help you file.{" "}
           {PAYMENTS_LIVE
             ? `${PRICE.run} per run; a subscription is optional.`
-            : `Free during launch: up to ${PRICE.runPages} pages a run.`}
+            : `Free during launch: your first ${PRICE.runPages} pages.`}
         </p>
         <div className="mt-10">
           <StartButton />
@@ -545,7 +545,7 @@ function LandingPage() {
         intro={
           PAYMENTS_LIVE
             ? undefined
-            : `During launch, every Standard run of up to ${PRICE.runPages} pages is free. Extra pages and Premium are coming soon.`
+            : `During launch, your first ${PRICE.runPages} pages are read free. More pages and Premium are coming soon.`
         }
         className="bg-tk-surface/70"
       >
@@ -601,7 +601,7 @@ function LandingPage() {
         <h2 className="text-[30px]/[36px] font-bold tracking-tight text-balance sm:text-[38px]/[44px]">
           {PAYMENTS_LIVE
             ? `Start with your first ${PRICE.trialPages} pages, free.`
-            : `Start free: up to ${PRICE.runPages} pages a run during launch.`}
+            : `Start free: your first ${PRICE.runPages} pages during launch.`}
         </h2>
         <p className="mt-3 text-lg text-tk-muted">No card needed. Takes a few minutes.</p>
         <div className="mt-8">

@@ -19,7 +19,7 @@ committed, so never put a secret there).
       `supabase/tests/run.sh` against a local Postgres.
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
-      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000 20261117090000 20261117150000`.
+      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000 20261117090000 20261117150000 20261117190000`.
 - [x] **COR tax types** (`20261116150000_cor_tax_types.sql`): keeps the tax types and forms
       printed on the COR (0619-E, 1601-EQ, 2551Q…) on the account. Applied on 2026-11-16 after its
       rolled-back dry run with `supabase/tests/40_cor_tax_types.sql`; it is in the repair line
@@ -32,16 +32,21 @@ committed, so never put a secret there).
       `review_document()`, which saves the "Check what was read" form, and the
       `checked_document` entry of the activity log. Applied on 2026-11-16 after its rolled-back
       dry run with every check file; it is in the repair line above.
+- [x] **Pages, storage and tags** (`20261117190000_pages_storage_tags.sql`): counts pages on
+      the account across uploads (`runs.pages_added`, `account_usage()`, `open_run()`), gives
+      the upload function the storage in use, and adds tags (`documents.tags`,
+      `tag_documents()`). Applied on 2026-11-17 (Manila) after its rolled-back dry run with every
+      check file; it is in the repair line above.
 - A dry run sends, as one query, `begin;` + the migration + `20_behaviour_api.sql`,
-  `30_invitations.sql`, `40_cor_tax_types.sql`, `50_document_delete.sql` and
-  `60_document_review.sql` + `rollback;`. The check files look only at their own test users,
+  `30_invitations.sql`, `40_cor_tax_types.sql`, `50_document_delete.sql`,
+  `60_document_review.sql` and `70_pages_storage_tags.sql` + `rollback;`. The check files look only at their own test users,
   so they are safe on a project with real users.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
       `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and
       `payments-webhook` are deployed (`payments-webhook` and `read-step` skip the login check;
       `read-step` accepts only the service role key). Each answers "not configured" until its
-      keys are set. All nine matched the code file by file on 2026-11-16 (`read-step` was last
-      deployed that day from `v0.002` at `90d12f8`). Redeploy after changes
+      keys are set. All nine matched the code file by file on 2026-11-17, Manila (the last
+      deploy was from `v0.002` at `6bc74f6`). Redeploy after changes
       with `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
 
 ## 1. Cloudflare R2 (file storage)
@@ -155,9 +160,9 @@ the `tr_dev_…` key).
 Payments are switched off for launch with one constant, `PAYMENTS_LIVE = false` in
 `supabase/functions/_shared/uploads/rules.ts`. While it is off:
 
-- every **Standard run of up to 80 pages is free**, for taxpayers and partners, as often as
-  they like;
-- **pages over 80 (₱3.50 each)** and **Premium (₱649 a month)** show "coming soon" and cannot be
+- every account's **first 80 pages are read free**, counted across all its uploads, whoever
+  uploads them (the owner or a professional with access);
+- **more pages (₱3.50 each)** and **Premium (₱649 a month)** show "coming soon" and cannot be
   bought, on the screens and on the server (`create-checkout` answers `coming_soon`).
 
 The price list is `PRICING` in the same file: a Standard run is ₱149 for up to 80 pages, then
@@ -165,14 +170,15 @@ The price list is `PRICING` in the same file: a Standard run is ₱149 for up to
 partners pay 25% less for a client's run. The site, the app and the deck read their figures from
 it, so change a price there and redeploy the site and the edge functions.
 
-Two things the screens show that the server does not enforce yet, for the owner to decide
-before payments go live (`docs/HANDOVER.md`, section 5):
+Pages and storage are enforced on the server: `create-checkout` counts every page against the
+account's pages (80 free at launch, then "coming soon") and `create-upload-urls` refuses an
+upload that does not fit in the tier's storage. Still to do before payments go live:
 
-- **Storage.** The usage meter shows 300 MB (Standard) or 15 GB (Premium), from `PRICING`, but
-  `create-upload-urls` does not refuse an upload that goes over it, and the storage add-on
-  (₱250 for 5 GB a month) has no checkout.
-- **A Standard run's unused pages.** Every upload is its own run, so pages left over from a run
-  of up to 80 are not kept for the next upload.
+- **Confirm the paid rule for pages.** As built: the pages left are used first, then the free
+  trial's 10, then a new run of 80 pages for ₱149 (₱3.50 for each page it does not cover), and
+  pages not used carry over to the next upload.
+- **More storage.** The storage add-on (₱250 for 5 GB a month) has no checkout, so a full
+  Standard account can only delete files or wait for Premium.
 
 To switch payments on (Xendit: GCash, Maya, cards):
 

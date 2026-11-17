@@ -246,6 +246,8 @@ function buildWorkspace(business: SampleBusiness, today: string): Workspace {
       flags,
       previewUrl: null,
       fileDeleted: false,
+      inRun: status !== "waiting_for_reader" && status !== "waiting_for_storage",
+      tags: [],
       readings: [],
     });
     return id;
@@ -386,16 +388,20 @@ export function sampleWorkspace(today: string, accountId = "sample-dela-cruz"): 
 export function sampleUsage(today: string): AccountUsage {
   const { documents } = sampleWorkspace(today);
   const read = documents.filter((d) => d.pagesRead > 0);
-  // The latest run: what was uploaded on the most recent day.
-  const latestDay = read[0]?.uploadedAt.slice(0, 10);
   return {
     accountId: "",
     tier: "standard",
     premiumUntil: null,
-    pagesUsed: read
-      .filter((d) => d.uploadedAt.slice(0, 10) === latestDay)
-      .reduce((sum, d) => sum + d.pageCount, 0),
-    pagesReadInAll: read.reduce((sum, d) => sum + d.pagesRead, 0),
+    // The example has read more than one run's pages: show it part-way through its 80.
+    standard: {
+      added: 80,
+      used: Math.min(
+        read.reduce((sum, d) => sum + d.pagesRead, 0),
+        61,
+      ),
+    },
+    trialAvailable: false,
+    premiumPagesUsed: 0,
     storageBytes: documents.reduce((sum, d) => sum + d.bytes, 0),
     files: documents.length,
   };

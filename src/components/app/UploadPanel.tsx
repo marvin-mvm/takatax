@@ -1,13 +1,18 @@
 /**
  * Upload and scan: pick or photograph documents, check each photo in the browser (blur,
- * darkness, glare), count every PDF's pages, and show what the run will cost before anything
- * is uploaded: "You uploaded 10 JPG and 2 PDF files with 50 total combined pages." Proceed then
- * uploads to Cloudflare R2, pays (or uses the free trial or Premium) and starts the reader.
+ * darkness, glare), count every PDF's pages, and show what reading them will use of the
+ * account's pages and storage before anything is sent.
  *
- * Steps after Proceed: ensure the account -> signed upload links -> PUT each file to R2 ->
- * confirm-upload -> create-checkout (free: read now; paid: the payment provider, then back here with ?run=)
- * -> read-documents, which starts the reader (Supabase or Trigger.dev, by the READER secret)
- * -> progress from the run's row.
+ * Saving a file and reading it are two steps, so a person chooses what to read:
+ * - "Proceed" on a file saves that file only. It goes to Cloudflare R2 and then waits to be
+ *   read, with its own "Read" button; nothing is read and no pages are used yet.
+ * - "Proceed All" saves every file picked and reads everything that is saved and not read yet,
+ *   in one run.
+ *
+ * Steps: ensure the account -> signed upload links (refused when the tier's storage is full)
+ * -> PUT each file to R2 -> confirm-upload. Reading: create-checkout (prices the pages against
+ * the account's pages; free: read now; paid: the payment provider, then back here with ?run=)
+ * -> read-documents, which starts the reader -> progress from the run's row.
  * Each step that needs a key says so plainly when it is missing. See docs/MISSING_PIECES.md.
  */
 
@@ -15,6 +20,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
+  BookOpenCheck,
   Camera,
   FileText,
   FolderOpen,
@@ -22,7 +28,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { DOCUMENT_KIND_LABEL, type DocumentKind } from "@shared/parser/schema.ts";
 import {
@@ -38,11 +44,13 @@ import {
   pesoText,
   quoteRun,
 } from "@shared/uploads/rules.ts";
+import { sizeText, storageRoom } from "@shared/uploads/usage.ts";
 import { buttonOutline, buttonPrimary } from "@/components/site/styles";
 import { supabase } from "@/integrations/supabase/client";
-import { usePlan } from "@/lib/data/queries";
+import { useClientWorkspace, useMyWorkspace, usePlan, useUsage } from "@/lib/data/queries";
 import { loadRunProgress } from "@/lib/data/repository";
-import { fileSize, peso } from "@/lib/money";
+import type { StoredDocument } from "@/lib/data/types";
+import { fileSize } from "@/lib/money";
 import { checkoutRun } from "@/lib/services/payments";
 import { startReading } from "@/lib/services/reader";
 import {
@@ -89,6 +97,10 @@ type Stage =
   | { step: "payments_not_connected"; uploaded: number }
   | { step: "reader_not_connected"; uploaded: number }
   | { step: "done"; read: number; needsReview: number; documents: RunDocumentProgress[] }
+  /** Files were saved without being read (a file's own Proceed). */
+  | { step: "saved"; files: number }
+  /** Documents whose reading had not finished were started again. */
+  | { step: "started" }
   | { step: "error"; message: string };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -107,6 +119,11 @@ export function UploadPanel({
 }) {
   const { user } = useAppUser();
   const plan = usePlan(user.id);
+  // The pages and the storage of the account the files go into: the user's, or a client's.
+  const usage = useUsage(user.id, clientAccountId);
+  const mine = useMyWorkspace(user.id);
+  const client = useClientWorkspace(clientAccountId ?? "");
+  const workspace = clientAccountId ? client : mine;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<DocumentKind>(initialKind);
@@ -115,9 +132,6 @@ export function UploadPanel({
   const [dragging, setDragging] = useState(false);
   const pickerRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
-  // The run summary's Proceed button. The small Proceed on each file card presses this one, so
-  // both follow the same rules and show the same progress.
-  const proceedRef = useRef<HTMLButtonElement>(null);
   const hintId = useId();
   const mounted = useRef(true);
   useEffect(() => {
@@ -201,37 +215,74 @@ export function UploadPanel({
       return current.filter((q) => q.id !== id);
     });
 
-  // ---- What the person is about to run: pages, limit and price ------------------------------
+  // ---- Saved files that were not read yet ---------------------------------------------------
+  const waiting = useMemo<StoredDocument[]>(
+    () =>
+      workspace.data?.source === "live"
+        ? workspace.data.data.documents.filter(
+            (d) => d.status === "waiting_for_reader" && !d.fileDeleted,
+          )
+        : [],
+    [workspace.data],
+  );
+  // Never sent for reading: reading them uses pages.
+  const unread = waiting.filter((d) => !d.inRun);
+  // Sent before, but the reading did not finish: read again in the run that counted them.
+  const unfinished = waiting.filter((d) => d.inRun);
+
+  // ---- What Proceed All is about to do: pages, storage and price ----------------------------
   const ready = queue.filter((q) => !q.problem);
   const counting = ready.some((q) => q.checking);
-  const images = ready.filter((q) => !q.isPdf);
-  const pdfs = ready.filter((q) => q.isPdf);
-  const pdfPages = pdfs.reduce((sum, q) => sum + (q.pages ?? 0), 0);
-  const totalPages = images.length + pdfPages;
-  const batchBytes = ready.reduce((sum, q) => sum + (q.prepared?.blob.size ?? q.file.size), 0);
+  const sizeOf = (q: QueuedFile) => q.prepared?.blob.size ?? q.file.size;
+  const localImages = ready.filter((q) => !q.isPdf);
+  const localPdfs = ready.filter((q) => q.isPdf);
+  const savedPdfs = unread.filter((d) => d.mimeType === "application/pdf");
+  const savedImages = unread.filter((d) => d.mimeType !== "application/pdf");
+  const pdfPages =
+    localPdfs.reduce((sum, q) => sum + (q.pages ?? 0), 0) +
+    savedPdfs.reduce((sum, d) => sum + d.pageCount, 0);
+  const images = localImages.length + savedImages.length;
+  const totalPages = images + pdfPages;
+  const batchBytes = ready.reduce((sum, q) => sum + sizeOf(q), 0);
   const tooBig = batchBytes > MAX_BATCH_BYTES;
-  const premiumLeft = clientAccountId ? null : (plan.data?.data.premiumPagesLeft ?? null);
-  // An estimate for the message; create-checkout works out the real price on the server.
-  const quote = quoteRun(totalPages, {
+
+  const account = usage.data?.data;
+  const quoteOptions = {
     partner: Boolean(clientAccountId),
     trialAvailable: !clientAccountId && plan.data?.data.trialUsed !== true,
-    ...(premiumLeft !== null ? { premiumRemaining: premiumLeft } : {}),
-  });
+    ...(account ? { standard: account.standard } : {}),
+    ...(!clientAccountId && typeof plan.data?.data.premiumPagesLeft === "number"
+      ? { premiumRemaining: plan.data.data.premiumPagesLeft }
+      : {}),
+  };
+  // An estimate for the message; create-checkout works out the real price on the server.
+  const quote = quoteRun(totalPages, quoteOptions);
+  // Storage: what the files picked would add to what the account already stores.
+  const room = storageRoom(account?.tier ?? "standard", account?.storageBytes ?? 0, batchBytes);
+  const fits = (item: QueuedFile) =>
+    storageRoom(account?.tier ?? "standard", account?.storageBytes ?? 0, sizeOf(item)).ok;
   const message =
-    ready.length && !counting
+    totalPages > 0 && !counting
       ? batchMessage(
           {
-            images: images.length,
-            allJpeg: images.every((q) => isJpeg(q.file)),
-            pdfs: pdfs.length,
+            images,
+            allJpeg:
+              localImages.every((q) => isJpeg(q.file)) &&
+              savedImages.every((d) => d.mimeType === "image/jpeg"),
+            pdfs: localPdfs.length + savedPdfs.length,
             pdfPages,
           },
           quote,
         )
       : [];
   const busy = stage.step === "working" || stage.step === "reading";
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["workspace"] });
+    void queryClient.invalidateQueries({ queryKey: ["plan"] });
+    void queryClient.invalidateQueries({ queryKey: ["usage"] });
+  };
 
-  // ---- Reading: start the Trigger.dev job, then follow its progress -------------------------
+  // ---- Reading: start the reader, then follow its progress -----------------------------------
   /** Starts reading a run, waiting a little for the payment confirmation if it is not in yet. */
   const readRun = async (runId: string, uploaded: number) => {
     for (let attempt = 0; attempt < 10; attempt++) {
@@ -259,6 +310,7 @@ export function UploadPanel({
       }
       await wait(3_000);
     }
+    refresh();
 
     // The reader (Supabase or Trigger.dev) writes its progress to the run. Follow it while this
     // screen is open; leaving is fine, reading carries on.
@@ -272,9 +324,7 @@ export function UploadPanel({
             needsReview: progress.needsReview,
             documents: progress.documents,
           });
-          void queryClient.invalidateQueries({ queryKey: ["workspace"] });
-          void queryClient.invalidateQueries({ queryKey: ["plan"] });
-          void queryClient.invalidateQueries({ queryKey: ["usage"] });
+          refresh();
           return;
         }
         setStage({
@@ -302,31 +352,35 @@ export function UploadPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on return
   }, [returningRunId]);
 
-  /** Proceed: upload, confirm, price on the server, pay if needed, then read. */
-  const proceed = async () => {
-    if (!ready.length || counting || tooBig || quote.blocked) return;
+  /**
+   * Saves files: signed links, each file to R2, then the check that they arrived. Returns the
+   * account and the documents now waiting to be read, or null when it could not be done (the
+   * reason is on the screen). Nothing is read here.
+   */
+  const send = async (
+    items: QueuedFile[],
+  ): Promise<{ accountId: string; arrived: string[] } | null> => {
     setStage({ step: "working", message: "Preparing the account…" });
-
     // A partner uploads into their client's account; a taxpayer into their own (created now if
     // this is their first upload).
-    let account = clientAccountId ?? "";
-    if (!account) {
-      const { data: accountId, error } = await supabase.rpc("ensure_my_account" as never);
-      account = typeof accountId === "string" ? accountId : "";
-      if (error || !account) {
+    let accountId = clientAccountId ?? "";
+    if (!accountId) {
+      const { data, error } = await supabase.rpc("ensure_my_account" as never);
+      accountId = typeof data === "string" ? data : "";
+      if (error || !accountId) {
         setStage({ step: "storage_not_connected" });
-        return;
+        return null;
       }
     }
 
     setStage({ step: "working", message: "Getting upload links…" });
     const slots = await requestUploadSlots(
-      account,
-      ready.map((q) => ({
+      accountId,
+      items.map((q) => ({
         clientId: q.id,
         fileName: q.file.name,
         mimeType: q.prepared?.mimeType ?? q.file.type,
-        bytes: q.prepared?.blob.size ?? q.file.size,
+        bytes: sizeOf(q),
         kind: q.kind,
         pages: q.pages ?? 1,
       })),
@@ -337,14 +391,14 @@ export function UploadPanel({
           ? { step: "storage_not_connected" }
           : { step: "error", message: slots.message },
       );
-      return;
+      return null;
     }
 
-    let uploaded = 0;
+    let sent = 0;
     for (const slot of slots.data.slots) {
-      const item = ready.find((q) => q.id === slot.clientId);
+      const item = items.find((q) => q.id === slot.clientId);
       if (!item) continue;
-      setStage({ step: "working", message: `Uploading ${uploaded + 1} of ${ready.length}…` });
+      setStage({ step: "working", message: `Uploading ${sent + 1} of ${items.length}…` });
       if (
         await putToStorage(
           slot,
@@ -352,13 +406,13 @@ export function UploadPanel({
           item.prepared?.mimeType ?? item.file.type,
         )
       )
-        uploaded++;
+        sent++;
     }
 
     setStage({ step: "working", message: "Checking the uploads…" });
     const confirmed = await confirmUploads(
-      account,
-      slots.data.slots.map((s) => s.documentId),
+      accountId,
+      slots.data.slots.map((slot) => slot.documentId),
     );
     if (!confirmed.ok || confirmed.data.arrived.length === 0) {
       setStage(
@@ -368,18 +422,34 @@ export function UploadPanel({
             ? { step: "storage_not_connected" }
             : { step: "error", message: confirmed.message },
       );
-      return;
+      return null;
     }
-    setQueue([]);
+    // The files that arrived leave the list of files to upload: they are saved now.
+    const arrived = new Set(confirmed.data.arrived);
+    const savedIds = new Set(
+      slots.data.slots.filter((slot) => arrived.has(slot.documentId)).map((slot) => slot.clientId),
+    );
+    setQueue((current) => {
+      current
+        .filter((q) => savedIds.has(q.id) && q.previewUrl)
+        .forEach((q) => URL.revokeObjectURL(q.previewUrl ?? ""));
+      return current.filter((q) => !savedIds.has(q.id));
+    });
+    refresh();
+    return { accountId, arrived: confirmed.data.arrived };
+  };
 
-    setStage({ step: "working", message: "Working out the price…" });
-    const checkout = await checkoutRun(account, confirmed.data.arrived);
+  /** Prices the documents against the account's pages, pays if needed, then reads them. */
+  const read = async (accountId: string, documentIds: string[], uploaded: number) => {
+    setStage({ step: "working", message: "Counting the pages…" });
+    const checkout = await checkoutRun(accountId, documentIds);
     if (!checkout.ok) {
       setStage(
         checkout.reason === "not_connected"
           ? { step: "payments_not_connected", uploaded }
-          : { step: "error", message: checkout.message },
+          : { step: "error", message: `${checkout.message}.`.replace(/\.\.$/, ".") },
       );
+      refresh();
       return;
     }
     if (checkout.data.checkoutUrl) {
@@ -390,13 +460,60 @@ export function UploadPanel({
     if (checkout.data.runId) await readRun(checkout.data.runId, uploaded);
   };
 
-  const cannotProceed = busy || counting || tooBig || quote.blocked || ready.length === 0;
-  /** The small Proceed on a file card: shows the run summary (below the list on a phone) and
-   * presses its Proceed button. */
-  const proceedFromCard = () => {
-    proceedRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    proceedRef.current?.click();
+  /** A file's own Proceed: saves that file only. It then waits to be read. */
+  const saveOne = async (item: QueuedFile) => {
+    if (busy || item.problem || item.checking || !fits(item)) return;
+    const sent = await send([item]);
+    if (sent) setStage({ step: "saved", files: sent.arrived.length });
   };
+
+  /** "Read" on a saved file: reads that file only. */
+  const readOne = async (doc: StoredDocument) => {
+    if (busy) return;
+    if (!doc.inRun) {
+      await read(doc.accountId, [doc.id], 0);
+      return;
+    }
+    // Its reading did not finish: the run that counted its pages reads it again.
+    setStage({ step: "working", message: "Starting the reader…" });
+    const started = await startReading({ accountId: doc.accountId, documentIds: [doc.id] });
+    refresh();
+    setStage(
+      started.ok
+        ? { step: "started" }
+        : started.reason === "not_connected"
+          ? { step: "reader_not_connected", uploaded: 0 }
+          : { step: "error", message: started.message },
+    );
+  };
+
+  const nothingToDo = ready.length === 0 && waiting.length === 0;
+  const cannotProceedAll = busy || counting || tooBig || quote.blocked || !room.ok || nothingToDo;
+
+  /** Proceed All: saves every file picked, then reads everything saved and not read yet. */
+  const proceedAll = async () => {
+    if (cannotProceedAll) return;
+    let accountId = clientAccountId ?? waiting[0]?.accountId ?? "";
+    let arrived: string[] = [];
+    if (ready.length) {
+      const sent = await send(ready);
+      if (!sent) return;
+      accountId = sent.accountId;
+      arrived = sent.arrived;
+    }
+    if (unfinished.length) {
+      // No new pages: these were counted when they were first sent for reading.
+      void startReading({ accountId, documentIds: unfinished.map((d) => d.id) }).then(refresh);
+    }
+    const documentIds = [...arrived, ...unread.map((d) => d.id)];
+    if (documentIds.length) await read(accountId, documentIds, arrived.length);
+    else setStage({ step: "started" });
+  };
+
+  const pagesNote =
+    quote.plan === "premium"
+      ? `${quote.leftAfter.toLocaleString("en-PH")} of ${quote.allowance.toLocaleString("en-PH")} pages left this Premium month`
+      : `${quote.leftAfter.toLocaleString("en-PH")} of ${quote.allowance.toLocaleString("en-PH")} pages left`;
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -489,104 +606,164 @@ export function UploadPanel({
         </div>
 
         {queue.length > 0 ? (
-          <ul className="flex flex-col gap-2" aria-label="Files to upload">
-            {queue.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-3 rounded-[14px] border border-tk-line bg-tk-surface p-3"
-              >
-                {item.previewUrl ? (
-                  <img
-                    src={item.previewUrl}
-                    alt=""
-                    className="size-14 shrink-0 rounded-[10px] object-cover"
-                  />
-                ) : (
-                  <span className="flex size-14 shrink-0 items-center justify-center rounded-[10px] bg-tk-surface-2 text-tk-muted">
-                    <FileText aria-hidden className="size-6" />
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{item.file.name}</p>
-                  <p className="text-sm text-tk-muted">
-                    {fileSize(item.file.size)}
-                    {item.isPdf && item.pages
-                      ? ` · ${item.pages} page${item.pages === 1 ? "" : "s"}`
-                      : ""}{" "}
-                    ·{" "}
-                    <select
-                      aria-label={`Type of ${item.file.name}`}
-                      value={item.kind}
-                      onChange={(event) =>
-                        setQueue((current) =>
-                          current.map((q) =>
-                            q.id === item.id
-                              ? { ...q, kind: event.target.value as DocumentKind }
-                              : q,
-                          ),
-                        )
-                      }
-                      className="max-w-full rounded-[6px] bg-transparent font-medium text-tk-ink"
-                    >
-                      {KIND_CHOICES.map((choice) => (
-                        <option key={choice.kind} value={choice.kind}>
-                          {DOCUMENT_KIND_LABEL[choice.kind]}
-                        </option>
-                      ))}
-                    </select>
-                  </p>
-                  {item.problem ? (
-                    <p className="mt-1 text-sm text-tk-danger">{FILE_PROBLEM_TEXT[item.problem]}</p>
-                  ) : item.checking ? (
-                    <p className="mt-1 flex items-center gap-1.5 text-sm text-tk-muted">
-                      <Loader2 aria-hidden className="size-4 animate-spin" />
-                      {item.isPdf ? "Counting pages…" : "Checking the photo…"}
-                    </p>
-                  ) : item.photoFlags.length ? (
-                    <p className="mt-1 flex items-center gap-1.5 text-sm text-tk-warn">
-                      <TriangleAlert aria-hidden className="size-4" />
-                      This photo {item.photoFlags.map((f) => PHOTO_FLAG_TEXT[f]).join(" and ")}.
-                      Retake it, or keep it and we will check it.
-                    </p>
+          <section aria-labelledby="to-upload-title" className="flex flex-col gap-2">
+            <h2 id="to-upload-title" className="font-semibold">
+              Files to upload
+            </h2>
+            <p className="text-sm text-tk-muted">
+              Proceed on a file saves that file only: it is stored and waits to be read. Proceed All
+              saves every file and reads them.
+            </p>
+            <ul className="flex flex-col gap-2">
+              {queue.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-center gap-3 rounded-[14px] border border-tk-line bg-tk-surface p-3"
+                >
+                  {item.previewUrl ? (
+                    <img
+                      src={item.previewUrl}
+                      alt=""
+                      className="size-14 shrink-0 rounded-[10px] object-cover"
+                    />
                   ) : (
-                    <p className="mt-1 text-sm text-tk-brand">Looks good</p>
+                    <span className="flex size-14 shrink-0 items-center justify-center rounded-[10px] bg-tk-surface-2 text-tk-muted">
+                      <FileText aria-hidden className="size-6" />
+                    </span>
                   )}
-                  {!item.problem && !item.checking ? (
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{item.file.name}</p>
+                    <p className="text-sm text-tk-muted">
+                      {fileSize(item.file.size)}
+                      {item.isPdf && item.pages
+                        ? ` · ${item.pages} page${item.pages === 1 ? "" : "s"}`
+                        : ""}{" "}
+                      ·{" "}
+                      <select
+                        aria-label={`Type of ${item.file.name}`}
+                        value={item.kind}
+                        onChange={(event) =>
+                          setQueue((current) =>
+                            current.map((q) =>
+                              q.id === item.id
+                                ? { ...q, kind: event.target.value as DocumentKind }
+                                : q,
+                            ),
+                          )
+                        }
+                        className="max-w-full rounded-[6px] bg-transparent font-medium text-tk-ink"
+                      >
+                        {KIND_CHOICES.map((choice) => (
+                          <option key={choice.kind} value={choice.kind}>
+                            {DOCUMENT_KIND_LABEL[choice.kind]}
+                          </option>
+                        ))}
+                      </select>
+                    </p>
+                    {item.problem ? (
+                      <p className="mt-1 text-sm text-tk-danger">
+                        {FILE_PROBLEM_TEXT[item.problem]}
+                      </p>
+                    ) : item.checking ? (
+                      <p className="mt-1 flex items-center gap-1.5 text-sm text-tk-muted">
+                        <Loader2 aria-hidden className="size-4 animate-spin" />
+                        {item.isPdf ? "Counting pages…" : "Checking the photo…"}
+                      </p>
+                    ) : !fits(item) ? (
+                      <p className="mt-1 text-sm text-tk-danger">
+                        This file does not fit in the storage that is free.
+                      </p>
+                    ) : item.photoFlags.length ? (
+                      <p className="mt-1 flex items-center gap-1.5 text-sm text-tk-warn">
+                        <TriangleAlert aria-hidden className="size-4" />
+                        This photo {item.photoFlags.map((f) => PHOTO_FLAG_TEXT[f]).join(" and ")}.
+                        Retake it, or keep it and we will check it.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm text-tk-brand">Looks good</p>
+                    )}
+                    {!item.problem && !item.checking ? (
+                      <button
+                        type="button"
+                        onClick={() => void saveOne(item)}
+                        disabled={busy || !fits(item)}
+                        title="Saves this file only. It is stored and waits to be read."
+                        aria-label={`Proceed with ${item.file.name} only: save it without reading it`}
+                        className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-[9px] bg-tk-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-tk-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <ArrowRight aria-hidden className="size-4" />
+                        Proceed
+                      </button>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => remove(item.id)}
+                    disabled={busy}
+                    aria-label={`Remove ${item.file.name}`}
+                    className="flex size-10 shrink-0 items-center justify-center rounded-[10px] text-tk-muted hover:bg-tk-danger-soft hover:text-tk-danger"
+                  >
+                    <Trash2 aria-hidden className="size-5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {waiting.length > 0 ? (
+          <section aria-labelledby="saved-title" className="flex flex-col gap-2">
+            <h2 id="saved-title" className="font-semibold">
+              Saved, waiting to be read
+            </h2>
+            <p className="text-sm text-tk-muted">
+              These files are stored. Read one by one, or press Proceed All to read them all.
+            </p>
+            <ul className="flex flex-col gap-2">
+              {waiting.map((doc) => {
+                const pagesShort = !doc.inRun && quoteRun(doc.pageCount, quoteOptions).blocked;
+                return (
+                  <li
+                    key={doc.id}
+                    className="flex items-center gap-3 rounded-[14px] border border-tk-line bg-tk-surface p-3"
+                  >
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-tk-surface-2 text-tk-muted">
+                      <FileText aria-hidden className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to="/app/documents/$documentId"
+                        params={{ documentId: doc.id }}
+                        search={clientAccountId ? { account: clientAccountId } : {}}
+                        className="block truncate font-medium hover:underline"
+                      >
+                        {doc.fileName}
+                      </Link>
+                      <p className="text-sm text-tk-muted">
+                        {fileSize(doc.bytes)} · {doc.pageCount} page{doc.pageCount === 1 ? "" : "s"}
+                        {doc.inRun ? " · its reading did not finish" : ""}
+                      </p>
+                      {pagesShort ? (
+                        <p className="mt-1 text-sm text-tk-danger">
+                          Not enough pages left to read this file.
+                        </p>
+                      ) : null}
+                    </div>
                     <button
                       type="button"
-                      onClick={proceedFromCard}
-                      disabled={cannotProceed}
-                      title={
-                        ready.length > 1
-                          ? `Proceed with all ${ready.length} files, like the Proceed button in This run`
-                          : "Same as the Proceed button in This run"
-                      }
-                      aria-label={
-                        ready.length > 1 ? `Proceed with all ${ready.length} files` : "Proceed"
-                      }
-                      className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-[9px] bg-tk-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-tk-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => void readOne(doc)}
+                      disabled={busy || pagesShort}
+                      aria-label={`Read ${doc.fileName} only`}
+                      className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-[9px] border border-tk-brand px-3 text-sm font-semibold text-tk-brand transition-colors hover:bg-tk-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {busy ? (
-                        <Loader2 aria-hidden className="size-4 animate-spin" />
-                      ) : (
-                        <ArrowRight aria-hidden className="size-4" />
-                      )}
-                      Proceed
+                      <BookOpenCheck aria-hidden className="size-4" />
+                      Read
                     </button>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => remove(item.id)}
-                  disabled={busy}
-                  aria-label={`Remove ${item.file.name}`}
-                  className="flex size-10 shrink-0 items-center justify-center rounded-[10px] text-tk-muted hover:bg-tk-danger-soft hover:text-tk-danger"
-                >
-                  <Trash2 aria-hidden className="size-5" />
-                </button>
-              </li>
-            ))}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         ) : null}
 
         {(stage.step === "reading" || stage.step === "done") && stage.documents.length > 0 ? (
@@ -634,10 +811,13 @@ export function UploadPanel({
           className="rounded-[18px] border border-tk-line bg-tk-surface p-5"
         >
           <h2 id="run-summary-title" className="font-semibold">
-            This run
+            Proceed All
           </h2>
+          <p className="mt-1 text-sm text-tk-muted">
+            Saves every file picked and reads everything that is saved and not read yet.
+          </p>
           <div aria-live="polite" className="mt-3 flex flex-col gap-2 text-[15px]/[22px]">
-            {ready.length === 0 ? (
+            {nothingToDo ? (
               <p className="text-tk-muted">Add photos or PDFs to see how many pages they are.</p>
             ) : counting ? (
               <p className="flex items-center gap-2 text-tk-muted">
@@ -656,14 +836,36 @@ export function UploadPanel({
                     {line}
                   </p>
                 ))}
-                <dl className="mt-1 flex justify-between gap-3 border-t border-tk-line pt-3">
-                  <dt className="text-tk-muted">Total</dt>
-                  <dd className="text-right">
-                    <span className="font-tk-mono text-lg font-medium tabular-nums">
-                      {pesoText(quote.total)}
-                    </span>
-                    <span className="block text-sm text-tk-muted">{quote.summary}</span>
-                  </dd>
+                {unfinished.length > 0 ? (
+                  <p className="text-sm text-tk-muted">
+                    {unfinished.length} saved file{unfinished.length === 1 ? "" : "s"} whose reading
+                    did not finish will be read again, with no new pages used.
+                  </p>
+                ) : null}
+                <dl className="mt-1 flex flex-col gap-2 border-t border-tk-line pt-3">
+                  {totalPages > 0 && !quote.blocked ? (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-tk-muted">After this</dt>
+                      <dd className="text-right text-sm">{pagesNote}</dd>
+                    </div>
+                  ) : null}
+                  {account && batchBytes > 0 ? (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-tk-muted">Storage</dt>
+                      <dd className="text-right text-sm">
+                        {sizeText(batchBytes)} to save, {sizeText(room.free)} free
+                      </dd>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-tk-muted">Total</dt>
+                    <dd className="text-right">
+                      <span className="font-tk-mono text-lg font-medium tabular-nums">
+                        {pesoText(quote.total)}
+                      </span>
+                      <span className="block text-sm text-tk-muted">{quote.summary}</span>
+                    </dd>
+                  </div>
                 </dl>
               </>
             )}
@@ -672,12 +874,23 @@ export function UploadPanel({
                 These files add up to {fileSize(batchBytes)}. Upload up to 5 GB at a time.
               </p>
             ) : null}
+            {!room.ok ? (
+              <p role="alert" className="text-sm text-tk-danger">
+                These files take {sizeText(batchBytes)} and only {sizeText(room.free)} of the{" "}
+                {sizeText(room.limit)} storage is free. Remove some files here, or delete files you
+                no longer need in Documents.
+              </p>
+            ) : null}
+            {quote.blocked && ready.length > 0 ? (
+              <p className="text-sm text-tk-muted">
+                You can still save a file with its own Proceed button and read it later.
+              </p>
+            ) : null}
           </div>
           <button
-            ref={proceedRef}
             type="button"
-            onClick={() => void proceed()}
-            disabled={cannotProceed}
+            onClick={() => void proceedAll()}
+            disabled={cannotProceedAll}
             className={`${buttonPrimary} mt-4 w-full scroll-mt-24`}
           >
             {stage.step === "working" ? (
@@ -689,16 +902,16 @@ export function UploadPanel({
                 <Loader2 aria-hidden className="size-5 animate-spin" /> Reading…
               </>
             ) : (
-              "Proceed"
+              "Proceed All"
             )}
           </button>
           <p className="mt-3 text-[13px]/[18px] text-tk-muted">
             {!PAYMENTS_LIVE
-              ? `Standard runs are free during launch: up to ${PRICING.runPages} pages a run, as often as you need. Extra pages (${pesoText(PRICING.extraPage)} each) and Premium are coming soon.`
+              ? `During launch, ${clientAccountId ? "each client's" : "your"} first ${PRICING.runPages} pages are read free, counted across all uploads. More pages (${pesoText(PRICING.extraPage)} each) and Premium are coming soon.`
               : `${
                   clientAccountId
-                    ? `Your partner price: ${pesoText(PARTNER_RUN_PRICE)} for up to ${PRICING.runPages} pages for this client, then ${pesoText(PRICING.extraPage)} a page.`
-                    : `Your first ${PRICING.trialPages} pages are free. Then ${pesoText(PRICING.runPrice)} reads up to ${PRICING.runPages} pages, then ${pesoText(PRICING.extraPage)} a page. Premium covers ${PRICING.premiumPages.toLocaleString("en-PH")} pages a month, then ${pesoText(PRICING.premiumExtraPage)} a page.`
+                    ? `Your partner price: ${pesoText(PARTNER_RUN_PRICE)} for a run of ${PRICING.runPages} pages for this client, then ${pesoText(PRICING.extraPage)} a page.`
+                    : `Your first ${PRICING.trialPages} pages are free. Then ${pesoText(PRICING.runPrice)} buys a run of ${PRICING.runPages} pages that lasts across uploads, then ${pesoText(PRICING.extraPage)} a page. Premium covers ${PRICING.premiumPages.toLocaleString("en-PH")} pages a month, then ${pesoText(PRICING.premiumExtraPage)} a page.`
                 } Payment goes through Xendit (GCash, Maya or card); the final price is confirmed at checkout.`}
           </p>
         </section>
@@ -715,6 +928,17 @@ export function UploadPanel({
               You can leave this page. Reading carries on, and results appear in Documents.
             </p>
           </div>
+        ) : null}
+        {stage.step === "saved" ? (
+          <p role="status" className="rounded-[12px] bg-tk-brand-soft px-4 py-3 text-tk-brand">
+            Saved. {stage.files === 1 ? "The file is" : `${stage.files} files are`} stored and
+            waiting to be read: press Read on {stage.files === 1 ? "it" : "them"}, or Proceed All.
+          </p>
+        ) : null}
+        {stage.step === "started" ? (
+          <p role="status" className="rounded-[12px] bg-tk-brand-soft px-4 py-3 text-tk-brand">
+            Reading has started again. Results appear in Documents.
+          </p>
         ) : null}
         {stage.step === "storage_not_connected" ? (
           <NotConnectedNotice title="File storage is not connected yet">
@@ -733,7 +957,7 @@ export function UploadPanel({
           <NotConnectedNotice title="The AI reader is not connected yet">
             {stage.uploaded > 0
               ? `${stage.uploaded} file${stage.uploaded === 1 ? " was" : "s were"} uploaded and will be read once the reader's keys are added.`
-              : "Your paid run will be read once the reader's keys are added."}
+              : "Your documents will be read once the reader's keys are added."}
           </NotConnectedNotice>
         ) : null}
         {stage.step === "done" ? (

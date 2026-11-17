@@ -59,6 +59,8 @@ const doc = (
   flags: ["missing_date"],
   previewUrl: null,
   fileDeleted: false,
+  inRun: true,
+  tags: [],
   readings,
   ...changes,
 });
