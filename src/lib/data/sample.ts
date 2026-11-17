@@ -246,6 +246,8 @@ function buildWorkspace(business: SampleBusiness, today: string): Workspace {
       flags,
       previewUrl: null,
       fileDeleted: false,
+      inRun: status !== "waiting_for_reader" && status !== "waiting_for_storage",
+      tags: [],
       readings: [],
     });
     return id;

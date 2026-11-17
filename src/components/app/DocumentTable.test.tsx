@@ -35,6 +35,8 @@ const doc = (changes: Partial<StoredDocument> = {}): StoredDocument => ({
   flags: [],
   previewUrl: null,
   fileDeleted: false,
+  inRun: true,
+  tags: [],
   readings: [],
   ...changes,
 });

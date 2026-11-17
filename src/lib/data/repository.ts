@@ -181,6 +181,10 @@ function toDocument(row: Row): StoredDocument {
     flags: Array.isArray(row["flags"]) ? (row["flags"] as CheckFlag[]) : [],
     previewUrl: null,
     fileDeleted: Boolean(row["file_deleted_at"]),
+    inRun: Boolean(row["run_id"]),
+    tags: Array.isArray(row["tags"])
+      ? (row["tags"] as unknown[]).filter((tag): tag is string => typeof tag === "string")
+      : [],
     // While a document is being read, `extracted` holds its progress, not a reading.
     readings:
       READ_FINISHED.includes(status) && text(row["kind"]) !== "cor"

@@ -214,7 +214,9 @@ function SettingsPage() {
         {plan.payments.length === 0 ? (
           <p className="text-tk-muted">
             No transactions yet.
-            {PAYMENTS_LIVE ? "" : " Runs are free during launch, so there is nothing to pay."}
+            {PAYMENTS_LIVE
+              ? ""
+              : " Your first pages are free during launch, so there is nothing to pay."}
           </p>
         ) : (
           <div className="relative overflow-x-auto rounded-[18px] border border-tk-line bg-tk-surface">

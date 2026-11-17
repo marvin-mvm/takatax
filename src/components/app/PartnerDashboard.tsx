@@ -167,9 +167,9 @@ export function PartnerDashboard() {
               </>
             ) : (
               <>
-                <strong className="font-semibold text-tk-ink">Free during launch.</strong> Client
-                runs of up to {PRICE.runPages} pages are free; your {PRICE.partnerDiscount} partner
-                price applies once payments start.
+                <strong className="font-semibold text-tk-ink">Free during launch.</strong> Each
+                client's first {PRICE.runPages} pages are read free; your {PRICE.partnerDiscount}{" "}
+                partner price applies once payments start.
               </>
             )}
           </p>

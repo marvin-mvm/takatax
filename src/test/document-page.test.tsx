@@ -83,6 +83,8 @@ const doc = (changes: Partial<StoredDocument> = {}): StoredDocument => ({
   flags: ["missing_date", "low_confidence"],
   previewUrl: null,
   fileDeleted: false,
+  inRun: true,
+  tags: [],
   readings: [reading()],
   ...changes,
 });

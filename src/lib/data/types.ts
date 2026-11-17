@@ -65,6 +65,13 @@ export interface StoredDocument {
   /** True when the file was deleted and only its records were kept (Premium). */
   fileDeleted: boolean;
   /**
+   * True once the document was sent for reading (it is in a run, and its pages are counted).
+   * A file that is saved but was never sent for reading is false.
+   */
+  inRun: boolean;
+  /** Short labels the person put on the file to find it again, for example "Exp Q1 2026". */
+  tags: string[];
+  /**
    * What was read from the file, one entry per document found in it: the AI's reading, or the
    * person's corrections once it was checked. Empty for a COR and until the file is read.
    */
