@@ -94,9 +94,9 @@ const smallButton =
   "inline-flex min-h-9 items-center gap-1.5 rounded-[8px] border border-tk-line bg-tk-surface px-3 text-sm font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 /**
- * The bar shown while files are ticked: how many, a box to add a tag (existing tags are offered
- * as it is typed; anything else makes a new tag), and the tags already on them, each with a
- * button to take it off.
+ * The bar shown while files are ticked: a box to add a tag (existing tags are offered as it is
+ * typed; anything else makes a new tag), how many files are ticked, and the tags already on them,
+ * each with a button to take it off. Stacked on a phone, on one line on wider screens.
  */
 function TagBar({
   chosen,
@@ -153,13 +153,14 @@ function TagBar({
       aria-label="Tag the selected files"
       className="flex flex-col gap-3 rounded-[14px] border border-tk-brand/40 bg-tk-brand-soft p-3"
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <p className="flex items-center gap-1.5 font-semibold text-tk-brand">
-          <TagIcon aria-hidden className="size-4" />
-          {chosen.length} selected
-        </p>
+      {/*
+        On a phone the pieces are stacked, each the full width: the box, "Add tag" under it, then
+        how many are selected with "Clear selection". From 640px they sit on one line, in the
+        order: how many, the box and its button, Clear selection.
+      */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
         <form
-          className="flex min-w-0 flex-1 flex-wrap gap-2"
+          className="order-1 flex flex-col gap-2 sm:order-2 sm:min-w-0 sm:flex-1 sm:flex-row"
           onSubmit={(event) => {
             event.preventDefault();
             if (tag) void change([tag], []);
@@ -175,8 +176,9 @@ function TagBar({
             onChange={(event) => setTyped(event.target.value)}
             maxLength={MAX_TAG_LENGTH}
             autoComplete="off"
-            placeholder="Find a tag or type a new one, e.g. Exp Q1 2026"
-            className="min-h-10 min-w-0 flex-1 basis-[220px] rounded-[10px] border border-tk-line bg-tk-surface px-3 text-[15px] focus-visible:outline-2 focus-visible:outline-tk-brand"
+            placeholder="Pick a tag or type a new one"
+            // 16px text: a phone does not zoom the page in when the box is tapped.
+            className="min-h-11 w-full rounded-[10px] border border-tk-line bg-tk-surface px-3 text-base focus-visible:outline-2 focus-visible:outline-tk-brand sm:min-w-0 sm:flex-1 sm:basis-[220px]"
           />
           <datalist id={listId}>
             {knownTags.map((known) => (
@@ -186,19 +188,25 @@ function TagBar({
           <button
             type="submit"
             disabled={!tag || saving}
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-[10px] bg-tk-brand px-4 text-[15px] font-semibold text-tk-surface transition-colors hover:bg-tk-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] bg-tk-brand px-4 text-base font-semibold whitespace-nowrap text-tk-surface transition-colors hover:bg-tk-brand/90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {saving ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
             Add tag
           </button>
         </form>
-        <button
-          type="button"
-          onClick={onClear}
-          className="min-h-10 rounded-[10px] px-3 text-[15px] font-medium text-tk-muted hover:text-tk-ink"
-        >
-          Clear selection
-        </button>
+        <div className="order-2 flex items-center justify-between gap-3 sm:contents">
+          <p className="flex items-center gap-1.5 font-semibold whitespace-nowrap text-tk-brand sm:order-1">
+            <TagIcon aria-hidden className="size-4" />
+            {chosen.length} selected
+          </p>
+          <button
+            type="button"
+            onClick={onClear}
+            className="min-h-10 rounded-[10px] px-3 text-[15px] font-medium whitespace-nowrap text-tk-muted hover:text-tk-ink sm:order-3"
+          >
+            Clear selection
+          </button>
+        </div>
       </div>
       {tagsOn(chosen).length > 0 ? (
         <ul aria-label="Tags on the selected files" className="flex flex-wrap gap-2">

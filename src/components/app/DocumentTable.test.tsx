@@ -289,6 +289,35 @@ describe("tagging files in the table", () => {
     expect(screen.getByRole("checkbox", { name: "Select rent.jpg" })).not.toBeChecked();
   });
 
+  it("stacks the tag bar for a phone: the box, Add tag under it, then the count and Clear", () => {
+    show(files(), "standard");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select rent.jpg" }));
+
+    const input = within(bar()).getByLabelText("Tag to put on the selected files");
+    const add = within(bar()).getByRole("button", { name: "Add tag" });
+    const count = within(bar()).getByText("1 selected");
+    const clear = within(bar()).getByRole("button", { name: "Clear selection" });
+    // On a phone the pieces follow the order they are written in, one under the other.
+    const before = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(input, add)).toBe(true);
+    expect(before(add, count)).toBe(true);
+    expect(before(count, clear)).toBe(true);
+
+    // Stacked and full width on a phone; side by side from the "sm" width up.
+    const form = input.closest("form") as HTMLElement;
+    expect(form.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(["flex-col", "sm:flex-row"]),
+    );
+    expect(input.className.split(/\s+/)).toEqual(expect.arrayContaining(["w-full", "text-base"]));
+    expect(add.className.split(/\s+/)).toEqual(expect.arrayContaining(["w-full", "sm:w-auto"]));
+    // The count and Clear share the last line on a phone, and rejoin the row on wider screens.
+    expect(count.parentElement).toBe(clear.parentElement);
+    expect((count.parentElement as HTMLElement).className.split(/\s+/)).toEqual(
+      expect.arrayContaining(["justify-between", "sm:contents"]),
+    );
+  });
+
   it("takes a tag off the ticked files", async () => {
     show(files(), "standard");
 
