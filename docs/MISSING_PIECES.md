@@ -19,7 +19,7 @@ committed, so never put a secret there).
       `supabase/tests/run.sh` against a local Postgres.
       They were applied by hand, so Supabase's migration history is empty. If you start using
       `supabase db push`, first mark them as applied:
-      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000 20261117090000 20261117150000`.
+      `supabase migration repair --status applied 20261115120000 20261115140000 20261116120000 20261116150000 20261117090000 20261117150000 20261117190000`.
 - [x] **COR tax types** (`20261116150000_cor_tax_types.sql`): keeps the tax types and forms
       printed on the COR (0619-E, 1601-EQ, 2551Q…) on the account. Applied on 2026-11-16 after its
       rolled-back dry run with `supabase/tests/40_cor_tax_types.sql`; it is in the repair line
@@ -32,16 +32,21 @@ committed, so never put a secret there).
       `review_document()`, which saves the "Check what was read" form, and the
       `checked_document` entry of the activity log. Applied on 2026-11-16 after its rolled-back
       dry run with every check file; it is in the repair line above.
+- [x] **Pages, storage and tags** (`20261117190000_pages_storage_tags.sql`): counts pages on
+      the account across uploads (`runs.pages_added`, `account_usage()`, `open_run()`), gives
+      the upload function the storage in use, and adds tags (`documents.tags`,
+      `tag_documents()`). Applied on 2026-11-17 (Manila) after its rolled-back dry run with every
+      check file; it is in the repair line above.
 - A dry run sends, as one query, `begin;` + the migration + `20_behaviour_api.sql`,
-  `30_invitations.sql`, `40_cor_tax_types.sql`, `50_document_delete.sql` and
-  `60_document_review.sql` + `rollback;`. The check files look only at their own test users,
+  `30_invitations.sql`, `40_cor_tax_types.sql`, `50_document_delete.sql`,
+  `60_document_review.sql` and `70_pages_storage_tags.sql` + `rollback;`. The check files look only at their own test users,
   so they are safe on a project with real users.
 - [x] **Edge functions**: `create-upload-urls`, `confirm-upload`, `document-link`,
       `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and
       `payments-webhook` are deployed (`payments-webhook` and `read-step` skip the login check;
       `read-step` accepts only the service role key). Each answers "not configured" until its
-      keys are set. All nine matched the code file by file on 2026-11-16 (`read-step` was last
-      deployed that day from `v0.002` at `90d12f8`). Redeploy after changes
+      keys are set. All nine matched the code file by file on 2026-11-17, Manila (the last
+      deploy was from `v0.002` at `6bc74f6`). Redeploy after changes
       with `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
 
 ## 1. Cloudflare R2 (file storage)
