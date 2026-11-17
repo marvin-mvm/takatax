@@ -65,6 +65,24 @@ describe("describeAccessEvent", () => {
     expect(notCounted.lines).toEqual(["marked as not a tax document, so nothing is counted"]);
   });
 
+  it("says which tags a professional put on or took off files", () => {
+    const tagged = describeAccessEvent(
+      event("tagged_documents", "2026-11-17T04:00:00Z", {
+        documents: 3,
+        added: ["Exp Q1 2026"],
+        removed: [],
+      }),
+    );
+    expect(tagged.title).toBe("Liza Mendoza changed the tags of 3 files");
+    expect(tagged.lines).toEqual(["Added: Exp Q1 2026"]);
+    expect(ACTION_GROUP.tagged_documents).toBe("changed");
+    expect(
+      describeAccessEvent(
+        event("tagged_documents", "2026-11-17T04:05:00Z", { documents: 1, removed: ["Rent"] }),
+      ).lines,
+    ).toEqual(["Removed: Rent"]);
+  });
+
   it("tells a kept-records deletion apart from deleting the file only", () => {
     const fileOnly = describeAccessEvent(
       event("deleted_document", "2026-11-17T01:00:00Z", {

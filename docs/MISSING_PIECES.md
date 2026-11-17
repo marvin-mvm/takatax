@@ -155,9 +155,9 @@ the `tr_dev_…` key).
 Payments are switched off for launch with one constant, `PAYMENTS_LIVE = false` in
 `supabase/functions/_shared/uploads/rules.ts`. While it is off:
 
-- every **Standard run of up to 80 pages is free**, for taxpayers and partners, as often as
-  they like;
-- **pages over 80 (₱3.50 each)** and **Premium (₱649 a month)** show "coming soon" and cannot be
+- every account's **first 80 pages are read free**, counted across all its uploads, whoever
+  uploads them (the owner or a professional with access);
+- **more pages (₱3.50 each)** and **Premium (₱649 a month)** show "coming soon" and cannot be
   bought, on the screens and on the server (`create-checkout` answers `coming_soon`).
 
 The price list is `PRICING` in the same file: a Standard run is ₱149 for up to 80 pages, then
@@ -165,14 +165,15 @@ The price list is `PRICING` in the same file: a Standard run is ₱149 for up to
 partners pay 25% less for a client's run. The site, the app and the deck read their figures from
 it, so change a price there and redeploy the site and the edge functions.
 
-Two things the screens show that the server does not enforce yet, for the owner to decide
-before payments go live (`docs/HANDOVER.md`, section 5):
+Pages and storage are enforced on the server: `create-checkout` counts every page against the
+account's pages (80 free at launch, then "coming soon") and `create-upload-urls` refuses an
+upload that does not fit in the tier's storage. Still to do before payments go live:
 
-- **Storage.** The usage meter shows 300 MB (Standard) or 15 GB (Premium), from `PRICING`, but
-  `create-upload-urls` does not refuse an upload that goes over it, and the storage add-on
-  (₱250 for 5 GB a month) has no checkout.
-- **A Standard run's unused pages.** Every upload is its own run, so pages left over from a run
-  of up to 80 are not kept for the next upload.
+- **Confirm the paid rule for pages.** As built: the pages left are used first, then the free
+  trial's 10, then a new run of 80 pages for ₱149 (₱3.50 for each page it does not cover), and
+  pages not used carry over to the next upload.
+- **More storage.** The storage add-on (₱250 for 5 GB a month) has no checkout, so a full
+  Standard account can only delete files or wait for Premium.
 
 To switch payments on (Xendit: GCash, Maya, cards):
 

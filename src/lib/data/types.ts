@@ -235,7 +235,8 @@ export type AccessEventAction =
   | "edited_record"
   | "confirmed_cor"
   | "deleted_document"
-  | "checked_document";
+  | "checked_document"
+  | "tagged_documents";
 
 /** One entry in the taxpayer's activity log. Entries can never be changed. */
 export interface AccessEvent {

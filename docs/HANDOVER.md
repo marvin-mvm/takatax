@@ -148,9 +148,11 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
   Premium. Their own runs stay Standard with the partner discount. Premium is not on sale yet
   (`PAYMENTS_LIVE = false`), but its features are built behind that switch.
 - Pricing by pages (a photo is 1 page, a PDF every page). Every figure is in `PRICING` in
-  `supabase/functions/_shared/uploads/rules.ts`: a Standard run is ₱149 for up to 80 pages, then
+  `supabase/functions/_shared/uploads/rules.ts`: a Standard run is ₱149 for 80 pages, then
   ₱3.50 a page; Premium is ₱649 a month for 300 pages and 15 GB of storage, then ₱2.65 a page;
-  bookkeepers, CPAs and tax lawyers pay 25% less for a client's run (₱112). The site, the app
+  bookkeepers, CPAs and tax lawyers pay 25% less for a client's run (₱112). Pages are counted
+  on the account, across uploads: what a run did not use stays for the next upload, and the
+  database (`account_usage()`, `open_run()`) keeps the count so a limit cannot be passed. The site, the app
   and the deck take their figures from `PRICING` (through `src/lib/pricing-copy.ts`), so a price
   changes in one place.
 - Checking a document by hand. A document the reader was not sure of ("Please check") opens on
@@ -163,16 +165,24 @@ Mac (macOS Catalina), so prefer things that run in GitHub Actions or a cloud ses
   `supabase/functions/_shared/parser/review.ts`, `src/components/app/ReadingReview.tsx`,
   `review_document()` in migration 6.
 - Usage and account settings. The Documents tab shows two meters, "AI doc parsing" and "Doc
-  storage", as used / limit ("75 / 80 pages", "240 MB / 300 MB"). Standard counts the latest
-  run's pages out of 80, because every upload starts a new run; Premium counts the pages of its
-  month out of 300. Storage is what the stored files take, out of 300 MB or 15 GB. "Hi [first
-  name]" in the header (in place of Log out) opens `/app/settings`: the user's details and Log
-  out, the current tier, the same meters, Premium and the transaction history. The Plan tab is
-  gone; `/app/plan` redirects to the settings page. On a phone the green header scrolls away with
+  storage", as used / limit ("11 / 80 pages", "240 MB / 300 MB"). Standard shows the pages used
+  out of the pages the account has, counted across every upload (a photo is 1 page, a PDF every
+  page); Premium the pages of its month out of 300. Storage is what the stored files take, out
+  of 300 MB or 15 GB, and an upload that does not fit is refused. "Hi [first name]" in the
+  header opens `/app/settings`: the user's details and Log out, the current tier, the same
+  meters, Premium and the transaction history. On a phone the green header scrolls away with
   the page. Code: `supabase/functions/_shared/uploads/usage.ts`, `src/lib/account/`,
   `src/components/app/UsageMeters.tsx`, `src/routes/app/settings.tsx`.
-- Launch mode: `PAYMENTS_LIVE = false` in the same file. Standard runs up to 80 pages are free;
-  extra pages and Premium show "coming soon". Payments provider: Xendit, built but switched off.
+- Uploading in two steps. "Proceed" on a file saves that file only: it is stored and waits to
+  be read, with its own "Read" button. "Proceed All" saves every file picked and reads
+  everything saved and not read yet. Code: `src/components/app/UploadPanel.tsx`.
+- Search and tags on the Documents tab. The search box finds a document by its file name, by the
+  names and numbers read from it, and by its tags. Files are ticked and tagged ("Exp Q1 2026")
+  from a bar above the table, and the list can be narrowed to one tag. Code:
+  `src/lib/documents/tags.ts`, `src/components/app/DocumentTable.tsx`, `tag_documents()`.
+- Launch mode: `PAYMENTS_LIVE = false` in the same file. An account's first 80 pages are read
+  free; when they are used, reading stops: more pages and Premium show "coming soon". To give
+  an account more pages by hand, raise `pages_added` on one of its runs. Payments provider: Xendit, built but switched off.
 
 ---
 
@@ -285,21 +295,20 @@ tax calendar on 2026-11-16), and each repeating return a COR names is put on the
 form numbers on old CORs are swapped for today's forms, and retired ones such as 0605 never
 show. Documents can be deleted, and a professional's features follow the client's tier.
 
-1. **Two decisions for the owner about the usage meters** (asked on 2026-11-16, not answered
-   yet). Nothing is broken while they wait.
-   - Should the pages of a Standard run carry over? Today every upload is its own run of up to 80
-     pages, so the meter shows the latest run and the pages it did not use are not kept. If the
-     owner wants ₱149 to buy 80 pages that last across uploads ("75 of 80 used, 5 left"), that is
-     a change to the pricing rules in `create-checkout` and `quoteRun`, not to the meter alone.
-   - Should uploads be refused when storage is full? The meter shows the limit (300 MB, or 15 GB
-     on Premium) but `create-upload-urls` does not check it. On Standard, deleting a file to
-     make room also deletes its records, and more storage cannot be bought yet.
+1. **Decided by the owner on 2026-11-17: pages are counted across uploads, and storage is
+   enforced.** Both are built (see section 2). One thing follows from it and is worth the
+   owner's eye before real users arrive: at launch an account gets 80 free pages in all, and
+   reading stops there until payments are on (the owner's own account had used 13 by then). If
+   that is too tight for launch, the rule is `pagesLeft()` in
+   `supabase/functions/_shared/uploads/rules.ts`; a single account can be topped up by raising
+   `pages_added` on one of its runs. With payments live, a new run of 80 pages is sold when the
+   pages left do not cover an upload; pages not used carry over. The owner has not yet said
+   whether that is the intended paid rule, so confirm it before setting `PAYMENTS_LIVE`.
 
    The records assistant is done: the owner confirmed on 2026-11-16 that the chat on the Tracker
    answers (Gemini Flash-Lite, `google/gemini-3.5-flash-lite`; the fix for the month's last day
    is in `supabase/functions/_shared/assistant/period.ts`). It sees the period's figures only,
-   which is enough for now. Migration 5 is applied, and deleting and the US dollar conversion
-   work on the live site.
+   which is enough for now.
 
 2. **Owner's settings and keys** (`docs/MISSING_PIECES.md`): make the owner staff
    (`insert into public.admins …`; the table is empty), then verify professionals on the Staff

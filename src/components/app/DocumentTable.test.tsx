@@ -10,6 +10,11 @@ import { DocumentTable } from "./DocumentTable";
 
 const service = vi.hoisted(() => ({ deleteDocument: vi.fn() }));
 vi.mock("@/lib/services/documents", () => service);
+const repository = vi.hoisted(() => ({
+  tagDocuments: vi.fn(),
+  NotConnectedError: class NotConnectedError extends Error {},
+}));
+vi.mock("@/lib/data/repository", () => repository);
 // The table only needs the links to render; there is no router in this test.
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: ReactNode; className?: string }) => (
@@ -72,6 +77,8 @@ beforeAll(() => {
 beforeEach(() => {
   service.deleteDocument.mockReset();
   service.deleteDocument.mockResolvedValue({ ok: true, data: {} });
+  repository.tagDocuments.mockReset();
+  repository.tagDocuments.mockResolvedValue(1);
 });
 
 afterEach(cleanup);
@@ -205,5 +212,133 @@ describe("DocumentTable: the Parsed Records (?)", () => {
       screen.getByRole("button", { name: "Why the records of rent.jpg cannot be deleted yet" }),
     );
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Delete the file first");
+  });
+});
+
+describe("tagging files in the table", () => {
+  const SECOND = "33333333-3333-4333-8333-333333333333";
+  const files = () => [
+    doc({ tags: ["Exp Q1 2026", "Rent"] }),
+    doc({ id: SECOND, fileName: "power.jpg", tags: ["Exp Q1 2026"] }),
+  ];
+  const bar = () => screen.getByRole("region", { name: "Tag the selected files" });
+
+  it("shows each file's tags, and no tag bar until a file is ticked", () => {
+    show(files(), "standard");
+
+    const tags = within(screen.getByRole("list", { name: "Tags of rent.jpg" })).getAllByRole(
+      "listitem",
+    );
+    expect(tags.map((tag) => tag.textContent)).toEqual(["Exp Q1 2026", "Rent"]);
+    expect(
+      screen.queryByRole("region", { name: "Tag the selected files" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("puts a new tag on the ticked files", async () => {
+    show(files(), "standard");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select rent.jpg" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select power.jpg" }));
+    expect(within(bar()).getByText("2 selected")).toBeInTheDocument();
+    fireEvent.change(within(bar()).getByLabelText("Tag to put on the selected files"), {
+      target: { value: "  For   filing " },
+    });
+    fireEvent.click(within(bar()).getByRole("button", { name: "Add tag" }));
+
+    await waitFor(() => expect(repository.tagDocuments).toHaveBeenCalledTimes(1));
+    expect(repository.tagDocuments).toHaveBeenCalledWith(
+      ACCOUNT,
+      ["22222222-2222-4222-8222-222222222222", SECOND],
+      ["For filing"],
+      [],
+    );
+  });
+
+  it("offers the tags already in use, and uses their spelling", async () => {
+    show(files(), "standard");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select power.jpg" }));
+    const input = within(bar()).getByLabelText("Tag to put on the selected files");
+    const offered = [...(input as HTMLInputElement).list!.options].map((option) => option.value);
+    expect(offered).toEqual(["Exp Q1 2026", "Rent"]);
+
+    fireEvent.change(input, { target: { value: "rent" } });
+    fireEvent.click(within(bar()).getByRole("button", { name: "Add tag" }));
+
+    await waitFor(() =>
+      expect(repository.tagDocuments).toHaveBeenCalledWith(ACCOUNT, [SECOND], ["Rent"], []),
+    );
+  });
+
+  it("selects every file with the box in the header, and clears the selection", () => {
+    show(files(), "standard");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select every file" }));
+    expect(within(bar()).getByText("2 selected")).toBeInTheDocument();
+    // "Rent" is on one of the two files only.
+    const onThem = within(within(bar()).getByRole("list", { name: "Tags on the selected files" }))
+      .getAllByRole("listitem")
+      .map((item) => item.textContent);
+    expect(onThem).toEqual(["Exp Q1 2026", "Rent(some)"]);
+
+    fireEvent.click(within(bar()).getByRole("button", { name: "Clear selection" }));
+    expect(
+      screen.queryByRole("region", { name: "Tag the selected files" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select rent.jpg" })).not.toBeChecked();
+  });
+
+  it("takes a tag off the ticked files", async () => {
+    show(files(), "standard");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select rent.jpg" }));
+    fireEvent.click(
+      within(bar()).getByRole("button", { name: "Take the tag Rent off the selected files" }),
+    );
+
+    await waitFor(() =>
+      expect(repository.tagDocuments).toHaveBeenCalledWith(
+        ACCOUNT,
+        ["22222222-2222-4222-8222-222222222222"],
+        [],
+        ["Rent"],
+      ),
+    );
+  });
+
+  it("does not add an empty tag, an eleventh tag, or a tag to sample files", async () => {
+    const full = doc({ tags: Array.from({ length: 10 }, (_, i) => `t${i}`) });
+    const { unmount } = show([full], "standard");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select rent.jpg" }));
+    expect(within(bar()).getByRole("button", { name: "Add tag" })).toBeDisabled();
+    fireEvent.change(within(bar()).getByLabelText("Tag to put on the selected files"), {
+      target: { value: "one more" },
+    });
+    fireEvent.click(within(bar()).getByRole("button", { name: "Add tag" }));
+    expect(await within(bar()).findByRole("alert")).toHaveTextContent("up to 10 tags");
+    unmount();
+
+    show([doc({ id: "sample-dela-cruz-doc-1" })], "standard");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select rent.jpg" }));
+    fireEvent.change(within(bar()).getByLabelText("Tag to put on the selected files"), {
+      target: { value: "Rent" },
+    });
+    fireEvent.click(within(bar()).getByRole("button", { name: "Add tag" }));
+    expect(await within(bar()).findByRole("alert")).toHaveTextContent("sample documents");
+    expect(repository.tagDocuments).not.toHaveBeenCalled();
+  });
+
+  it("says so when the tag could not be saved", async () => {
+    repository.tagDocuments.mockRejectedValue(new Error("boom"));
+    show(files(), "standard");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select rent.jpg" }));
+    fireEvent.change(within(bar()).getByLabelText("Tag to put on the selected files"), {
+      target: { value: "Meals" },
+    });
+    fireEvent.click(within(bar()).getByRole("button", { name: "Add tag" }));
+
+    expect(await within(bar()).findByRole("alert")).toHaveTextContent("We could not save the tag");
   });
 });

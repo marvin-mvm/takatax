@@ -1053,6 +1053,24 @@ export async function reviewDocument(
   return status === "rejected" ? "rejected" : "accepted";
 }
 
+/**
+ * Adds and removes tags on documents of an account (database function `tag_documents`), for the
+ * owner or a professional with access. Returns how many files were changed.
+ */
+export async function tagDocuments(
+  accountId: string,
+  documentIds: string[],
+  add: string[],
+  remove: string[],
+): Promise<number> {
+  const touched = await rpc<number>(
+    "tag_documents",
+    { account: accountId, document_ids: documentIds, add_tags: add, remove_tags: remove },
+    "Tags",
+  );
+  return Number(touched) || 0;
+}
+
 /** Saves the confirmed COR: this sets the account's tax types and deadlines. */
 export async function confirmCor(documentId: string, details: CorDetails): Promise<void> {
   await rpc("confirm_cor", { document: documentId, details }, "COR confirmation");
