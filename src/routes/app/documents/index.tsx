@@ -40,7 +40,8 @@ const chip = (on: boolean) =>
 /**
  * Every uploaded document, newest first, with its reading status, under the two usage meters
  * (pages read and storage). The list can be searched (file name, who the document is from, its
- * number, its tags) and narrowed by status and by tag; files are tagged from the table.
+ * number, its tags) and narrowed by status and by tag (a dropdown, "Choose tag"); files are
+ * tagged from the table.
  */
 function DocumentsPage() {
   const { user } = useAppUser();
@@ -110,29 +111,36 @@ function DocumentsPage() {
           ))}
         </div>
         {tags.length > 0 ? (
-          <div role="radiogroup" aria-label="Tag" className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-tk-muted">Tags</span>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={activeTag === null}
-              onClick={() => setTag(null)}
-              className={chip(activeTag === null)}
+          // A dropdown, not one chip per tag: an account can have many tags.
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="tag-filter" className="text-sm font-medium text-tk-muted">
+              Tags
+            </label>
+            <select
+              id="tag-filter"
+              value={activeTag ?? ""}
+              onChange={(event) => setTag(event.target.value || null)}
+              className={cn(
+                "min-h-10 max-w-full min-w-[180px] rounded-[10px] border bg-tk-surface px-3 text-base focus-visible:outline-2 focus-visible:outline-tk-brand",
+                activeTag ? "border-tk-brand text-tk-ink" : "border-tk-line text-tk-muted",
+              )}
             >
-              Any
-            </button>
-            {tags.map((name) => (
+              <option value="">Choose tag</option>
+              {tags.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            {activeTag ? (
               <button
-                key={name}
                 type="button"
-                role="radio"
-                aria-checked={activeTag === name}
-                onClick={() => setTag(name)}
-                className={chip(activeTag === name)}
+                onClick={() => setTag(null)}
+                className="min-h-10 rounded-[10px] px-2 text-sm font-medium text-tk-brand hover:underline"
               >
-                {name}
+                Clear tag
               </button>
-            ))}
+            ) : null}
           </div>
         ) : (
           <p className="text-sm text-tk-muted">

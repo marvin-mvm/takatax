@@ -137,27 +137,44 @@ describe("the Documents tab", () => {
     expect(names()).toEqual(["receipt-2026-11.pdf"]);
   });
 
-  it("narrows the list to one tag", () => {
+  it('offers the tags in a dropdown that starts on "Choose tag", not as a row of chips', () => {
     show(files());
-    const tags = screen.getByRole("radiogroup", { name: "Tag" });
-    expect(
-      within(tags)
-        .getAllByRole("radio")
-        .map((r) => r.textContent),
-    ).toEqual(["Any", "Exp Q4 2026", "Software"]);
 
-    fireEvent.click(within(tags).getByRole("radio", { name: "Software" }));
+    const tags = screen.getByRole("combobox", { name: "Tags" }) as HTMLSelectElement;
+    expect(tags).toHaveValue("");
+    expect([...tags.options].map((option) => option.textContent)).toEqual([
+      "Choose tag",
+      "Exp Q4 2026",
+      "Software",
+    ]);
+    expect(screen.queryByRole("radiogroup", { name: "Tag" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear tag" })).not.toBeInTheDocument();
+  });
+
+  it("narrows the list to the tag chosen, and back", () => {
+    show(files());
+    const tags = screen.getByRole("combobox", { name: "Tags" });
+
+    fireEvent.change(tags, { target: { value: "Software" } });
     expect(names()).toEqual(["workspace.pdf"]);
-    fireEvent.click(within(tags).getByRole("radio", { name: "Exp Q4 2026" }));
+    fireEvent.change(tags, { target: { value: "Exp Q4 2026" } });
     expect(names()).toEqual(["receipt-2026-11.pdf", "workspace.pdf"]);
-    fireEvent.click(within(tags).getByRole("radio", { name: "Any" }));
+
+    // Back to every tag: with "Clear tag", or by choosing "Choose tag" again.
+    fireEvent.click(screen.getByRole("button", { name: "Clear tag" }));
+    expect(names()).toHaveLength(3);
+    expect(tags).toHaveValue("");
+    fireEvent.change(tags, { target: { value: "Software" } });
+    fireEvent.change(tags, { target: { value: "" } });
     expect(names()).toHaveLength(3);
   });
 
   it("combines the search, the status and the tag", () => {
     show(files());
 
-    fireEvent.click(screen.getByRole("radio", { name: "Exp Q4 2026" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Tags" }), {
+      target: { value: "Exp Q4 2026" },
+    });
     fireEvent.change(screen.getByRole("searchbox", { name: "Search documents" }), {
       target: { value: "google" },
     });
@@ -168,11 +185,12 @@ describe("the Documents tab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show all documents" }));
     expect(names()).toHaveLength(3);
     expect(screen.getByRole("searchbox", { name: "Search documents" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Tags" })).toHaveValue("");
   });
 
   it("explains tags when none is in use yet", () => {
     show([doc("photo.jpg")]);
-    expect(screen.queryByRole("radiogroup", { name: "Tag" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Tags" })).not.toBeInTheDocument();
     expect(screen.getByText(/Tick files in the list to put a tag on them/)).toBeInTheDocument();
   });
 });
