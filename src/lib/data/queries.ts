@@ -124,9 +124,15 @@ export const useCorToConfirm = (accountId: string) =>
 export const usePlan = (userId: string) =>
   useQuery({ queryKey: ["plan", userId], queryFn: () => loadPlan(userId) });
 
-/** Pages read and storage used on the signed-in user's own account. */
-export const useUsage = (userId: string) =>
-  useQuery({ queryKey: ["usage", userId], queryFn: loadUsage });
+/**
+ * Pages read and storage used: on the signed-in user's own account, or on a client's account
+ * when a professional works on it.
+ */
+export const useUsage = (userId: string, clientAccountId?: string) =>
+  useQuery({
+    queryKey: ["usage", userId, clientAccountId ?? "own"],
+    queryFn: () => loadUsage(clientAccountId),
+  });
 
 /** The tier of a client's account, for a professional: their features follow it. */
 export const useAccountTier = (accountId: string) =>

@@ -10,52 +10,71 @@ const usage = (changes: Partial<AccountUsage> = {}): AccountUsage => ({
   accountId: "11111111-1111-4111-8111-111111111111",
   tier: "standard",
   premiumUntil: null,
-  pagesUsed: 0,
-  pagesReadInAll: 0,
+  standard: { added: 0, used: 0 },
+  trialAvailable: false,
+  premiumPagesUsed: 0,
   storageBytes: 0,
   files: 0,
   ...changes,
 });
 
 describe("the AI doc parsing meter", () => {
-  it("shows a Standard account its latest run out of a run's pages", () => {
-    const { pages, tierLabel } = usageView(usage({ pagesUsed: 75, pagesReadInAll: 212 }), {
+  it("counts every page a Standard account sent for reading, across its uploads", () => {
+    const { pages, tierLabel } = usageView(usage({ standard: { added: 80, used: 11 } }), {
       paymentsLive: false,
     });
     expect(tierLabel).toBe("Standard");
     expect(pages.title).toBe("AI doc parsing");
-    expect(pages.figure).toBe("75 / 80 pages");
-    expect(pages.spoken).toBe("75 of 80 pages");
-    expect(pages.meter).toMatchObject({ used: 75, limit: PRICING.runPages, left: 5 });
+    expect(pages.figure).toBe("11 / 80 pages");
+    expect(pages.spoken).toBe("11 of 80 pages");
+    expect(pages.meter).toMatchObject({ used: 11, limit: PRICING.runPages, left: 69 });
     expect(pages.note).toBe(
-      "Your latest run. Each upload starts a new run of up to 80 pages, free during launch. 212 pages read so far.",
+      "69 pages left. A photo is 1 page; a PDF counts every page. More pages (₱3.50 each) are coming soon.",
     );
+    expect(pages.tone).toBe("brand");
   });
 
-  it("never warns about a full Standard run: the next upload is a new run", () => {
-    expect(usageView(usage({ pagesUsed: 80, pagesReadInAll: 80 })).pages.tone).toBe("brand");
-  });
-
-  it("says a new account has read nothing yet", () => {
+  it("gives a new account its 80 free pages at launch", () => {
     const { pages } = usageView(usage(), { paymentsLive: false });
     expect(pages.figure).toBe("0 / 80 pages");
     expect(pages.note).toBe(
-      "Nothing read yet. Each upload starts a new run of up to 80 pages, free during launch.",
+      "Your first 80 pages are free during launch. A photo is 1 page; a PDF counts every page.",
     );
   });
 
-  it("states the price of a run once payments are live", () => {
-    const { pages } = usageView(usage({ pagesUsed: 12, pagesReadInAll: 1 }), {
+  it("warns near the limit and turns red when the pages are used", () => {
+    const near = usageView(usage({ standard: { added: 80, used: 75 } }), { paymentsLive: false });
+    expect(near.pages.figure).toBe("75 / 80 pages");
+    expect(near.pages.tone).toBe("warn");
+
+    const full = usageView(usage({ standard: { added: 80, used: 80 } }), { paymentsLive: false });
+    expect(full.pages.figure).toBe("80 / 80 pages");
+    expect(full.pages.tone).toBe("danger");
+    expect(full.pages.note).toBe(
+      "You have used your 80 free pages. More pages (₱3.50 each) are coming soon.",
+    );
+  });
+
+  it("counts against everything the account's runs added once payments are live", () => {
+    const { pages } = usageView(usage({ standard: { added: 170, used: 95 } }), {
       paymentsLive: true,
     });
+    expect(pages.figure).toBe("95 / 170 pages");
     expect(pages.note).toBe(
-      "Your latest run. Each upload starts a new run: ₱149 for up to 80 pages, then ₱3.50 a page. 1 page read so far.",
+      "75 pages left. A photo is 1 page; a PDF counts every page. A new run of 80 pages is ₱149.",
+    );
+    const out = usageView(usage({ standard: { added: 80, used: 80 } }), { paymentsLive: true });
+    expect(out.pages.note).toBe("No pages left. A new run of 80 pages is ₱149.");
+    const trial = usageView(usage({ trialAvailable: true }), { paymentsLive: true });
+    expect(trial.pages.figure).toBe("0 / 10 pages");
+    expect(trial.pages.note).toBe(
+      "10 pages to start with. A photo is 1 page; a PDF counts every page.",
     );
   });
 
   it("counts a Premium account's month out of 300 pages", () => {
     const { pages, tierLabel } = usageView(
-      usage({ tier: "premium", premiumUntil: "2026-12-14T04:00:00Z", pagesUsed: 120 }),
+      usage({ tier: "premium", premiumUntil: "2026-12-14T04:00:00Z", premiumPagesUsed: 120 }),
     );
     expect(tierLabel).toBe("Premium");
     expect(pages.figure).toBe("120 / 300 pages");
@@ -64,11 +83,11 @@ describe("the AI doc parsing meter", () => {
   });
 
   it("warns a Premium account near its month's pages, and prices what went over", () => {
-    const near = usageView(usage({ tier: "premium", premiumUntil: null, pagesUsed: 299 }));
+    const near = usageView(usage({ tier: "premium", premiumPagesUsed: 299 }));
     expect(near.pages.tone).toBe("warn");
     expect(near.pages.note).toBe("1 page left this Premium month.");
 
-    const over = usageView(usage({ tier: "premium", premiumUntil: null, pagesUsed: 312 }));
+    const over = usageView(usage({ tier: "premium", premiumPagesUsed: 312 }));
     expect(over.pages.figure).toBe("312 / 300 pages");
     expect(over.pages.meter.percent).toBe(100);
     expect(over.pages.note).toBe("12 pages over this month's 300, at ₱2.65 each.");
@@ -106,11 +125,13 @@ describe("the doc storage meter", () => {
     expect(launch.storage.figure).toBe("320 MB / 300 MB");
     expect(launch.storage.tone).toBe("danger");
     expect(launch.storage.note).toBe(
-      "1 file stored. Storage is full. Premium (coming soon) comes with 15 GB.",
+      "1 file stored. Storage is full: new uploads are refused until files are deleted. Premium (coming soon) comes with 15 GB.",
     );
     expect(
       usageView(usage({ storageBytes: 320 * MB, files: 1 }), { paymentsLive: true }).storage.note,
-    ).toBe("1 file stored. Storage is full. Premium comes with 15 GB.");
+    ).toBe(
+      "1 file stored. Storage is full: new uploads are refused until files are deleted. Premium comes with 15 GB.",
+    );
   });
 
   it("gives a Premium account 15 GB", () => {

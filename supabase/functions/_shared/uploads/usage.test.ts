@@ -9,6 +9,7 @@ import {
   premiumWindowStart,
   sizeText,
   storageLimit,
+  storageRoom,
   tierOf,
 } from "./usage.ts";
 
@@ -55,6 +56,27 @@ describe("the limits of each tier", () => {
     expect(storageLimit("premium")).toBe(PRICING.premiumStorageGb * GB);
     expect(sizeText(storageLimit("standard"))).toBe("300 MB");
     expect(sizeText(storageLimit("premium"))).toBe("15 GB");
+  });
+});
+
+describe("storageRoom", () => {
+  it("lets an upload in while it fits in the tier's storage", () => {
+    expect(storageRoom("standard", 240 * MB, 60 * MB)).toEqual({
+      ok: true,
+      limit: 300 * MB,
+      free: 60 * MB,
+    });
+    expect(storageRoom("standard", 0, 300 * MB).ok).toBe(true);
+  });
+
+  it("refuses what does not fit, by a single byte too", () => {
+    expect(storageRoom("standard", 240 * MB, 60 * MB + 1).ok).toBe(false);
+    expect(storageRoom("standard", 320 * MB, 1)).toMatchObject({ ok: false, free: 0 });
+  });
+
+  it("gives a Premium account its 15 GB", () => {
+    expect(storageRoom("premium", 320 * MB, 5 * GB).ok).toBe(true);
+    expect(storageRoom("premium", 14 * GB, 2 * GB).ok).toBe(false);
   });
 });
 

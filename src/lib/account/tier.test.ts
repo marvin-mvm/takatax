@@ -15,8 +15,8 @@ describe("tierSummary", () => {
       name: "Standard",
       tag: "Free during launch",
       points: [
-        "Every run of up to 80 pages is free, as often as you need.",
-        "Pages over 80 (₱3.50 each) and Premium are coming soon.",
+        "Your first 80 pages are read free, counted across all your uploads.",
+        "More pages (₱3.50 each) and Premium are coming soon.",
         "300 MB of document storage.",
       ],
     });
@@ -27,7 +27,7 @@ describe("tierSummary", () => {
       name: "Standard",
       tag: "Pay per run",
       points: [
-        "₱149 a run for up to 80 pages, then ₱3.50 a page.",
+        "₱149 a run of 80 pages, then ₱3.50 a page. Pages you do not use stay for your next upload.",
         "Free trial: your first 10 pages are read free.",
         "300 MB of document storage.",
       ],
@@ -57,15 +57,13 @@ describe("tierSummary", () => {
     expect(launch.name).toBe("Standard");
     expect(launch.tag).toBe("Free during launch");
     expect(launch.points).toEqual([
-      "Client runs of up to 80 pages are free during launch.",
+      "Each client's first 80 pages are read free during launch.",
       "On a client's account you get that client's tier, Standard or Premium.",
       "Pages and storage are counted on each client's account.",
     ]);
 
     const live = tierSummary({ ...taxpayer, role: "bookkeeper", paymentsLive: true });
     expect(live.tag).toBe("Partner price");
-    expect(live.points[0]).toBe(
-      "₱112 a client run (25% off ₱149) for up to 80 pages, then ₱3.50 a page.",
-    );
+    expect(live.points[0]).toBe("₱112 a client run of 80 pages (25% off ₱149), then ₱3.50 a page.");
   });
 });

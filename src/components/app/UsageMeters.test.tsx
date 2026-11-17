@@ -22,8 +22,9 @@ const usage = (changes: Partial<AccountUsage> = {}): AccountUsage => ({
   accountId: "11111111-1111-4111-8111-111111111111",
   tier: "standard",
   premiumUntil: null,
-  pagesUsed: 75,
-  pagesReadInAll: 90,
+  standard: { added: 80, used: 75 },
+  trialAvailable: false,
+  premiumPagesUsed: 0,
   storageBytes: 240 * MB,
   files: 61,
   ...changes,
@@ -56,7 +57,7 @@ describe("UsageMeters", () => {
   });
 
   it("counts a Premium account's month and its 15 GB", () => {
-    loaded(usage({ tier: "premium", premiumUntil: "2026-12-14T04:00:00Z", pagesUsed: 120 }));
+    loaded(usage({ tier: "premium", premiumUntil: "2026-12-14T04:00:00Z", premiumPagesUsed: 120 }));
     render(<UsageMeters userId="u1" />);
 
     expect(screen.getByRole("heading", { name: /Your usage/ })).toHaveTextContent("Premium");
@@ -65,7 +66,7 @@ describe("UsageMeters", () => {
   });
 
   it("draws a sliver for one page and nothing for none", () => {
-    loaded(usage({ pagesUsed: 1, storageBytes: 0, files: 0 }));
+    loaded(usage({ standard: { added: 80, used: 1 }, storageBytes: 0, files: 0 }));
     render(<UsageMeters userId="u1" />);
 
     const bar = (name: string) =>
