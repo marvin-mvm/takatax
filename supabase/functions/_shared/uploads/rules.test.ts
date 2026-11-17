@@ -6,6 +6,7 @@ import {
   PRICING,
   batchMessage,
   checkFile,
+  pagesLeft,
   pesoText,
   quoteRun as quote,
 } from "./rules.ts";
@@ -164,10 +165,147 @@ describe("launch pricing (payments not live yet)", () => {
     const counts = { images: 40, allJpeg: true, pdfs: 5, pdfPages: 60 };
     expect(batchMessage(counts, quoteAtLaunch(100))).toEqual([
       "You uploaded 40 JPG and 5 PDF files with 100 total combined pages.",
-      "It exceeded the 80 limit for a Standard run. Extra pages (₱3.50 each) are coming soon, so for now please remove 20 pages to keep this run to 80.",
+      "You have 80 pages left of your 80 free pages. Extra pages (₱3.50 each) are coming soon, so for now please remove 20 pages.",
     ]);
     expect(
       batchMessage({ ...counts, images: 10, pdfs: 2, pdfPages: 40 }, quoteAtLaunch(50)),
     ).toEqual(["You uploaded 10 JPG and 2 PDF files with 50 total combined pages."]);
+  });
+});
+
+describe("pages are counted across uploads", () => {
+  const photos = (n: number) => ({ images: n, allJpeg: true, pdfs: 0, pdfPages: 0 });
+
+  describe("at launch: the first run of 80 pages is free, then more pages are coming soon", () => {
+    it("gives a new account its 80 pages with its first run", () => {
+      expect(pagesLeft(undefined, { paymentsLive: false })).toEqual({
+        limit: 80,
+        used: 0,
+        left: 80,
+      });
+      expect(quoteAtLaunch(3)).toMatchObject({
+        blocked: false,
+        pagesAdded: 80,
+        allowance: 80,
+        leftAfter: 77,
+      });
+    });
+
+    it("counts every upload against the same 80 pages", () => {
+      const standard = { added: 80, used: 11 };
+      expect(pagesLeft(standard, { paymentsLive: false })).toEqual({
+        limit: 80,
+        used: 11,
+        left: 69,
+      });
+      // A 3-page PDF is 3 pages, not 1.
+      expect(quoteAtLaunch(3, { standard })).toMatchObject({
+        blocked: false,
+        pagesAdded: 0,
+        limit: 69,
+        leftAfter: 66,
+        total: 0,
+      });
+      expect(quoteAtLaunch(69, { standard })).toMatchObject({ blocked: false, leftAfter: 0 });
+    });
+
+    it("blocks what the pages left do not cover, and says how many to remove", () => {
+      const standard = { added: 80, used: 75 };
+      const quoted = quoteAtLaunch(12, { standard });
+      expect(quoted).toMatchObject({ blocked: true, extra: 7, limit: 5, pagesAdded: 0 });
+      expect(batchMessage(photos(12), quoted)[1]).toBe(
+        "You have 5 pages left of your 80 free pages. Extra pages (₱3.50 each) are coming soon, so for now please remove 7 pages.",
+      );
+    });
+
+    it("blocks everything once the 80 pages are used, for a partner on the account too", () => {
+      const standard = { added: 80, used: 80 };
+      expect(quoteAtLaunch(1, { standard })).toMatchObject({ blocked: true, extra: 1, limit: 0 });
+      expect(quoteAtLaunch(1, { standard, partner: true }).blocked).toBe(true);
+      expect(batchMessage(photos(1), quoteAtLaunch(1, { standard }))[1]).toBe(
+        "You have used your 80 free pages. Extra pages (₱3.50 each) are coming soon.",
+      );
+    });
+
+    it("never gives the free 80 pages twice", () => {
+      expect(quoteAtLaunch(5, { standard: { added: 80, used: 80 } }).pagesAdded).toBe(0);
+      expect(quoteAtLaunch(5, { standard: { added: 80, used: 0 } }).pagesAdded).toBe(0);
+      // A run that is refused adds nothing either.
+      expect(quoteAtLaunch(100).pagesAdded).toBe(0);
+    });
+  });
+
+  describe("with payments live: pages left first, then the trial, then a new run", () => {
+    it("reads from the pages a run left over, at no price", () => {
+      const quoted = quoteRun(20, { standard: { added: 80, used: 30 } });
+      expect(quoted).toMatchObject({
+        plan: "standard",
+        total: 0,
+        pagesAdded: 0,
+        summary: "Covered by your pages left",
+        leftAfter: 30,
+      });
+      expect(batchMessage(photos(20), quoted)[1]).toBe("Your pages left cover them.");
+    });
+
+    it("sells a new run of 80 pages when the pages left run out", () => {
+      // 5 pages left, 20 to read: 15 more are needed, so a new run; 65 pages stay for later.
+      expect(quoteRun(20, { standard: { added: 80, used: 75 } })).toMatchObject({
+        plan: "standard",
+        total: 149,
+        extra: 0,
+        pagesAdded: 80,
+        limit: 85,
+        leftAfter: 65,
+      });
+    });
+
+    it("prices only the pages a new run does not cover at ₱3.50", () => {
+      // 5 left + a run of 80 covers 85 of the 100 pages: 15 extra.
+      const quoted = quoteRun(100, { standard: { added: 80, used: 75 } });
+      expect(quoted).toMatchObject({
+        total: 149 + 15 * 3.5,
+        extra: 15,
+        pagesAdded: 95,
+        leftAfter: 0,
+      });
+      expect(batchMessage(photos(100), quoted)[1]).toBe(
+        "It exceeded the 85 pages your pages left and a new run cover, so ₱3.50 will be applied for each of the 15 extra pages (₱52.50).",
+      );
+    });
+
+    it("gives the free trial's 10 pages once, and keeps what a later run does not use", () => {
+      expect(pagesLeft(undefined, { paymentsLive: true, trialAvailable: true }).left).toBe(10);
+      expect(quoteRun(8, { trialAvailable: true })).toMatchObject({
+        plan: "trial",
+        total: 0,
+        usesTrial: true,
+        pagesAdded: 10,
+        leftAfter: 2,
+      });
+      // 15 pages: the trial covers 10, a run the other 5; 75 pages stay on the account.
+      expect(quoteRun(15, { trialAvailable: true })).toMatchObject({
+        plan: "standard",
+        total: 149,
+        usesTrial: true,
+        pagesAdded: 90,
+        leftAfter: 75,
+      });
+      // The trial is not touched while pages are left.
+      expect(
+        quoteRun(5, { trialAvailable: true, standard: { added: 80, used: 10 } }),
+      ).toMatchObject({ usesTrial: false, total: 0, pagesAdded: 0 });
+      expect(quoteRun(8, { trialAvailable: true, partner: true })).toMatchObject({
+        plan: "partner",
+        usesTrial: false,
+        total: 112,
+      });
+    });
+
+    it("leaves Premium's month as it was", () => {
+      expect(
+        quoteRun(200, { premiumRemaining: 300, standard: { added: 80, used: 80 } }),
+      ).toMatchObject({ plan: "premium", total: 0, pagesAdded: 0, allowance: 300, leftAfter: 100 });
+    });
   });
 });

@@ -92,10 +92,29 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
 - Pricing is per page (a photo is one page, a PDF every page): `quoteRun` in
   `supabase/functions/_shared/uploads/rules.ts`, shared by the upload screen and
   `create-checkout`.
+- Pages are counted on the account, across uploads. A run adds Standard pages (80 for a run, 10
+  for the free trial, each extra page bought: `runs.pages_added`) and every page sent for
+  reading uses one; pages a run did not use stay for the next upload. `account_usage()` in the
+  database adds them up (it gives pages back only for a run whose documents were deleted before
+  anything was read), and `create-checkout` opens every run through `open_run()`, which refuses
+  if the account's pages changed since the price was worked out. At launch the first 80 pages
+  of an account are free and more are "coming soon", so reading stops at 80. Premium's pages
+  are counted by its month.
+- Storage is the account's, by its tier (300 MB Standard, 15 GB Premium, from `PRICING`):
+  `create-upload-urls` refuses an upload that does not fit in what is free (`storageRoom` in
+  `supabase/functions/_shared/uploads/usage.ts`), and the upload screen says so first.
+- Uploading: saving a file and reading it are two steps (`src/components/app/UploadPanel.tsx`).
+  "Proceed" on a file saves that file only; it then waits to be read, with its own "Read"
+  button. "Proceed All" saves every file picked and reads everything saved and not read yet.
+- Tags and search: `documents.tags` holds short labels ("Exp Q1 2026"). Files are ticked in the
+  Documents table and tagged from the bar that appears (`tag_documents()`, for the owner or a
+  professional with access; a professional's tagging is logged). The Documents tab searches by
+  file name, the names and numbers read from the document, and tags, and filters by status and
+  tag. Rules: `src/lib/documents/tags.ts`.
 - File storage: Cloudflare R2 (private buckets, signed upload links), not Supabase Storage.
   R2 keys live in Supabase Edge Function secrets.
 - Payments: Xendit, switched off for launch by `PAYMENTS_LIVE` in
-  `supabase/functions/_shared/uploads/rules.ts` (Standard runs up to 80 pages are free; extra
+  `supabase/functions/_shared/uploads/rules.ts` (an account's first 80 pages are free; more
   pages and Premium are "coming soon" on the screens and in `create-checkout`). The provider code
   is in `supabase/functions/_lib/payments.ts`; `payments-webhook` (JWT check off in
   `supabase/config.toml`; it checks Xendit's callback token) marks runs and Premium months paid.
@@ -135,12 +154,10 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
   activity log (`checked_document`). A file in which the reader finds no document at all is
   also "needs_review" (`combineReadings`), so it gets the empty form and is never shown as read.
 - Usage meters: "AI doc parsing" and "Doc storage" as used / limit (`UsageMeters`, on the
-  Documents tab and the account settings page). The limits come from `PRICING` through
-  `supabase/functions/_shared/uploads/usage.ts`; `loadUsage()` counts and
-  `src/lib/account/usage.ts` words them. Standard counts the latest run's pages out of 80 (every
-  upload starts a new run); Premium counts the Premium month's pages out of 300. Storage is the
-  size of the files still stored, out of 300 MB (Standard) or 15 GB (Premium). The storage limit
-  is shown, not enforced: uploads are not refused when it is passed.
+  Documents tab and the account settings page). `loadUsage()` reads the database's count and
+  `src/lib/account/usage.ts` words it. Standard shows the pages used out of the pages the
+  account has (11 / 80); Premium the Premium month's pages out of 300. Storage is the size of
+  the files still stored, out of 300 MB (Standard) or 15 GB (Premium).
 - Account settings: `/app/settings`, opened from "Hi [first name]" in the header (which replaced
   the Log out button): the user's details and Log out, the current tier
   (`src/lib/account/tier.ts`), the usage meters, Premium and the transaction history.

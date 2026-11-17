@@ -181,6 +181,10 @@ function toDocument(row: Row): StoredDocument {
     flags: Array.isArray(row["flags"]) ? (row["flags"] as CheckFlag[]) : [],
     previewUrl: null,
     fileDeleted: Boolean(row["file_deleted_at"]),
+    inRun: Boolean(row["run_id"]),
+    tags: Array.isArray(row["tags"])
+      ? (row["tags"] as unknown[]).filter((tag): tag is string => typeof tag === "string")
+      : [],
     // While a document is being read, `extracted` holds its progress, not a reading.
     readings:
       READ_FINISHED.includes(status) && text(row["kind"]) !== "cor"
@@ -1049,6 +1053,24 @@ export async function reviewDocument(
   return status === "rejected" ? "rejected" : "accepted";
 }
 
+/**
+ * Adds and removes tags on documents of an account (database function `tag_documents`), for the
+ * owner or a professional with access. Returns how many files were changed.
+ */
+export async function tagDocuments(
+  accountId: string,
+  documentIds: string[],
+  add: string[],
+  remove: string[],
+): Promise<number> {
+  const touched = await rpc<number>(
+    "tag_documents",
+    { account: accountId, document_ids: documentIds, add_tags: add, remove_tags: remove },
+    "Tags",
+  );
+  return Number(touched) || 0;
+}
+
 /** Saves the confirmed COR: this sets the account's tax types and deadlines. */
 export async function confirmCor(documentId: string, details: CorDetails): Promise<void> {
   await rpc("confirm_cor", { document: documentId, details }, "COR confirmation");
@@ -1111,82 +1133,57 @@ export function loadPlan(userId: string): Promise<Loaded<PlanStatus>> {
   );
 }
 
-/** The size and number of the account's files in storage, a thousand rows at a time. */
-async function storedFiles(accountId: string): Promise<{ bytes: number; files: number }> {
-  const PAGE = 1_000;
-  let bytes = 0;
-  let files = 0;
-  for (let from = 0; ; from += PAGE) {
-    const page = rows<Row[]>(
-      await db
-        .from("documents")
-        .select("bytes")
-        .eq("account_id", accountId)
-        // A file that was deleted (its records kept) or never reached storage takes no space.
-        .is("file_deleted_at", null)
-        .neq("status", "waiting_for_storage")
-        .order("id")
-        .range(from, from + PAGE - 1),
-    );
-    for (const row of page) bytes += typeof row["bytes"] === "number" ? row["bytes"] : 0;
-    files += page.length;
-    if (page.length < PAGE) return { bytes, files };
-  }
-}
-
 /**
- * What the signed-in user's account has used of its tier: pages read and file storage.
- * Standard counts the latest run's pages (every upload starts a new run of up to 80 pages);
- * Premium counts the pages of the current Premium month, the window create-checkout prices by.
+ * What an account has used of its tier: pages read and file storage, counted in the database
+ * (`account_usage()`). Without an account id it is the signed-in user's own account; with one,
+ * a client's account for a professional with access (who learns the tier, the pages and the
+ * storage, never the plan's dates).
  */
-export function loadUsage(): Promise<Loaded<AccountUsage>> {
+export function loadUsage(clientAccountId?: string): Promise<Loaded<AccountUsage>> {
   return liveOrSample(
     async () => {
       // Billing columns are not readable from the table; my_plan() returns the owner's only.
-      const plan = rows<Row[]>(await db.rpc("my_plan"))[0];
-      const accountId = text(plan?.["account_id"]);
+      const plan = clientAccountId ? undefined : rows<Row[]>(await db.rpc("my_plan"))[0];
+      const accountId = clientAccountId ?? text(plan?.["account_id"]);
       const premiumUntil = text(plan?.["premium_until"]) || null;
-      const tier = tierOf(premiumUntil);
       const usage: AccountUsage = {
         accountId,
-        tier,
+        tier: tierOf(premiumUntil),
         premiumUntil,
-        pagesUsed: 0,
-        pagesReadInAll: 0,
+        standard: { added: 0, used: 0 },
+        trialAvailable: Boolean(plan) && plan?.["trial_used"] !== true,
+        premiumPagesUsed: 0,
         storageBytes: 0,
         files: 0,
       };
       // No account yet: nothing was uploaded, so nothing is used.
-      if (!accountId) return usage;
+      if (!accountId) return { ...usage, trialAvailable: !clientAccountId };
 
-      const [runRows, stored] = await Promise.all([
-        db
-          .from("runs")
-          .select("kind, status, page_count, pages_read, created_at")
-          .eq("account_id", accountId)
-          .order("created_at", { ascending: false })
-          .limit(1_000),
-        storedFiles(accountId),
-      ]);
-      const count = (value: unknown) => (typeof value === "number" ? Math.max(value, 0) : 0);
-      // A run whose payment was never finished read nothing.
-      const runs = rows<Row[]>(runRows).filter((run) => run["status"] !== "awaiting_payment");
-      if (tier === "premium" && premiumUntil) {
-        const windowStart = premiumWindowStart(text(plan?.["premium_started_at"]), premiumUntil);
-        usage.pagesUsed = runs
-          .filter(
-            (run) =>
-              run["kind"] === "premium_month" && Date.parse(text(run["created_at"])) >= windowStart,
-          )
-          .reduce((sum, run) => sum + count(run["page_count"]), 0);
-      } else {
-        usage.pagesUsed = count(
-          runs.find((run) => run["kind"] !== "premium_month")?.["page_count"],
-        );
+      const counted = rows<Row[]>(await db.rpc("account_usage", { account: accountId }))[0];
+      const count = (value: unknown) => Math.max(Number(value) || 0, 0);
+      usage.tier = counted?.["tier"] === "premium" ? "premium" : "standard";
+      usage.standard = {
+        added: count(counted?.["pages_added"]),
+        used: count(counted?.["pages_used"]),
+      };
+      usage.storageBytes = count(counted?.["storage_bytes"]);
+      usage.files = count(counted?.["files"]);
+
+      // The owner's Premium month: the window create-checkout prices by.
+      if (!clientAccountId && usage.tier === "premium" && premiumUntil) {
+        const windowStart = new Date(
+          premiumWindowStart(text(plan?.["premium_started_at"]), premiumUntil),
+        ).toISOString();
+        usage.premiumPagesUsed = rows<Row[]>(
+          await db
+            .from("runs")
+            .select("page_count")
+            .eq("account_id", accountId)
+            .eq("kind", "premium_month")
+            .neq("status", "awaiting_payment")
+            .gte("created_at", windowStart),
+        ).reduce((sum, run) => sum + count(run["page_count"]), 0);
       }
-      usage.pagesReadInAll = runs.reduce((sum, run) => sum + count(run["pages_read"]), 0);
-      usage.storageBytes = stored.bytes;
-      usage.files = stored.files;
       return usage;
     },
     () => sampleUsage(todayInManila()),

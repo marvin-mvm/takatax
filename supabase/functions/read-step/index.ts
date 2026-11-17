@@ -125,6 +125,8 @@ async function step(payload: StepPayload): Promise<void> {
   try {
     await readPart(admin, document);
     await reportProgress(admin, payload);
+    // Documents read again by id still belong to a run: its counter and status follow them.
+    if (!payload.runId && document.run_id) await closeRunIfRead(admin, document.run_id);
   } catch (error) {
     const attempt = (payload.attempt ?? 0) + 1;
     console.error(`read-step: ${document.id} failed (attempt ${attempt})`, error);
@@ -318,6 +320,22 @@ async function reportProgress(admin: SupabaseClient, payload: StepPayload): Prom
     }
   }
   await admin.from("runs").update({ pages_read: pagesRead }).eq("id", payload.runId);
+}
+
+/**
+ * For documents read again by id: counts the pages read in their run and, once none of its
+ * documents is waiting or being read, closes it.
+ */
+async function closeRunIfRead(admin: SupabaseClient, runId: string): Promise<void> {
+  await reportProgress(admin, { runId });
+  const { data } = await admin.from("documents").select("status").eq("run_id", runId);
+  const statuses = (data ?? []).map((d) => d.status as string);
+  if (statuses.some((s) => s === "reading" || s === "waiting_for_reader")) return;
+  await admin
+    .from("runs")
+    .update({ status: statuses.includes("needs_review") ? "review" : "complete" })
+    .eq("id", runId)
+    .in("status", ["paid", "reading"]);
 }
 
 /** Nothing left that this reader can read: close the run. */

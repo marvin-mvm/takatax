@@ -3,6 +3,10 @@
 //
 // Creates one `documents` row per file and a signed R2 upload link for each. The browser then
 // PUTs the file to R2 directly. Answers 503 { code: "not_configured" } until R2 is set up.
+//
+// Storage is the account's, by its tier (300 MB on Standard, 15 GB on Premium, from PRICING):
+// an upload that does not fit in what is free answers 409 { code: "storage_full" } and nothing
+// is created. What is stored comes from account_usage() in the database.
 import { adminClient, authorize } from "../_lib/clients.ts";
 import { HttpError, json, serve } from "../_lib/http.ts";
 import { assertStorageConfigured, signedUploadUrl } from "../_lib/r2.ts";
@@ -12,6 +16,7 @@ import {
   MAX_FILES_PER_UPLOAD,
   MAX_PDF_PAGES,
 } from "../_shared/uploads/rules.ts";
+import { sizeText, storageRoom, type Tier } from "../_shared/uploads/usage.ts";
 
 interface RequestFile {
   clientId: string;
@@ -55,8 +60,27 @@ serve(async (request) => {
       ? Math.min(Math.max(Math.floor(Number(file.pages) || 1), 1), MAX_PDF_PAGES)
       : 1;
 
-  const { userId } = await authorize(request, accountId);
+  const { userId, client } = await authorize(request, accountId);
   assertStorageConfigured();
+
+  // Does it fit in the storage the account's tier comes with?
+  const { data: usageRows, error: usageError } = await client.rpc("account_usage", {
+    account: accountId,
+  });
+  if (usageError) throw usageError;
+  const usage = (usageRows ?? [])[0] as { tier: string; storage_bytes: number } | undefined;
+  if (!usage) throw new HttpError(403, "forbidden", "You do not have access to this account");
+  const tier: Tier = usage.tier === "premium" ? "premium" : "standard";
+  const room = storageRoom(tier, Number(usage.storage_bytes) || 0, batchBytes);
+  if (!room.ok) {
+    throw new HttpError(
+      409,
+      "storage_full",
+      room.free > 0
+        ? `These files take ${sizeText(batchBytes)} and the account has ${sizeText(room.free)} of its ${sizeText(room.limit)} storage free. Delete files you no longer need, then try again`
+        : `The account's ${sizeText(room.limit)} storage is full. Delete files you no longer need, then try again`,
+    );
+  }
 
   const admin = adminClient();
   const year = new Date().getUTCFullYear();

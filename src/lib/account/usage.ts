@@ -4,7 +4,7 @@
  * `@shared/uploads/usage.ts`; this file only turns them into what the screen says.
  */
 
-import { PAYMENTS_LIVE, PRICING, pesoText } from "@shared/uploads/rules.ts";
+import { PAYMENTS_LIVE, PRICING, pagesLeft, pesoText } from "@shared/uploads/rules.ts";
 import {
   type Meter,
   type Tier,
@@ -45,15 +45,16 @@ const plural = (value: number, one: string, many = `${one}s`) =>
   `${count(value)} ${value === 1 ? one : many}`;
 
 function pagesView(usage: AccountUsage, paymentsLive: boolean): MeterView {
-  const measured = meter(usage.pagesUsed, pageLimit(usage.tier));
-  const figure = `${count(measured.used)} / ${count(measured.limit)} pages`;
-  const spoken = `${count(measured.used)} of ${plural(measured.limit, "page")}`;
-  const base = { title: "AI doc parsing", figure, spoken, meter: measured };
+  const title = "AI doc parsing";
 
   if (usage.tier === "premium") {
+    const measured = meter(usage.premiumPagesUsed, pageLimit("premium"));
     const until = usage.premiumUntil ? ` Premium runs until ${shortDay(usage.premiumUntil)}.` : "";
     return {
-      ...base,
+      title,
+      figure: `${count(measured.used)} / ${count(measured.limit)} pages`,
+      spoken: `${count(measured.used)} of ${plural(measured.limit, "page")}`,
+      meter: measured,
       note:
         measured.over > 0
           ? `${plural(measured.over, "page")} over this month's ${count(measured.limit)}, at ${pesoText(PRICING.premiumExtraPage)} each.${until}`
@@ -62,16 +63,33 @@ function pagesView(usage: AccountUsage, paymentsLive: boolean): MeterView {
     };
   }
 
-  // Standard: every upload is its own run, so the bar is the latest run's and never a warning.
-  const perRun = paymentsLive
-    ? `Each upload starts a new run: ${pesoText(PRICING.runPrice)} for up to ${count(measured.limit)} pages, then ${pesoText(PRICING.extraPage)} a page.`
-    : `Each upload starts a new run of up to ${count(measured.limit)} pages, free during launch.`;
-  if (usage.pagesUsed === 0 && usage.pagesReadInAll === 0) {
-    return { ...base, note: `Nothing read yet. ${perRun}`, tone: "brand" };
+  // Standard: every page sent for reading counts, whatever upload it came in.
+  const pages = pagesLeft(usage.standard, { trialAvailable: usage.trialAvailable, paymentsLive });
+  const measured = meter(pages.used, pages.limit);
+  const more = paymentsLive
+    ? `A new run of ${count(PRICING.runPages)} pages is ${pesoText(PRICING.runPrice)}.`
+    : `More pages (${pesoText(PRICING.extraPage)} each) are coming soon.`;
+  const counting = "A photo is 1 page; a PDF counts every page.";
+  let note: string;
+  if (measured.left === 0) {
+    note = paymentsLive
+      ? `No pages left. ${more}`
+      : `You have used your ${count(measured.limit)} free pages. ${more}`;
+  } else if (measured.used === 0) {
+    note = paymentsLive
+      ? `${plural(measured.left, "page")} to start with. ${counting}`
+      : `Your first ${count(measured.limit)} pages are free during launch. ${counting}`;
+  } else {
+    note = `${plural(measured.left, "page")} left. ${counting} ${more}`;
   }
-  const soFar =
-    usage.pagesReadInAll > 0 ? ` ${plural(usage.pagesReadInAll, "page")} read so far.` : "";
-  return { ...base, note: `Your latest run. ${perRun}${soFar}`, tone: "brand" };
+  return {
+    title,
+    figure: `${count(measured.used)} / ${count(measured.limit)} pages`,
+    spoken: `${count(measured.used)} of ${plural(measured.limit, "page")}`,
+    meter: measured,
+    note,
+    tone: measured.level === "full" ? "danger" : measured.level === "near" ? "warn" : "brand",
+  };
 }
 
 function storageView(usage: AccountUsage, paymentsLive: boolean): MeterView {
@@ -84,8 +102,8 @@ function storageView(usage: AccountUsage, paymentsLive: boolean): MeterView {
   if (measured.level === "full") {
     note =
       usage.tier === "premium"
-        ? `${files} Storage is full.`
-        : `${files} Storage is full. Premium${paymentsLive ? "" : " (coming soon)"} comes with ${PRICING.premiumStorageGb} GB.`;
+        ? `${files} Storage is full: new uploads are refused until files are deleted.`
+        : `${files} Storage is full: new uploads are refused until files are deleted. Premium${paymentsLive ? "" : " (coming soon)"} comes with ${PRICING.premiumStorageGb} GB.`;
   }
   return {
     title: "Doc storage",

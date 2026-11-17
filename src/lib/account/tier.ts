@@ -39,8 +39,8 @@ export function tierSummary(input: {
       tag: paymentsLive ? "Partner price" : "Free during launch",
       points: [
         paymentsLive
-          ? `${pesoText(PARTNER_RUN_PRICE)} a client run (${Math.round(PRICING.partnerDiscount * 100)}% off ${pesoText(PRICING.runPrice)}) for up to ${runPages} pages, then ${extraPage} a page.`
-          : `Client runs of up to ${runPages} pages are free during launch.`,
+          ? `${pesoText(PARTNER_RUN_PRICE)} a client run of ${runPages} pages (${Math.round(PRICING.partnerDiscount * 100)}% off ${pesoText(PRICING.runPrice)}), then ${extraPage} a page.`
+          : `Each client's first ${runPages} pages are read free during launch.`,
         "On a client's account you get that client's tier, Standard or Premium.",
         "Pages and storage are counted on each client's account.",
       ],
@@ -66,8 +66,8 @@ export function tierSummary(input: {
       name: TIER_LABEL.standard,
       tag: "Free during launch",
       points: [
-        `Every run of up to ${runPages} pages is free, as often as you need.`,
-        `Pages over ${runPages} (${extraPage} each) and Premium are coming soon.`,
+        `Your first ${runPages} pages are read free, counted across all your uploads.`,
+        `More pages (${extraPage} each) and Premium are coming soon.`,
         storage,
       ],
     };
@@ -76,7 +76,7 @@ export function tierSummary(input: {
     name: TIER_LABEL.standard,
     tag: "Pay per run",
     points: [
-      `${pesoText(PRICING.runPrice)} a run for up to ${runPages} pages, then ${extraPage} a page.`,
+      `${pesoText(PRICING.runPrice)} a run of ${runPages} pages, then ${extraPage} a page. Pages you do not use stay for your next upload.`,
       input.trialUsed
         ? `Free trial used: your first ${PRICING.trialPages} pages were read free.`
         : `Free trial: your first ${PRICING.trialPages} pages are read free.`,
