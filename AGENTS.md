@@ -132,7 +132,8 @@ of Supabase and Trigger.dev, what has been built, and what to do next.
   shown as "Not counted", when nothing in the file is a tax document). The form is also behind
   "Correct what was read" on a document that is already read. Amounts typed in the form are
   pesos; a foreign amount is never offered as pesos. A professional's check goes in the
-  activity log (`checked_document`).
+  activity log (`checked_document`). A file in which the reader finds no document at all is
+  also "needs_review" (`combineReadings`), so it gets the empty form and is never shown as read.
 - Usage meters: "AI doc parsing" and "Doc storage" as used / limit (`UsageMeters`, on the
   Documents tab and the account settings page). The limits come from `PRICING` through
   `supabase/functions/_shared/uploads/usage.ts`; `loadUsage()` counts and

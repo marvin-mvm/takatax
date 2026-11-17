@@ -44,9 +44,15 @@ const STEP_ORDER: ReaderStep[] = ["fast", "recheck", "settle"];
 /**
  * One result for a whole document from the results of its page groups: every document found,
  * the furthest reader step used, all flags, and "needs_review" if any group needs it.
+ *
+ * A file in which nothing at all was found also needs review: a person must look at it, so it
+ * is never marked as read with nothing to show for it.
  */
 export function combineReadings(results: ReadResult[], extraFlags: CheckFlag[] = []): ReadResult {
-  const flags = [...new Set([...results.flatMap((r) => r.flags), ...extraFlags])];
+  const nothingFound: CheckFlag[] = results.some((r) => r.documents.length > 0)
+    ? []
+    : ["not_a_document"];
+  const flags = [...new Set([...results.flatMap((r) => r.flags), ...extraFlags, ...nothingFound])];
   const deepest = results.reduce(
     (longest, r) => (r.path.length > longest.length ? r.path : longest),
     [] as ReaderStep[],

@@ -40,7 +40,8 @@ committed, so never put a secret there).
       `delete-document`, `read-documents`, `read-step`, `assistant-chat`, `create-checkout` and
       `payments-webhook` are deployed (`payments-webhook` and `read-step` skip the login check;
       `read-step` accepts only the service role key). Each answers "not configured" until its
-      keys are set. All nine matched `main` file by file on 2026-11-16. Redeploy after changes
+      keys are set. All nine matched the code file by file on 2026-11-16 (`read-step` was last
+      deployed that day from `v0.002` at `90d12f8`). Redeploy after changes
       with `supabase functions deploy --project-ref thiznrxojzrxkjwqhtjt --use-api`.
 
 ## 1. Cloudflare R2 (file storage)

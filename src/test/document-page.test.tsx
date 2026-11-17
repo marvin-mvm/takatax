@@ -164,6 +164,37 @@ describe("a document's page", () => {
     ).toBeInTheDocument();
   });
 
+  it("gives a file the AI found nothing in an empty form to type in", async () => {
+    repository.reviewDocument.mockResolvedValue("rejected");
+    show(doc({ kind: "unknown", flags: ["not_a_document"], readings: [] }));
+
+    expect(screen.getByRole("heading", { name: "Check what was read" })).toBeInTheDocument();
+    expect(
+      screen.getByText("This does not look like a receipt, invoice or Form 2307."),
+    ).toBeInTheDocument();
+    const form = screen.getByRole("form", { name: "Check what was read" });
+    expect(
+      within(form).getByText(/The AI could not read anything from this file/),
+    ).toBeInTheDocument();
+    expect(within(form).getByLabelText("What it is")).toHaveValue("unknown");
+
+    // It can be typed in from the photo…
+    fireEvent.change(within(form).getByLabelText("What it is"), {
+      target: { value: "expense_receipt" },
+    });
+    fireEvent.change(within(form).getByLabelText("Date"), { target: { value: "2026-11-05" } });
+    fireEvent.change(within(form).getByLabelText("Total (₱)"), { target: { value: "85" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save as checked" }));
+
+    await waitFor(() => expect(repository.reviewDocument).toHaveBeenCalledTimes(1));
+    const [, , rows] = repository.reviewDocument.mock.calls[0] ?? [];
+    expect(rows[0]).toMatchObject({
+      kind: "expense",
+      record_date: "2026-11-05",
+      amount_centavos: 8500,
+    });
+  });
+
   it("saves the check from the page", async () => {
     show(doc());
 
