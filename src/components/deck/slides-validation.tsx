@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { PRICE } from "@/lib/pricing-copy";
 import { Block, Cite, Pill, Point, Points, Slide, Stat } from "./primitives";
 
-const PHASE_1 = "Phase 1 · Validate and define";
+const PHASE_1 = "Deliverable 1 · Idea validation report";
 
 export function CoverSlide() {
   return (
@@ -61,21 +61,19 @@ export function CoverSlide() {
         />
       </div>
       <div className="mt-8 flex flex-wrap items-center gap-2">
-        <a href="#validation" className="rounded-full focus-visible:outline-2">
-          <Pill tone="brand">Phase 1 · Validate and define</Pill>
-        </a>
-        <a href="#architecture" className="rounded-full focus-visible:outline-2">
-          <Pill tone="brand">Phase 2 · Spec and architecture</Pill>
-        </a>
-        <a href="#build" className="rounded-full focus-visible:outline-2">
-          <Pill tone="brand">Phase 3 · Build</Pill>
-        </a>
-        <a href="#deploy" className="rounded-full focus-visible:outline-2">
-          <Pill tone="brand">Phase 4 · Deploy</Pill>
-        </a>
-        <a href="#document" className="rounded-full focus-visible:outline-2">
-          <Pill tone="brand">Phase 5 · Document and reflect</Pill>
-        </a>
+        {[
+          ["#validation", "1 · Idea validation report"],
+          ["#prd", "2 · PRD"],
+          ["#architecture", "3 · Spec and architecture"],
+          ["#build", "4 · GitHub repository"],
+          ["#deploy", "5 · Live app"],
+          ["#document", "6 · Demo"],
+          ["#document", "7 · Reflection"],
+        ].map(([href, label]) => (
+          <a key={label} href={href} className="rounded-full focus-visible:outline-2">
+            <Pill tone="brand">{label}</Pill>
+          </a>
+        ))}
       </div>
     </Slide>
   );

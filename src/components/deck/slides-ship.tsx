@@ -3,8 +3,8 @@
 import { Block, Point, Points, Slide } from "./primitives";
 import { Checklist } from "./slides-spec";
 
-const PHASE_4 = "Phase 4 · Deploy";
-const PHASE_5 = "Phase 5 · Document and reflect";
+const PHASE_4 = "Deliverable 5 · Live deployed application";
+const PHASE_5 = "Deliverables 6 and 7 · Demo and reflection";
 
 /** The brief's recommended stack, and what Takatax uses in its place. */
 const STACK_MAP: { layer: string; recommended: string; ours: string }[] = [

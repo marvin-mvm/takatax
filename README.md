@@ -8,9 +8,13 @@ An AI reader extracts each document; a tested TypeScript tax engine does the mat
 number can be reproduced and explained. Verified bookkeepers, CPAs and tax lawyers can be
 invited into an account, and a community answers tax questions.
 
+- **Submission index (every deliverable, with links):** [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
 - **Live app:** https://takatax.netlify.app
-- **Pitch deck** (validation, PRD, what-if model, architecture, build): https://takatax.netlify.app/deck ([PDF](docs/Takatax-pitch-deck.pdf))
-- **Spec:** [`spec.md`](spec.md) · **Reflection:** [`docs/REFLECTION.md`](docs/REFLECTION.md) ·
+- **Pitch deck** (validation, PRD, what-if model, architecture, build): https://takatax.netlify.app/deck ([PDF](docs/Takatax-submission.pdf))
+- **Validation report:** [`docs/01-idea-validation-report.md`](docs/01-idea-validation-report.md) ·
+  **PRD:** [`docs/02-PRD.md`](docs/02-PRD.md) · **Spec:** [`spec.md`](spec.md) ·
+  **Architecture:** [`docs/03-architecture-notes.md`](docs/03-architecture-notes.md) ·
+  **Reflection:** [`docs/07-reflection.md`](docs/07-reflection.md) ·
   **v2 idea:** [issue #44](https://github.com/marvin-mvm/takatax/issues/44)
 
 ## The problem and the user
@@ -127,7 +131,7 @@ docs/                  setup checklist, handover, reflection
 - [`spec.md`](spec.md): product spec, architecture and acceptance criteria (v1.1)
 - [`AGENTS.md`](AGENTS.md): rules for AI coding tools and the architecture notes
 - [`docs/MISSING_PIECES.md`](docs/MISSING_PIECES.md): keys and one-time settings
-- [`docs/REFLECTION.md`](docs/REFLECTION.md): one-page reflection
+- [`docs/07-reflection.md`](docs/07-reflection.md): one-page reflection
 - The deck at [`/deck`](https://takatax.netlify.app/deck): the seven validation steps, PRD,
   revenue model, architecture, spec review and build plan, with sources
 

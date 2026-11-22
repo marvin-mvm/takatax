@@ -8,13 +8,13 @@ import { PRICE, RUN_AI_COST_AT_MOST } from "@/lib/pricing-copy";
 import { Block, Cite, Pill, Point, Points, Slide } from "./primitives";
 import { WhatIfModel } from "./WhatIfModel";
 
-const PHASE_2 = "Phase 2 · Spec and architecture";
+const PHASE_2 = "Deliverable 3 · Spec and architecture notes";
 
 export function ModelSlide() {
   return (
     <Slide
       id="model"
-      eyebrow="Phase 1 · What-if model"
+      eyebrow="Deliverable 2 · PRD: what-if model"
       title="Play with the plan"
       lead="0.1% of micro enterprises in year 1. 1% by year 3. Move any slider and the numbers follow."
     >
@@ -84,8 +84,8 @@ export function ArchitectureSlide() {
         />
         <FlowArrow />
         <Node
-          title="Trigger.dev"
-          subtitle="Background jobs, no time limit"
+          title="Reader"
+          subtitle="Supabase read-step today; Trigger.dev ready"
           items={["Reads page by page", "Long PDFs in groups", "Retries and progress"]}
           highlight
         />
@@ -119,9 +119,10 @@ export function ArchitectureSlide() {
           AI runs only for a paid run or the one free trial.
         </Point>
         <Point title="Files go straight to R2.">
-          The browser uploads with a short-lived signed link, up to 5 GB a batch. A Trigger.dev job
-          reads each photo, and each PDF a few pages at a time, so long PDFs never hit the edge
-          function's 150 to 400 second limit.
+          The browser uploads with a short-lived signed link, up to 5 GB a batch. The reader reads
+          each photo, and each PDF a few pages at a time, saving its progress and restarting itself,
+          so long PDFs never hit a function's time limit. One secret switches it between a Supabase
+          function (live today) and a Trigger.dev job.
         </Point>
         <Point title="No secrets in the repo or the browser.">
           Each key lives where it is used: the OpenRouter key and a read-only R2 key in Trigger.dev;
@@ -487,7 +488,7 @@ export function BuildSlide() {
   return (
     <Slide
       id="build"
-      eyebrow="Phase 3 · Build"
+      eyebrow="Deliverable 4 · GitHub repository"
       title="Build plan, and where we are."
       lead="The foundation and the AI reader are live."
     >
