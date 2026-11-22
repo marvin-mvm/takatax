@@ -1,0 +1,14 @@
+Read AGENTS.md before changing anything: it holds the project rules, architecture and workflow.
+New sessions start with docs/HANDOVER.md; the build spec is spec.md.
+
+Key rules:
+- TypeScript everywhere. App: TanStack Start (React 19), Tailwind 4 with the tk-* tokens.
+- AI reads documents; the tax engine in supabase/functions/_shared/domain/ computes. Never let a
+  model produce a tax figure.
+- No secrets in the repo or the browser. Keys live in Supabase secrets and Trigger.dev variables.
+- Every table has row-level security; database changes go in a new file in supabase/migrations/
+  with checks in supabase/tests/.
+- Work on branch v0.002; every commit ends with [skip netlify]; never push to main or v0.001.
+- Commits are authored by marvin-mvm <marvinmata19@gmail.com>, with no AI attribution.
+- Before every commit: bunx tsc --noEmit, bun run test, bun run lint, bunx prettier --check,
+  bun run build.

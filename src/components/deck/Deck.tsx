@@ -17,6 +17,8 @@ import {
   StackSlide,
   WorkflowSlide,
 } from "./slides-spec";
+import { DeploySlide, DocumentSlide, ReflectionSlide } from "./slides-ship";
+import { ContentsSlide, WhyNowSlide } from "./slides-submission";
 import {
   CompetitorsSlide,
   CoverSlide,
@@ -38,6 +40,7 @@ interface SlideEntry {
 
 const SLIDES: SlideEntry[] = [
   { id: "cover", Component: CoverSlide },
+  { id: "contents", Component: ContentsSlide },
   { id: "validation", section: "Validation", Component: ValidationOverviewSlide },
   { id: "problem", Component: ProblemSlide },
   { id: "users", Component: UsersSlide },
@@ -46,6 +49,7 @@ const SLIDES: SlideEntry[] = [
   { id: "edge", Component: EdgeSlide },
   { id: "test", Component: TestSlide },
   { id: "risks", Component: RisksSlide },
+  { id: "whynow", Component: WhyNowSlide },
   { id: "prd", section: "PRD", Component: PrdSlide },
   { id: "revenue", section: "Revenue", Component: RevenueSlide },
   { id: "model", section: "What-if", Component: ModelSlide },
@@ -56,8 +60,13 @@ const SLIDES: SlideEntry[] = [
   { id: "workflow", Component: WorkflowSlide },
   { id: "design", Component: DesignSlide },
   { id: "build", section: "Build", Component: BuildSlide },
+  { id: "deploy", section: "Ship", Component: DeploySlide },
+  { id: "document", Component: DocumentSlide },
+  { id: "reflection", Component: ReflectionSlide },
   { id: "sources", section: "Sources", Component: SourcesSlide },
 ];
+
+const SLIDE_IDS = SLIDES.map((slide) => slide.id);
 
 const SECTIONS = SLIDES.flatMap((slide, index) =>
   slide.section ? [{ id: slide.id, label: slide.section, index }] : [],
@@ -184,7 +193,10 @@ export function Deck() {
 
       <main className="mx-auto flex max-w-[1120px] flex-col gap-5 px-3 py-5 sm:gap-6 sm:px-6 sm:py-8">
         {SLIDES.map(({ id, Component }, index) => (
-          <SlideMetaContext.Provider key={id} value={{ number: index + 1, total: SLIDES.length }}>
+          <SlideMetaContext.Provider
+            key={id}
+            value={{ number: index + 1, total: SLIDES.length, ids: SLIDE_IDS }}
+          >
             <Component />
           </SlideMetaContext.Provider>
         ))}

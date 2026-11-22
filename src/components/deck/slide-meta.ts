@@ -4,6 +4,8 @@ import { createContext } from "react";
 export interface SlideMeta {
   number: number;
   total: number;
+  /** Every slide's id, in order, so a slide can name another slide's number. */
+  ids: string[];
 }
 
-export const SlideMetaContext = createContext<SlideMeta>({ number: 0, total: 0 });
+export const SlideMetaContext = createContext<SlideMeta>({ number: 0, total: 0, ids: [] });
