@@ -9,6 +9,7 @@ import { Plus, ScanLine, X } from "lucide-react";
 import { useState } from "react";
 
 import { buttonPrimary } from "@/components/site/styles";
+import { corSaveProblem } from "@/lib/cor/save-problem";
 import { useCorToConfirm } from "@/lib/data/queries";
 import { NotConnectedError, confirmCor } from "@/lib/data/repository";
 import type { CorDetails } from "@/lib/data/types";
@@ -117,13 +118,10 @@ function CorConfirmForm({
         queryClient.invalidateQueries({ queryKey: ["partner-clients"] }),
       ]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
       setProblem(
         error instanceof NotConnectedError
           ? "COR confirmation is not connected yet."
-          : /duplicate|unique/i.test(message)
-            ? "This TIN already belongs to another Takatax account. Each TIN can have one account; ask its owner to give you access instead."
-            : "We could not save your COR. Please check the fields and try again.",
+          : corSaveProblem(error),
       );
     } finally {
       setSaving(false);
