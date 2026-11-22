@@ -68,7 +68,7 @@ export function CoverSlide() {
           ["#build", "4 · GitHub repository"],
           ["#deploy", "5 · Live app"],
           ["#document", "6 · Demo"],
-          ["#document", "7 · Reflection"],
+          ["#reflection", "7 · Reflection"],
         ].map(([href, label]) => (
           <a key={label} href={href} className="rounded-full focus-visible:outline-2">
             <Pill tone="brand">{label}</Pill>

@@ -54,11 +54,11 @@ const DELIVERABLES: Deliverable[] = [
   {
     title: "Demo recording (2 minutes)",
     slides: ["document", "document"],
-    links: [{ label: "Linked in docs/SUBMISSION.md", href: `${REPO}/docs/SUBMISSION.md` }],
+    links: [{ label: "Link in the submission PDF", href: "#document" }],
   },
   {
     title: "Reflection write-up (1 page)",
-    slides: ["document", "document"],
+    slides: ["reflection", "reflection"],
     links: [{ label: "docs/07-reflection.md", href: `${REPO}/docs/07-reflection.md` }],
   },
 ];

@@ -4,7 +4,6 @@ import { Block, Point, Points, Slide } from "./primitives";
 import { Checklist } from "./slides-spec";
 
 const PHASE_4 = "Deliverable 5 · Live deployed application";
-const PHASE_5 = "Deliverables 6 and 7 · Demo and reflection";
 
 /** The brief's recommended stack, and what Takatax uses in its place. */
 const STACK_MAP: { layer: string; recommended: string; ours: string }[] = [
@@ -85,12 +84,29 @@ export function DocumentSlide() {
   return (
     <Slide
       id="document"
-      eyebrow={PHASE_5}
-      title="Documented, demoed, and the next version planned."
-      lead="Everything a reviewer needs is in the repository, linked from the README."
+      eyebrow="Deliverable 6 · Demo recording"
+      title="Demo: the core AI feature in action."
+      lead="A 2-minute walkthrough of the live app at takatax.netlify.app."
     >
       <div className="grid gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Block title="Phase 5 tasks">
+        <Block title="The 2-minute demo">
+          {/* The video link is added only to the submitted PDF, never to the repository. */}
+          <p
+            data-demo-link
+            className="rounded-[12px] border border-tk-line bg-tk-surface-2 px-4 py-3 font-semibold break-all"
+          >
+            The video link is in the submitted PDF.
+          </p>
+          <Points className="mt-5">
+            <Point title="Sign up and upload.">Receipts, invoices and a COR, photos or PDFs.</Point>
+            <Point title="AI reads them.">
+              Live progress for each document, the fast model first, then the checks.
+            </Point>
+            <Point title="Please check.">The few unsure fields, corrected in a form.</Point>
+            <Point title="The figures.">Tracker, deadlines and the return figures.</Point>
+          </Points>
+        </Block>
+        <Block title="Also done">
           <Checklist
             items={[
               {
@@ -99,36 +115,42 @@ export function DocumentSlide() {
                 note: "The problem, the AI feature, the stack, how to run it, secrets, CI/CD and monitoring.",
               },
               {
-                task: "2-minute demo",
-                status: "Done",
-                note: "Upload, AI reading with live progress, Please check, and the tax figures, on the live site.",
-              },
-              {
-                task: "1-page reflection",
-                status: "Done",
-                note: "docs/REFLECTION.md: what worked, what was hard, what I would change.",
-              },
-              {
                 task: "A GitHub issue for v2",
                 status: "Done",
                 note: "Issue #44: VAT returns (2550Q) for businesses that pass ₱3M in sales.",
               },
+              {
+                task: "No secrets exposed",
+                status: "Done",
+                note: "Every commit scanned for keys before the repository went public; none found.",
+              },
             ]}
           />
         </Block>
-        <Block title="Before submission">
-          <Points>
-            <Point title="The live URL works in a private window.">takatax.netlify.app</Point>
-            <Point title="The repository is public.">github.com/marvin-mvm/takatax</Point>
-            <Point title="No secrets exposed.">
-              Every commit scanned for keys before going public; none found.
-            </Point>
-            <Point title="Spec and rules in the repo.">
-              spec.md, AGENTS.md, CLAUDE.md and .cursorrules.
-            </Point>
-            <Point title="Demo and reflection linked.">From the README and the submission.</Point>
-          </Points>
-        </Block>
+      </div>
+    </Slide>
+  );
+}
+
+const REFLECTION = [
+  "The whole process of creating the AI-powered web app is not the most difficult part; instead, the idea validation, finding the right target audience and having measured data to back up the existence of the web app itself is the most challenging part for me.",
+  "Anyone can create a web app now using LLMs and cloud services, but it could be a 'toy' app. To justify its existence, the data from the PRD and idea validation and the target market dictate whether it is a viable app to spend time on and even to market to the public.",
+  "I think we are in a time where the tools have already caught up to the business ideas that we thought before were expensive and labor-consuming things to do. We normally spent a lot of money just to get to a working prototype before generative coding existed.",
+  "With coding agents, we can ship web or SaaS products quickly, but the content and the service type will still rely on humans and real-world validation.",
+];
+
+export function ReflectionSlide() {
+  return (
+    <Slide
+      id="reflection"
+      eyebrow="Deliverable 7 · Reflection"
+      title="Reflection"
+      lead="Also in the repository: docs/07-reflection.md."
+    >
+      <div className="flex max-w-[72ch] flex-col gap-4 text-lg/8 text-pretty">
+        {REFLECTION.map((paragraph) => (
+          <p key={paragraph.slice(0, 24)}>{paragraph}</p>
+        ))}
       </div>
     </Slide>
   );

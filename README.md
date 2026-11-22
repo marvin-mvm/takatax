@@ -10,7 +10,7 @@ invited into an account, and a community answers tax questions.
 
 - **Submission index (every deliverable, with links):** [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
 - **Live app:** https://takatax.netlify.app
-- **Pitch deck** (validation, PRD, what-if model, architecture, build): https://takatax.netlify.app/deck ([PDF](docs/Takatax-submission.pdf))
+- **Pitch deck** (validation, PRD, what-if model, architecture, build): https://takatax.netlify.app/deck
 - **Validation report:** [`docs/01-idea-validation-report.md`](docs/01-idea-validation-report.md) ·
   **PRD:** [`docs/02-PRD.md`](docs/02-PRD.md) · **Spec:** [`spec.md`](spec.md) ·
   **Architecture:** [`docs/03-architecture-notes.md`](docs/03-architecture-notes.md) ·
