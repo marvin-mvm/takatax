@@ -17,6 +17,7 @@ import {
   StackSlide,
   WorkflowSlide,
 } from "./slides-spec";
+import { DeploySlide, DocumentSlide } from "./slides-ship";
 import {
   CompetitorsSlide,
   CoverSlide,
@@ -56,6 +57,8 @@ const SLIDES: SlideEntry[] = [
   { id: "workflow", Component: WorkflowSlide },
   { id: "design", Component: DesignSlide },
   { id: "build", section: "Build", Component: BuildSlide },
+  { id: "deploy", section: "Ship", Component: DeploySlide },
+  { id: "document", Component: DocumentSlide },
   { id: "sources", section: "Sources", Component: SourcesSlide },
 ];
 

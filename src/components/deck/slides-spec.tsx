@@ -213,7 +213,7 @@ const STACK: { layer: string; choice: string }[] = [
   { layer: "Hosting", choice: "Netlify, deployed from the main branch" },
 ];
 
-type Status = "Done" | "Drafted" | "In progress" | "Next";
+export type Status = "Done" | "Drafted" | "In progress" | "Next";
 
 const statusTone: Record<Status, "brand" | "warn" | "neutral"> = {
   Done: "brand",
@@ -222,7 +222,7 @@ const statusTone: Record<Status, "brand" | "warn" | "neutral"> = {
   Next: "neutral",
 };
 
-function Checklist({ items }: { items: { task: string; status: Status; note: string }[] }) {
+export function Checklist({ items }: { items: { task: string; status: Status; note: string }[] }) {
   return (
     <ul className="flex flex-col">
       {items.map((item) => (
@@ -281,7 +281,11 @@ export function StackSlide() {
                 status: "Done",
                 note: "Project rules for AI coding tools, in the repo.",
               },
-              { task: "CLAUDE.md", status: "Done", note: "The same rules for Claude Code." },
+              {
+                task: "CLAUDE.md and .cursorrules",
+                status: "Done",
+                note: "Claude Code is our AI editor instead of Cursor: CLAUDE.md loads AGENTS.md, and .cursorrules carries the same rules for Cursor users.",
+              },
               {
                 task: "Spec revised after review",
                 status: "Done",
@@ -504,12 +508,12 @@ export function BuildSlide() {
               {
                 task: "At least 5 meaningful commits",
                 status: "Done",
-                note: "Small commits, one change each, through pull requests.",
+                note: "More than 120 commits on main, small and one change each, through pull requests.",
               },
               {
                 task: "At least 3 unit tests",
                 status: "Done",
-                note: "The financial model on this page is unit-tested in CI.",
+                note: "418 unit tests in 42 files (tax engine, reader checks, pricing, the financial model), plus SQL behaviour checks, all run in CI.",
               },
               {
                 task: "Check secrets and input validation",

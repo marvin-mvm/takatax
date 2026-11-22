@@ -70,6 +70,12 @@ export function CoverSlide() {
         <a href="#build" className="rounded-full focus-visible:outline-2">
           <Pill tone="brand">Phase 3 · Build</Pill>
         </a>
+        <a href="#deploy" className="rounded-full focus-visible:outline-2">
+          <Pill tone="brand">Phase 4 · Deploy</Pill>
+        </a>
+        <a href="#document" className="rounded-full focus-visible:outline-2">
+          <Pill tone="brand">Phase 5 · Document and reflect</Pill>
+        </a>
       </div>
     </Slide>
   );
