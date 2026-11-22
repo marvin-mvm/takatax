@@ -28,11 +28,28 @@ function PrdList({ items }: { items: ReactNode[] }) {
   );
 }
 
+/** Each core feature, with the test that says it is done. */
+const FEATURES: [string, string][] = [
+  ["Account from your COR", "Tax types change only after the owner confirms the COR."],
+  ["Upload photos or PDFs", "Pages and price show before upload; blurry photos are flagged."],
+  [
+    "AI reader, confidence per field",
+    "98% of amounts and TINs exact; unsure fields always flagged.",
+  ],
+  ["Please check, for unsure documents", "Under 5% of documents; a fix updates the figures."],
+  [
+    "Tax engine: 1701Q, 2551Q, SAWT",
+    "Matches hand-computed returns; every exclusion has a reason.",
+  ],
+  ["Tracker: deadlines, ₱3M threshold", "Every deadline from the COR's tax types is listed."],
+  ["Invite a bookkeeper", "Nothing visible until they accept; access ends at once on removal."],
+];
+
 export function PrdSlide() {
   return (
     <Slide
       id="prd"
-      eyebrow="Phase 1 · Product requirements"
+      eyebrow="Deliverable 2 · Product requirements document (PRD)"
       title="The one-page PRD"
       lead="Takatax turns photos of a taxpayer's documents into the figures for their BIR returns, line by line, for a pay-per-run fee."
     >
@@ -54,17 +71,14 @@ export function PrdSlide() {
             ]}
           />
         </PrdBlock>
-        <PrdBlock title="Core features">
+        <PrdBlock title="Core features · accepted when">
           <PrdList
-            items={[
-              "Account from your COR, one per TIN, with a free 10-document trial",
-              "Upload photos or PDFs, checked for blur in the browser",
-              "AI reader with per-field confidence and arithmetic checks",
-              "Review screen for the few documents the AI is unsure about",
-              "Tax engine: 1701Q, 2551Q and SAWT, with a reason for every excluded document",
-              "Tracker: deadlines, filed and paid, the ₱3M threshold",
-              "Bookkeeper access you can grant and revoke",
-            ]}
+            items={FEATURES.map(([feature, accept]) => (
+              <>
+                <span className="text-tk-ink">{feature}</span>
+                <span className="block text-[13px]/[19px]">✓ {accept}</span>
+              </>
+            ))}
           />
         </PrdBlock>
         <PrdBlock title="Out of scope">
@@ -160,7 +174,7 @@ export function RevenueSlide() {
   return (
     <Slide
       id="revenue"
-      eyebrow="Phase 1 · Revenue model"
+      eyebrow="Deliverable 2 · PRD: revenue model"
       title="How Takatax makes money"
       lead="Four streams, in this order. The parser comes first. The rest follow the users."
     >
